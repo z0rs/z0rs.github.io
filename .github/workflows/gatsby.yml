@@ -9,22 +9,14 @@ on:
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
-# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
 permissions:
   contents: read
   pages: write
   id-token: write
 
-# Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
-# However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
 concurrency:
   group: "pages"
   cancel-in-progress: false
-
-# Default to bash
-defaults:
-  run:
-    shell: bash
 
 jobs:
   # Build job
@@ -34,10 +26,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
 
+      # Tambahkan langkah instalasi dependensi di sini
+      - name: Install Dependencies
+        run: npm install --legacy-peer-deps # Atau gunakan "yarn install" jika Anda menggunakan Yarn
+
       - name: Setup Node
         uses: actions/setup-node@v2
         with:
-          node-version: "14" # Ganti dengan versi Node yang sesuai
+          node-version: "18"
 
       - name: Setup Pages
         id: pages
@@ -61,6 +57,14 @@ jobs:
         env:
           PREFIX_PATHS: 'true'
         run: npm run build  # Atau gunakan "yarn run build" jika Anda menggunakan Yarn
+
+      # Ganti langkah deployment dengan menggunakan Gatsby Pages Action
+      - name: Deploy to GitHub Pages
+        uses: enriikke/gatsby-gh-pages-action@v2
+        with:
+          access-token: ${{ secrets.GITHUB_TOKEN }}
+          deploy-branch: master # atau sesuaikan dengan nama branch yang ingin Anda gunakan
+          publish-dir: ./public
 
   # Deployment job
   deploy:
