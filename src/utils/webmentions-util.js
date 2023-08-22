@@ -1,7 +1,7 @@
 module.exports = async function() {
   try {
     // const response = await fetch(
-    //   `https://webmention.io/api/mentions.jf2?domain=z0rs.gatsbyjs.io&token=${process.env.WEBMENTION_API_KEY}`
+    //   `https://webmention.io/api/mentions.jf2?domain=z0rs.github.io&token=${process.env.WEBMENTION_API_KEY}`
     // );
 
     const response = await fetch(`https://webmention.io/api/mentions?token=${process.env.WEBMENTION_API_KEY}`);

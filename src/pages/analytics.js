@@ -206,8 +206,8 @@ const Page = ({
           <h2 className="m-0 text-2xl uppercase text-salmon text-center">Latest Webmentions</h2>
           <p className="mt-0 mb-4 text-slate-300 text-base text-center">
             Webmentions feed for{' '}
-            <a href="z0rs.gatsbyjs.io/" target="_blank" rel="noreferrer" className="text-salmon">
-              Partylabs.gatsbyjs.io
+            <a href="z0rs.github.io/" target="_blank" rel="noreferrer" className="text-salmon">
+              z0rs.github.io
             </a>
             .
           </p>

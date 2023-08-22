@@ -14,8 +14,8 @@ export const onRenderBody = ({ setHtmlAttributes, setHeadComponents }) => {
   setHtmlAttributes({ lang: 'en-GB' });
   setHeadComponents([
     <link key="x-icon" rel="icon" type="image/x-icon" href="/images/favicon.ico" />,
-    <link key="webmtion" rel="webmention" href="https://webmention.io/z0rs.gatsbyjs.io/webmention" />,
-    <link key="pingback" rel="pingback" href="https://webmention.io/z0rs.gatsbyjs.io/xmlrpc" />,
+    <link key="webmtion" rel="webmention" href="https://webmention.io/z0rs.github.io/webmention" />,
+    <link key="pingback" rel="pingback" href="https://webmention.io/z0rs.github.io/xmlrpc" />,
     <link
       key="16x16"
       rel="icon"

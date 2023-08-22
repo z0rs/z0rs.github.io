@@ -1,4 +1,4 @@
 # Eno Leriand
 
-- [z0rs.gatsbyjs.io](https://z0rs.gatsbyjs.io/)
+- [z0rs.github.io](https://z0rs.github.io/)
 
