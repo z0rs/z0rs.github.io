@@ -59,7 +59,7 @@ const Page = ({
             <TableOfContents slug={slug} items={toc} />
           </div>
         ) : null}
-        <WebmentionAside target={`https://z0rs.gatsbyjs.io${slug}`} />
+        <WebmentionAside target={`https://z0rs.github.io${slug}`} />
       </AsideElement>
     </Fragment>
   );
