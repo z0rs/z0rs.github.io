@@ -57,7 +57,12 @@ jobs:
         env:
           PREFIX_PATHS: 'true'
         run: npm run build  # Atau gunakan "yarn run build" jika Anda menggunakan Yarn
-        
+
+      # Tambahkan langkah untuk menghapus direktori "public" sebelum mengunggah ulang
+      - name: Remove existing "public" directory
+        run: rm -rf ./public
+
+      # Langkah upload artifact yang baru dibangun
       - name: Upload artifact
         uses: actions/upload-artifact@v2
         with:
