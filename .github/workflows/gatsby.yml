@@ -57,6 +57,12 @@ jobs:
         env:
           PREFIX_PATHS: 'true'
         run: npm run build  # Atau gunakan "yarn run build" jika Anda menggunakan Yarn
+        
+      - name: Upload artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: public
+          path: ./public
 
       # Ganti langkah deployment dengan menggunakan Gatsby Pages Action
       - name: Deploy to GitHub Pages
