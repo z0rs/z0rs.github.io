@@ -1,0 +1,736 @@
+---
+type: article
+title: Security Posture Assessment
+tags: [Identify, Detect]
+date: 2023-06-01
+author: Eno Leriand
+featuredImage: https://www.cimcor.com/hubfs/Cybersecurity%20Lifecycle.jpg
+---
+
+## Executive Summary
+In this report, we provide an overview of the security posture of the target system, detailing findings and their respective severities. The assessment is based on a comprehensive analysis of potential vulnerabilities and risks using the CVSS 3.0 and 3.1 scoring frameworks. Each finding is described along with its associated risk score and recommendations for remediation.
+
+## Scope and Methodology
+
+The security assessment focused on evaluating vulnerabilities within the target system's web application component. This included an examination of the application's source code, configurations, and user interactions. The assessment also encompassed the underlying infrastructure, database, and session management mechanisms. However, it's important to note that the assessment did not cover the network perimeter, physical security, or external dependencies outside the scope of the application.
+
+1. **Reconnaissance:** Gathered information about the target system, including technologies, frameworks, and application endpoints.
+2. **Vulnerability Identification:** Utilized automated scanning tools and manual testing techniques to identify potential vulnerabilities.
+3. **Vulnerability Verification:** Conducted further manual testing to validate and confirm the identified vulnerabilities.
+4. **Risk Assessment:** Evaluated the impact and exploitability of each vulnerability using the CVSS 3.0 and 3.1 scoring frameworks.
+5. **Remediation Recommendations:** Provided actionable recommendations for fixing identified vulnerabilities, following best practices and security guidelines.
+
+
+## List of Findings and Severity:
+
+| Finding                         | Severity  |
+|---------------------------------|-----------|
+| SQL Injection                   | High      |
+| Cross-Site Scripting (XSS)      | Medium    |
+| Insecure Auth. & Session Mgmt.  | Critical  |
+| Directory traversal             | High      |
+| OS command injection            | Critical  |
+| Business logic                  | High      |
+| Information Disclosure          | Medium    |
+| Access Control                  | High      |
+| File Upload                     | Critical  |
+| Race conditions                 | Medium    |
+| Server-side request forgery     | High      |
+| XML External Entity             | High      |
+| Cross-site request forgery      | Medium    |
+| Cross-origin resource sharing   | Medium    |
+| Clickjacking (UI redressing)    | Medium    |
+| DOM-based                       | High      |
+| WebSockets                      | Medium    |
+| GraphQL API                     | High      |
+| Server-side template injection  | High      |
+| Web cache poisoning             | High      |
+| HTTP Host header attacks        | Medium    |
+| HTTP request smuggling          | High      |
+| OAuth 2.0 authentication        | High      |
+| Prototype pollution             | High      |
+| JWT attacks                     | High      |
+
+## Details for Each Finding:
+
+#### SQL Injection
+The SQL Injection vulnerability discovered in the target system arises from improper input validation in user-provided data. Attackers can exploit this vulnerability to execute malicious SQL queries, potentially gaining unauthorized access to the database or altering data. The absence of input sanitization exposes the application to this risk.
+
+**Proof of Concept (PoC):**
+1. Input: `'; DROP TABLE users; --`
+2. Resulting Query: `SELECT * FROM products WHERE name = ''; DROP TABLE users; --'`
+
+![SQL Injection Example](https://res.cloudinary.com/z0rs/image/upload/v1692558927/sql-injection_vppvat.svg)
+
+**References:**
+- [OWASP SQL Injection](https://owasp.org/www-community/attacks/SQL_Injection)
+- [CWE-89: Improper Neutralization of Special Elements used in an SQL Command ('SQL Injection')](https://cwe.mitre.org/data/definitions/89.html)
+
+**Risk/Severity Scoring:**
+- CVSS Base Score: 8.5 (High)
+- CVSS Vector: CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H
+
+**Remediation/Fixing Recommendation:**
+1. Implement strict input validation and parameterized queries.
+2. Use prepared statements to prevent SQL injection attacks.
+3. Regularly update the application and underlying libraries to ensure security patches are applied.
+
+---
+
+#### Cross-Site Scripting (XSS)
+The Cross-Site Scripting vulnerability in the target system allows attackers to inject malicious scripts into web pages viewed by other users. This can lead to the theft of sensitive information, session hijacking, or distribution of malware. The vulnerability stems from inadequate input sanitization in user-generated content.
+
+**Proof of Concept (PoC):**
+1. Input: `<script>alert('XSS Attack');</script>`
+2. Result: Display of a JavaScript alert on the victim's browser.
+
+![XSS Example](https://res.cloudinary.com/z0rs/image/upload/v1692559312/cross-site-scripting_sbeago.svg)
+
+**References:**
+- [OWASP XSS](https://owasp.org/www-project-top-ten/OWASP_Top_Ten_2017/Top_10-2017_A3-Cross-Site_Scripting_(XSS))
+- [CWE-87: Improper Neutralization of Alternate XSS Syntax](https://cwe.mitre.org/data/definitions/87.html)
+
+**Risk/Severity Scoring:**
+- CVSS Base Score: 6.3 (Medium)
+- CVSS Vector: CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N
+
+**Remediation/Fixing Recommendation:**
+1. Employ output encoding when rendering user-generated content.
+2. Implement Content Security Policy (CSP) to mitigate XSS attacks.
+3. Regularly audit and sanitize user inputs to prevent script injection.
+
+---
+
+#### Insecure Auth. & Session Management
+The Insecure Authentication and Session Management vulnerability pose a critical risk to the target system's security. Insufficient enforcement of authentication controls and weak session management allow attackers to gain unauthorized access to user accounts, leading to data breaches and privacy violations.
+
+**Proof of Concept (PoC):**
+1. Attacker: Exploits weak session management to gain unauthorized access to another user's account.
+2. Steps:
+   - Attacker logs into the application with their credentials.
+   - Attacker captures the session token generated upon successful authentication.
+   - Attacker sends the captured session token to a victim user via a crafted link.
+   - Victim user clicks the link and unknowingly shares their session token.
+   - Attacker uses the stolen session token to access the victim user's account.
+
+![Session Management Example](https://res.cloudinary.com/z0rs/image/upload/v1692559399/password-reset-poisoning_drgqud.svg)
+
+**References:**
+- [OWASP Broken Authentication](https://owasp.org/API-Security/editions/2023/en/0xa2-broken-authentication/)
+- [CWE-287: Improper Authentication](https://cwe.mitre.org/data/definitions/287.html)
+
+**Risk/Severity Scoring:**
+- CVSS Base Score: 9.8 (Critical)
+- CVSS Vector: CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H
+
+**Remediation/Fixing Recommendation:**
+1. Implement strong authentication mechanisms (e.g., multi-factor authentication).
+2. Store session tokens securely and set proper expiration periods.
+3. Regularly audit and monitor authentication and session management processes.
+
+---
+
+#### Directory Traversal
+The Directory Traversal vulnerability allows attackers to navigate beyond the intended directory structure and access sensitive files or directories on the target system. Insufficient input validation and sanitization of user-provided data are common causes of this vulnerability.
+
+**Proof of Concept (PoC):**
+1. Attacker: Exploits the directory traversal vulnerability to access a sensitive configuration file.
+2. Steps:
+   - Attacker provides a crafted input, such as `../../../etc/passwd`.
+   - Application improperly processes the input, leading to the traversal.
+   - Attacker gains access to the `/etc/passwd` file and extracts sensitive information.
+
+![Directory Traversal Example](https://res.cloudinary.com/z0rs/image/upload/v1692559427/directory-traversal_izwfp4.svg)
+
+**References:**
+- [OWASP Directory Traversal](https://owasp.org/www-community/attacks/Path_Traversal)
+- [CWE-23: Relative Path Traversal](https://cwe.mitre.org/data/definitions/23.html)
+
+**Risk/Severity Scoring:**
+- CVSS Base Score: 7.2 (High)
+- CVSS Vector: CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:H/I:H/A:H
+
+**Remediation/Fixing Recommendation:**
+1. Implement strict input validation and filtering for user-provided data.
+2. Use whitelisting to restrict file paths and prevent directory traversal attacks.
+3. Keep sensitive files outside the web root directory to limit exposure.
+
+---
+
+#### Command Injection
+The Command Injection vulnerability arises when user-supplied data is executed as a command without proper validation. Attackers can exploit this vulnerability to execute arbitrary commands on the target system, potentially leading to remote code execution.
+
+**Proof of Concept (PoC):**
+1. Attacker: Exploits the command injection vulnerability to execute arbitrary commands.
+2. Steps:
+   - Attacker provides a malicious input, such as `; ls -la`.
+   - Application appends the input to a command without proper validation.
+   - Attacker gains the ability to execute the `ls -la` command on the server.
+
+![Command Injection Example](https://res.cloudinary.com/z0rs/image/upload/v1692559460/os-command-injection_elug4t.svg)
+
+**References:**
+- [OWASP Command Injection](https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/07-Input_Validation_Testing/12-Testing_for_Command_Injection)
+- [CWE-78: Improper Neutralization of Special Elements used in an OS Command ('OS Command Injection')](https://cwe.mitre.org/data/definitions/78.html)
+
+**Risk/Severity Scoring:**
+- CVSS Base Score: 9.0 (Critical)
+- CVSS Vector: CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:H/I:H/A:H
+
+**Remediation/Fixing Recommendation:**
+1. Avoid using user inputs directly in commands.
+2. Implement input validation and sanitization to prevent command injection.
+3. Use security mechanisms like Web Application Firewalls (WAF) to detect and block malicious inputs.
+
+---
+
+#### Business Logic
+Business Logic Vulnerabilities involve flaws in the design or implementation of the application's logic. Attackers exploit these vulnerabilities to bypass intended restrictions, manipulate transactions, or gain unauthorized access to resources.
+
+**Proof of Concept (PoC):**
+1. Attacker: Exploits a business logic vulnerability to escalate privileges.
+2. Steps:
+   - Attacker identifies a scenario where a user should have limited access.
+   - Attacker manipulates parameters or actions to gain unauthorized access.
+   - Attacker gains access to sensitive functionality, such as administrative controls.
+
+![Business Logic Example](https://res.cloudinary.com/z0rs/image/upload/v1692559494/logic-flaws_dblll2.jpg)
+
+**References:**
+- [OWASP Business Logic Vulnerabilities](https://owasp.org/www-pdf-archive/2008.07.17.OWASP.ppt.pdf)
+- [CWE-841: Improper Enforcement of Behavioral Workflow](https://cwe.mitre.org/data/definitions/841.html)
+
+**Risk/Severity Scoring:**
+- CVSS Base Score: 7.5 (High)
+- CVSS Vector: CVSS:3.1/AV:N/AC:H/PR:N/UI:R/S:C/C:H/I:H/A:H
+
+**Remediation/Fixing Recommendation:**
+1. Review and validate business logic flows for potential vulnerabilities.
+2. Implement access controls and authorization checks consistently.
+3. Use threat modeling to identify and address business logic vulnerabilities.
+
+#### Information Disclosure
+The Information Disclosure vulnerability exposes sensitive information, such as system details, error messages, or confidential data, to unauthorized users. Inadequate error handling and improper data protection contribute to this vulnerability.
+
+**Proof of Concept (PoC):**
+1. Attacker: Exploits an information disclosure vulnerability to obtain sensitive server details.
+2. Steps:
+   - Attacker intentionally triggers an error condition on the application.
+   - Application responds with a verbose error message containing server information.
+   - Attacker gains insights into the server's technology stack and configuration.
+
+![Information Disclosure Example](https://res.cloudinary.com/z0rs/image/upload/v1692559530/information-disclosure_gll4eq.jpg)
+
+**References:**
+- [OWASP Information Disclosure](https://owasp.org/www-project-top-ten/2017/A3_2017-Sensitive_Data_Exposure)
+- [CWE-497: Exposure of Sensitive System Information to an Unauthorized Control Sphere](https://cwe.mitre.org/data/definitions/497.html)
+
+**Risk/Severity Scoring:**
+- CVSS Base Score: 5.0 (Medium)
+- CVSS Vector: CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:N/A:N
+
+**Remediation/Fixing Recommendation:**
+1. Implement proper error handling to avoid revealing sensitive information.
+2. Configure security headers to restrict information leakage in responses.
+3. Regularly review and update error handling mechanisms.
+
+---
+
+#### Access Control
+Access Control vulnerabilities occur when improper restrictions or validations allow unauthorized users to access restricted functionality or data. Flaws in authorization mechanisms contribute to this vulnerability.
+
+**Proof of Concept (PoC):**
+1. Attacker: Exploits an access control vulnerability to access a privileged function.
+2. Steps:
+   - Attacker crafts a request to access a privileged endpoint, bypassing authorization.
+   - Application fails to enforce proper access controls, allowing the attacker to proceed.
+   - Attacker gains unauthorized access to administrative functions.
+
+![Access Control Example](https://res.cloudinary.com/z0rs/image/upload/v1692559555/access-control_ezk4mu.svg)
+
+**References:**
+- [OWASP Access Control](https://owasp.org/Top10/A01_2021-Broken_Access_Control/)
+- [CWE-1262: Improper Access Control for Register Interface](https://cwe.mitre.org/data/definitions/1262.html)
+
+**Risk/Severity Scoring:**
+- CVSS Base Score: 8.2 (High)
+- CVSS Vector: CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:H/I:H/A:H
+
+**Remediation/Fixing Recommendation:**
+1. Implement robust access controls based on roles and permissions.
+2. Conduct thorough authorization testing to ensure proper enforcement.
+3. Regularly review and update access control configurations.
+
+---
+
+#### File Upload
+File Upload vulnerabilities arise when inadequate validation and improper handling of user-uploaded files allow attackers to upload malicious files. This can lead to remote code execution, denial of service, or unauthorized data access.
+
+**Proof of Concept (PoC):**
+1. Attacker: Exploits a file upload vulnerability to upload and execute a malicious script.
+2. Steps:
+   - Attacker crafts a malicious file with executable code (e.g., PHP shell).
+   - Attacker uploads the malicious file to the application.
+   - Application fails to properly validate the file and stores it in a publicly accessible location.
+   - Attacker accesses the malicious file and gains remote code execution.
+
+![File Upload Example](https://res.cloudinary.com/z0rs/image/upload/v1692559580/file-upload-vulnerabilities_w3cbxf.jpg)
+
+**References:**
+- [OWASP File Upload](https://owasp.org/www-community/vulnerabilities/Unrestricted_File_Upload)
+- [CWE-434: Unrestricted Upload of File with Dangerous Type](https://cwe.mitre.org/data/definitions/434.html)
+
+**Risk/Severity Scoring:**
+- CVSS Base Score: 9.5 (Critical)
+- CVSS Vector: CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:U/C:H/I:H/A:H
+
+**Remediation/Fixing Recommendation:**
+1. Implement strict file type validation and content inspection.
+2. Store uploaded files in a secure and non-executable location.
+3. Use server-side mechanisms to prevent execution of uploaded files.
+---
+
+### Race Conditions
+Race Conditions vulnerabilities occur when multiple threads or processes compete to access shared resources simultaneously. Attackers exploit these vulnerabilities to manipulate the timing of operations and gain unauthorized access or privileges.
+
+**Proof of Concept (PoC):**
+1. Attacker: Exploits a race conditions vulnerability to gain unauthorized access to a privileged operation.
+2. Steps:
+   - Attacker initiates multiple parallel requests targeting the same resource.
+   - Application's race condition leads to improper synchronization and timing issues.
+   - Attacker's request is processed inappropriately, granting unauthorized access.
+
+![Race Conditions Example](https://res.cloudinary.com/z0rs/image/upload/v1692559608/race-conditions-main-graphic_xctq1v.png)
+
+**References:**
+- [OWASP Race Conditions](https://owasp.org/www-project-web-security-testing-guide/v42/4-Web_Application_Security_Testing/06-Session_Management_Testing/08-Testing_for_Session_Puzzling)
+- [CWE-366: Race Condition within a Thread](https://cwe.mitre.org/data/definitions/366.html)
+
+**Risk/Severity Scoring:**
+- CVSS Base Score: 6.8 (Medium)
+- CVSS Vector: CVSS:3.1/AV:N/AC:L/PR:H/UI:N/S:C/C:H/I:H/A:N
+
+**Remediation/Fixing Recommendation:**
+1. Implement proper synchronization and locking mechanisms.
+2. Avoid using shared resources without proper safeguards.
+3. Regularly audit and monitor the application for race conditions.
+
+---
+
+### Server-side Request Forgery (SSRF)
+Server-side Request Forgery (SSRF) vulnerabilities allow attackers to make arbitrary requests from the server to external resources. Attackers exploit this vulnerability to perform port scanning, interact with internal systems, and leak sensitive data.
+
+**Proof of Concept (PoC):**
+1. Attacker: Exploits an SSRF vulnerability to access an internal network resource.
+2. Steps:
+   - Attacker provides a crafted URL pointing to an internal resource.
+   - Application's SSRF vulnerability allows the attacker's request to be executed.
+   - Attacker receives sensitive information from the internal resource.
+
+![SSRF Example](https://res.cloudinary.com/z0rs/image/upload/v1692559658/server-side_20request_20forgery_tpa4fm.svg)
+
+**References:**
+- [OWASP Server-side Request Forgery (SSRF)](https://owasp.org/Top10/A10_2021-Server-Side_Request_Forgery_%28SSRF%29/)
+- [CWE-918: Server-Side Request Forgery (SSRF)](https://cwe.mitre.org/data/definitions/918.html)
+
+**Risk/Severity Scoring:**
+- CVSS Base Score: 7.5 (High)
+- CVSS Vector: CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:U/C:H/I:H/A:H
+
+**Remediation/Fixing Recommendation:**
+1. Implement input validation and whitelist-based URL filtering.
+2. Limit server requests to trusted and safe resources.
+3. Implement network-level controls to prevent internal network exposure.
+
+---
+
+#### XML External Entity (XXE)
+XML External Entity (XXE) vulnerabilities occur when an application processes XML input without proper validation. Attackers exploit these vulnerabilities to read files, perform internal port scanning, or launch denial of service attacks.
+
+**Proof of Concept (PoC):**
+1. Attacker: Exploits an XXE vulnerability to access sensitive data from the server.
+2. Steps:
+   - Attacker crafts a malicious XML input containing an external entity reference.
+   - Application processes the XML input and includes the external entity.
+   - Attacker receives the content of a sensitive file in the response.
+
+![XXE Example](https://res.cloudinary.com/z0rs/image/upload/v1692559691/xxe-injection_wm4zle.svg)
+
+**References:**
+- [OWASP XML External Entity (XXE)](https://owasp.org/www-community/vulnerabilities/XML_External_Entity_(XXE)_Processing)
+- [CWE-611: Improper Restriction of XML External Entity Reference](https://cwe.mitre.org/data/definitions/611.html)
+
+**Risk/Severity Scoring:**
+- CVSS Base Score: 8.2 (High)
+- CVSS Vector: CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:U/C:H/I:H/A:H
+
+**Remediation/Fixing Recommendation:**
+1. Disable external entity processing in XML parsers.
+2. Use safe and validated parsers that block external entity references.
+3. Regularly update XML parsers and libraries to the latest secure versions.
+---
+
+### Cross-site Request Forgery (CSRF)
+Cross-site Request Forgery (CSRF) vulnerabilities allow attackers to trick users into performing unintended actions on a web application. Attackers exploit this vulnerability to manipulate user sessions and execute actions on behalf of the victim.
+
+**Proof of Concept (PoC):**
+1. Attacker: Exploits a CSRF vulnerability to change the victim user's account password.
+2. Steps:
+   - Attacker crafts a malicious web page that contains a hidden form to change the password.
+   - Victim user, logged into the target application, visits the attacker's page.
+   - The hidden form is submitted on the victim's behalf, changing their password.
+
+![CSRF Example](https://res.cloudinary.com/z0rs/image/upload/v1692559719/cross-site_20request_20forgery_col5j6.svg)
+
+**References:**
+- [OWASP Cross-site Request Forgery (CSRF)](https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/06-Session_Management_Testing/05-Testing_for_Cross_Site_Request_Forgery)
+- [CWE-352: Cross-Site Request Forgery (CSRF)](https://cwe.mitre.org/data/definitions/352.html)
+
+**Risk/Severity Scoring:**
+- CVSS Base Score: 6.1 (Medium)
+- CVSS Vector: CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N
+
+**Remediation/Fixing Recommendation:**
+1. Implement anti-CSRF tokens to validate user actions.
+2. Ensure that critical actions require user confirmation and authorization.
+3. Regularly review and update CSRF protections.
+
+---
+
+#### Cross-Origin Resource Sharing (CORS)
+Cross-Origin Resource Sharing (CORS) vulnerabilities occur when an application does not properly control which origins can access its resources. Attackers exploit this vulnerability to perform unauthorized cross-origin requests and access sensitive data.
+
+**Proof of Concept (PoC):**
+1. Attacker: Exploits a CORS vulnerability to steal sensitive data from another domain.
+2. Steps:
+   - Attacker hosts a malicious website on domain "evil.com."
+   - Victim visits a legitimate website on domain "victim.com" that is vulnerable to CORS.
+   - Attacker's website sends a cross-origin request to "victim.com" and steals data.
+
+![CORS Example](https://res.cloudinary.com/z0rs/image/upload/v1692559744/attack-on-cors_bjyrzw.svg)
+
+**References:**
+- [OWASP Cross-Origin Resource Sharing (CORS)](https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/11-Client-side_Testing/07-Testing_Cross_Origin_Resource_Sharing)
+- [CWE-942: Permissive Cross-domain Policy with Untrusted Domains](https://cwe.mitre.org/data/definitions/942.html)
+
+**Risk/Severity Scoring:**
+- CVSS Base Score: 4.3 (Medium)
+- CVSS Vector: CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N
+
+**Remediation/Fixing Recommendation:**
+1. Implement proper CORS headers to restrict allowed origins.
+2. Use whitelisting to control which origins can access sensitive resources.
+3. Regularly review and update CORS configurations.
+
+---
+
+### Clickjacking (UI Redressing)
+Clickjacking vulnerabilities occur when attackers overlay or deceive users into interacting with hidden or opaque elements on a web page. Attackers exploit this vulnerability to trick users into performing actions without their consent.
+
+**Proof of Concept (PoC):**
+1. Attacker: Exploits a clickjacking vulnerability to trick a user into performing an unintended action.
+2. Steps:
+   - Attacker creates an invisible iframe and positions it over a button on a legitimate site.
+   - Victim user visits the legitimate site and clicks the seemingly visible button.
+   - In reality, the user clicks the attacker's hidden iframe, performing an unwanted action.
+
+![Clickjacking Example](https://res.cloudinary.com/z0rs/image/upload/v1692559777/clickjacking-infographic_qbaqza.svg)
+
+**References:**
+- [OWASP Clickjacking (UI Redressing)](https://owasp.org/www-project-web-security-testing-guide/v41/4-Web_Application_Security_Testing/11-Client_Side_Testing/09-Testing_for_Clickjacking)
+- [CWE-1021: Improper Restriction of Rendered UI Layers or Frames](https://cwe.mitre.org/data/definitions/1021.html)
+- [CAPEC-103: Clickjacking](https://capec.mitre.org/data/definitions/103.html)
+
+**Risk/Severity Scoring:**
+- CVSS Base Score: 4.7 (Medium)
+- CVSS Vector: CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:N/I:H/A:N
+
+**Remediation/Fixing Recommendation:**
+1. Implement frame-busting techniques to prevent clickjacking.
+2. Use the X-Frame-Options header or Content Security Policy (CSP) to restrict framing.
+3. Educate users to be cautious while interacting with embedded content.
+---
+
+#### DOM-based Cross-Site Scripting (XSS)
+DOM-based Cross-Site Scripting (XSS) vulnerabilities occur when untrusted data is used to manipulate the Document Object Model (DOM) in a web page. Attackers exploit this vulnerability to execute malicious scripts within the victim's browser.
+
+
+**Proof of Concept (PoC):**
+1. Attacker: Exploits a DOM-based XSS vulnerability to execute a script on the victim's browser.
+2. Steps:
+   - Attacker crafts a URL with a payload that modifies the DOM on the victim's browser.
+   - Victim user clicks the malicious link and the payload executes in their browser.
+
+![DOM-based XSS Example](https://res.cloudinary.com/z0rs/image/upload/v1692559805/e42e512e-e8df-4a0b-be92-17dd33c760e6_qrgqel.png)
+
+**References:**
+- [OWASP DOM-based Cross-Site Scripting (XSS)](https://owasp.org/www-project-web-security-testing-guide/v41/4-Web_Application_Security_Testing/11-Client_Side_Testing/01-Testing_for_DOM-based_Cross_Site_Scripting)
+- [CWE-79: Improper Neutralization of Input During Web Page Generation ('Cross-site Scripting')](https://cwe.mitre.org/data/definitions/79.html)
+- [CAPEC-588: DOM-Based XSS](https://capec.mitre.org/data/definitions/588.html#:~:text=This%20type%20of%20attack%20is,Document%20Object%20Model%20(DOM))
+
+**Risk/Severity Scoring:**
+- CVSS Base Score: 6.5 (Medium)
+- CVSS Vector: CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N
+
+**Remediation/Fixing Recommendation:**
+1. Use context-aware output encoding when inserting data into the DOM.
+2. Implement Content Security Policy (CSP) to mitigate XSS attacks.
+3. Regularly audit and sanitize user inputs to prevent script injection.
+
+---
+
+#### WebSockets
+WebSockets Security vulnerabilities occur when improper validation and authorization checks are applied to WebSocket connections. Attackers exploit this vulnerability to perform attacks such as data leakage or unauthorized access.
+
+**Proof of Concept (PoC):**
+1. Attacker: Exploits a WebSockets Security vulnerability to perform unauthorized actions.
+2. Steps:
+   - Attacker establishes a WebSocket connection to the target application.
+   - Application fails to enforce proper authorization and access controls.
+   - Attacker sends messages that trigger unauthorized actions on the server.
+
+![WebSockets Example](https://res.cloudinary.com/z0rs/image/upload/v1692559835/websockets_koiupa.svg)
+
+**References:**
+- [OWASP WebSockets Security](https://owasp.org/www-project-web-security-testing-guide/v41/4-Web_Application_Security_Testing/11-Client_Side_Testing/10-Testing_WebSockets)
+- [CWE-1385: Missing Origin Validation in WebSockets](https://cwe.mitre.org/data/definitions/1385.html)
+
+**Risk/Severity Scoring:**
+- CVSS Base Score: 7.8 (High)
+- CVSS Vector: CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:H/I:H/A:H
+
+**Remediation/Fixing Recommendation:**
+1. Implement strong authentication and authorization mechanisms for WebSocket connections.
+2. Regularly monitor WebSocket traffic and apply access controls.
+3. Keep WebSocket libraries and components up-to-date with security patches.
+---
+
+#### GraphQL API
+GraphQL API vulnerabilities arise from improper access controls, query validation, and data exposure in GraphQL endpoints. Attackers exploit these vulnerabilities to execute arbitrary queries, perform data enumeration, or escalate privileges.
+
+**Proof of Concept (PoC):**
+1. Attacker: Exploits a GraphQL API vulnerability to retrieve unauthorized data.
+2. Steps:
+   - Attacker crafts a malicious GraphQL query to access sensitive data.
+   - Application fails to enforce proper authorization and query validation.
+   - Attacker successfully extracts sensitive user information.
+
+![GraphQL API Example](https://res.cloudinary.com/z0rs/image/upload/v1692559861/graphql-graphic_t64ynq.png)
+
+**References:**
+- [OWASP GraphQL Security](https://cheatsheetseries.owasp.org/cheatsheets/GraphQL_Cheat_Sheet.html)
+- [CWE-200: Exposure of Sensitive Information to an Unauthorized Actor](https://cwe.mitre.org/data/definitions/200.html)
+
+**Risk/Severity Scoring:**
+- CVSS Base Score: 8.0 (High)
+- CVSS Vector: CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:U/C:H/I:H/A:H
+
+**Remediation/Fixing Recommendation:**
+1. Implement proper access controls and authentication mechanisms for GraphQL APIs.
+2. Validate and sanitize user inputs in GraphQL queries.
+3. Regularly review and update GraphQL schema and query validation.
+
+---
+
+#### Server-side Template Injection (SSTI)
+Server-side Template Injection (SSTI) vulnerabilities occur when user inputs are embedded directly into templates processed on the server. Attackers exploit this vulnerability to execute arbitrary code and gain unauthorized access.
+
+**Proof of Concept (PoC):**
+1. Attacker: Exploits an SSTI vulnerability to execute arbitrary code on the server.
+2. Steps:
+   - Attacker injects a payload into a template variable.
+   - Application processes the template and evaluates the payload as code.
+   - Attacker's payload executes arbitrary code on the server.
+
+![SSTI Example](https://res.cloudinary.com/z0rs/image/upload/v1692559892/template-decision-tree_o1qifh.png)
+
+**References:**
+- [OWASP Server-side Template Injection (SSTI)](https://owasp.org/www-project-web-security-testing-guide/v41/4-Web_Application_Security_Testing/07-Input_Validation_Testing/18-Testing_for_Server_Side_Template_Injection)
+- [CWE-1336: Improper Neutralization of Special Elements Used in a Template Engine](https://cwe.mitre.org/data/definitions/1336.html)
+
+**Risk/Severity Scoring:**
+- CVSS Base Score: 8.8 (High)
+- CVSS Vector: CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:H/I:H/A:H
+
+**Remediation/Fixing Recommendation:**
+1. Avoid interpolating user inputs directly into templates.
+2. Use safe template engines that automatically escape user inputs.
+3. Regularly update template engines to the latest secure versions.
+
+---
+
+#### Web Cache Poisoning
+Web Cache Poisoning vulnerabilities occur when malicious content is cached and served to unsuspecting users. Attackers exploit this vulnerability to serve malicious content, manipulate user sessions, or launch phishing attacks.
+
+**Proof of Concept (PoC):**
+1. Attacker: Exploits a web cache poisoning vulnerability to serve malicious content.
+2. Steps:
+   - Attacker injects a payload into a request parameter or URL.
+   - Application fails to validate or sanitize the input, causing caching of the malicious content.
+   - Future users visiting the cached page are exposed to the attacker's payload.
+
+![Web Cache Poisoning Example](https://res.cloudinary.com/z0rs/image/upload/v1692560207/caching_vmhbch.svg)
+
+**References:**
+- [OWASP Web Cache Poisoning](https://owasp.org/www-community/attacks/Cache_Poisoning)
+- [CWE-444: Inconsistent Interpretation of HTTP Requests](https://cwe.mitre.org/data/definitions/444.html)
+
+**Risk/Severity Scoring:**
+- CVSS Base Score: 7.2 (High)
+- CVSS Vector: CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:H/I:H/A:H
+
+**Remediation/Fixing Recommendation:**
+1. Validate and sanitize user inputs before processing and caching.
+2. Set proper caching headers and strategies to minimize cache poisoning risks.
+3. Regularly review and clear cached content to prevent exposure to malicious payloads.
+---
+
+#### HTTP Host Header Attacks
+
+**Description:**
+HTTP Host Header attacks exploit misconfigured web servers that rely on the Host header to determine the intended destination. Attackers exploit this vulnerability to redirect users to malicious sites or gain unauthorized access.
+
+**Proof of Concept (PoC):**
+1. Attacker: Exploits an HTTP Host Header attack to redirect users to a malicious site.
+2. Steps:
+   - Attacker crafts a request with a manipulated Host header pointing to the malicious site.
+   - Application processes the request and redirects the user to the attacker's site.
+
+![HTTP Host Header Attack Example](https://res.cloudinary.com/z0rs/image/upload/v1692560247/host-header-attacks_m713lq.jpg)
+
+**References:**
+- [OWASP Unvalidated Redirects and Forwards](https://owasp.org/www-project-web-security-testing-guide/v41/4-Web_Application_Security_Testing/11-Client_Side_Testing/04-Testing_for_Client_Side_URL_Redirect)
+- [CWE-601: URL Redirection to Untrusted Site](https://cwe.mitre.org/data/definitions/601.html)
+
+**Risk/Severity Scoring:**
+- CVSS Base Score: 5.7 (Medium)
+- CVSS Vector: CVSS:3.1/AV:N/AC:H/PR:N/UI:R/S:C/C:N/I:L/A:N
+
+**Remediation/Fixing Recommendation:**
+1. Validate and sanitize input values used in redirection logic.
+2. Use whitelisting for allowed redirection destinations.
+3. Implement proper security controls to prevent host header manipulation.
+
+---
+
+#### HTTP Request Smuggling
+HTTP Request Smuggling vulnerabilities occur due to discrepancies in how proxy servers and web servers handle and interpret HTTP requests. Attackers exploit this vulnerability to manipulate requests and perform actions on behalf of other users.
+
+**Proof of Concept (PoC):**
+1. Attacker: Exploits an HTTP Request Smuggling vulnerability to bypass security controls.
+2. Steps:
+   - Attacker crafts specially crafted requests with conflicting headers.
+   - Proxy server and web server interpret requests differently, leading to request smuggling.
+   - Attacker's malicious payload is executed by the web server.
+
+![HTTP Request Smuggling Example](https://res.cloudinary.com/z0rs/image/upload/v1692560287/http-request-smuggling_ookkjh.svg)
+
+**References:**
+- [OWASP HTTP Request Smuggling](https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/07-Input_Validation_Testing/15-Testing_for_HTTP_Splitting_Smuggling)
+- [CWE-444: Inconsistent Interpretation of HTTP Requests](https://cwe.mitre.org/data/definitions/444.html)
+
+**Risk/Severity Scoring:**
+- CVSS Base Score: 8.6 (High)
+- CVSS Vector: CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:U/C:H/I:H/A:H
+
+**Remediation/Fixing Recommendation:**
+1. Ensure consistent interpretation of headers between proxy and web server.
+2. Implement security mechanisms to detect and prevent request smuggling.
+3. Regularly update proxy and web server software to mitigate vulnerabilities.
+
+---
+
+#### OAuth 2.0 Authentication
+OAuth 2.0 authentication vulnerabilities arise from improper implementation of the OAuth 2.0 framework. Attackers exploit these vulnerabilities to gain unauthorized access to user accounts, impersonate users, or obtain unauthorized tokens.
+
+**Proof of Concept (PoC):**
+1. Attacker: Exploits an OAuth 2.0 authentication vulnerability to steal user tokens.
+2. Steps:
+   - Attacker crafts a malicious application and tricks users into authorizing it.
+   - Malicious application receives authorization code or token.
+   - Attacker gains unauthorized access to the victim's account or token.
+
+![OAuth 2.0 Authentication Example](https://res.cloudinary.com/z0rs/image/upload/v1692560317/oauth_iqzap8.jpg)
+
+**References:**
+- [OWASP OAuth 2.0 Security](https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/05-Authorization_Testing/05-Testing_for_OAuth_Weaknesses)
+- [CWE-287: Improper Authentication](https://cwe.mitre.org/data/definitions/287.html)
+
+**Risk/Severity Scoring:**
+- CVSS Base Score: 7.9 (High)
+- CVSS Vector: CVSS:3.1/AV:N/AC:H/PR:N/UI:R/S:U/C:H/I:H/A:H
+
+**Remediation/Fixing Recommendation:**
+1. Implement OAuth 2.0 securely with appropriate grant types.
+2. Validate and sanitize authorization callbacks to prevent open redirects.
+3. Regularly audit and monitor OAuth 2.0 authorization flows.
+---
+
+#### JWT (JSON Web Token) Attacks
+JWT (JSON Web Token) attacks exploit vulnerabilities in the generation, validation, and usage of JWTs. Attackers exploit these vulnerabilities to bypass authentication, impersonate users, or gain unauthorized access.
+
+**Proof of Concept (PoC):**
+1. Attacker: Exploits a JWT vulnerability to gain unauthorized access.
+2. Steps:
+   - Attacker crafts a malicious JWT with altered claims or tokens.
+   - Application fails to properly validate the JWT, allowing the attacker's token.
+   - Attacker gains access to resources or impersonates a user.
+
+![JWT Attack Example](https://res.cloudinary.com/z0rs/image/upload/v1692560342/jwt-infographic_hikzp3.jpg)
+
+**References:**
+- [OWASP JWT Security](https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/06-Session_Management_Testing/10-Testing_JSON_Web_Tokens)
+- [CWE-1270: Generation of Incorrect Security Tokens](https://cwe.mitre.org/data/definitions/1270.html)
+
+**Risk/Severity Scoring:**
+- CVSS Base Score: 7.2 (High)
+- CVSS Vector: CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:H/I:H/A:H
+
+**Remediation/Fixing Recommendation:**
+1. Use strong algorithms and keys for JWT generation and verification.
+2. Validate and sanitize JWT claims and tokens on both sides.
+3. Implement JWT expiration and refresh mechanisms securely.
+
+---
+
+#### Prototype Pollution
+Prototype Pollution vulnerabilities occur when attackers manipulate the prototype of objects in JavaScript code. Attackers exploit this vulnerability to inject malicious properties or modify existing ones, leading to remote code execution or denial of service.
+
+**Proof of Concept (PoC):**
+1. Attacker: Exploits a Prototype Pollution vulnerability to inject malicious properties.
+2. Steps:
+   - Attacker crafts input to manipulate JavaScript objects' prototypes.
+   - Application processes the input, leading to modification of object properties.
+   - Attacker's malicious properties are executed, leading to code execution.
+
+![Prototype Pollution Example](https://res.cloudinary.com/z0rs/image/upload/v1692560368/prototype-pollution-infographic_c8gx9b.svg)
+
+**References:**
+- [OWASP Prototype Pollution](https://cheatsheetseries.owasp.org/cheatsheets/Prototype_Pollution_Prevention_Cheat_Sheet.html)
+- [CWE-1321: Improperly Controlled Modification of Object Prototype Attributes ('Prototype Pollution')](https://cwe.mitre.org/data/definitions/1321.html)
+
+**Risk/Severity Scoring:**
+- CVSS Base Score: 8.9 (High)
+- CVSS Vector: CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:H/I:H/A:H
+
+**Remediation/Fixing Recommendation:**
+1. Avoid using untrusted input to modify object prototypes.
+2. Implement input validation and sanitation to prevent prototype pollution.
+3. Regularly update and patch JavaScript libraries to prevent vulnerabilities.
+---
+
+### Conclusion
+This assessment highlights critical vulnerabilities within the target system, which can potentially compromise data integrity, user privacy, and overall system security. The findings underscore the importance of proactive security practices, including robust input validation, secure authentication mechanisms, and ongoing vulnerability management. Implementing the recommended remediation steps is crucial to safeguard the target system and its users from potential threats.
+
+### Acknowledgments
+We would like to express our gratitude to the organization for granting us the opportunity to conduct this security assessment. Additionally, we extend our thanks to the security team and stakeholders for their cooperation, support, and valuable insights throughout the assessment process. Their commitment to enhancing the system's security posture is commendable.
+
+### Contact Information
+For inquiries or further assistance, please contact:
+- [Your Name]
+- [Your Email]
+
+This report is confidential and intended solely for the use of the [Client Name]. Unauthorized distribution or sharing is prohibited.
+
+- [Your Company Name]
+- [Date of Report]
