@@ -80,6 +80,13 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v2
+    - name: Deploy to GitHub Pages
+      id: deployment
+      uses: actions/deploy-pages@v2
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        timeout: 600000
+        error_count: 10
+        reporting_interval: 5000
+        artifact_name: public  # Ubah dari "github-pages" menjadi "public"
+        preview: false
