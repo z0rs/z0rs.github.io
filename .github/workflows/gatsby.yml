@@ -66,6 +66,12 @@ jobs:
           PREFIX_PATHS: 'true'
         run: npm run build  # Atau gunakan "yarn run build" jika Anda menggunakan Yarn
 
+      - name: Upload artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: github-pages # Tambahkan nama artifact yang sesuai
+          path: ./public
+
   # Deployment job
   deploy:
     environment:
