@@ -40,7 +40,7 @@ jobs:
 
       # Tambahkan langkah instalasi dependensi di sini
       - name: Install Dependencies
-        run: npm install  # Atau gunakan "yarn install" jika Anda menggunakan Yarn
+        run: npm install --legacy-peer-deps # Atau gunakan "yarn install" jika Anda menggunakan Yarn
 
       - name: Setup Node
         uses: actions/setup-node@v2
