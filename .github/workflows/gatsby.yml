@@ -19,7 +19,7 @@ jobs:
           node-version: 18
 
       - name: Install Dependencies
-        run: yarn install
+        run: yarn install --legacy-peer-deps
 
       - name: Build Gatsby Site
         run: yarn build
