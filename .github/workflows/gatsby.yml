@@ -28,7 +28,7 @@ jobs:
 
       # Tambahkan langkah untuk menghapus direktori "public" sebelum mengunggah ulang
       - name: Remove existing "public" directory
-        run: rm -rf ./public
+        run: rm -rf ./public public
 
       # Tambahkan langkah instalasi dependensi di sini
       - name: Install Dependencies
