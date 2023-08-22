@@ -81,12 +81,6 @@ module.exports = {
       options: {
         path: `${__dirname}/content/ctfs/`
       }
-    },
-    {
-      resolve: 'gatsby-plugin-google-analytics',
-      options: {
-        trackingId: 'G-xxxxx'
-      }
     }
   ],
   partytownProxiedURLs: [`https://www.googletagmanager.com/gtag/js?id=${process.env.GATSBY_GA_MEASUREMENT_ID}`]
