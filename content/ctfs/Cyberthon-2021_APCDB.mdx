@@ -17,7 +17,7 @@ featuredImage: https://upload.wikimedia.org/wikipedia/commons/5/52/Cyberthon_202
 
 ## Overview
 
-```c
+```cpp
 {
   char format[264]; // [rsp+0h] [rbp-110h] BYREF
   unsigned __int64 v4; // [rsp+108h] [rbp-8h]
@@ -43,8 +43,6 @@ Let's break down what the program is doing here:
 3. It **printf(format)** _aka our input_ which gives us a format string vulnerability.
 4. It then exits the program.
 
-<br><br>
-
 ## Exploitation Ideas
 
 It is apparent that we have to use the format string exploit in order to win, as it is the only exploit available to us.
@@ -61,8 +59,6 @@ Hence the idea is as such:
 
 Let's get started.
 
-<br><br>
-
 ## Exploitation
 
 Our first objective is to loop the program back continuously. This can be done by overwriting **GOT entry for exit() to the address of main**.
@@ -71,7 +67,7 @@ This is so that everytime the program tries to exit, it goes back to main instea
 
 Since PIE is not enabled, our GOT addresses will remain constant so we can easily find the addresses we need, made even easier with pwntools.
 
-```py
+```python
 from pwn import *
 p = remote('aiodmb3uswokssp2pp7eum8qwcsdf52r.ctf.sg', 30201)
 
@@ -112,7 +108,7 @@ This is because the scanf only reads up till the null terminator. Consider this:
 
 Anyways, this means that we will have to put our format string at the start and our leak behind.
 
-```py
+```python
 from pwn import *
 p = remote('aiodmb3uswokssp2pp7eum8qwcsdf52r.ctf.sg', 30201)
 context.binary = elf = ELF('apcdb')
@@ -161,7 +157,7 @@ With the libc base, we can find libc symbol for system, thus allowing us to over
 
 Thus the next time we send **/bin/sh\x00** as our input, it will be executed by system rather than printf and we get a shell.
 
-```py
+```python
 from pwn import *
 p = remote('aiodmb3uswokssp2pp7eum8qwcsdf52r.ctf.sg', 30201)
 context.binary = elf = ELF('apcdb')
