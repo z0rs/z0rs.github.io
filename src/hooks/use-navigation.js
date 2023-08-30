@@ -2,10 +2,22 @@ import { useStaticQuery, graphql } from 'gatsby';
 
 export const useNavigation = () => {
   const {
-    allMdx: { nodes: mdx }
+    allMdx: { nodes: mdx },
+    allPagesJson: { nodes: json }
   } = useStaticQuery(graphql`
     {
       allMdx(filter: { frontmatter: { type: { eq: "page" } } }, sort: { fields: { slug: ASC } }) {
+        nodes {
+          fields {
+            slug
+          }
+          frontmatter {
+            title
+            icon
+          }
+        }
+      }
+      allPagesJson {
         nodes {
           fields {
             slug
