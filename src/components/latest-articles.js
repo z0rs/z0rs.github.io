@@ -36,9 +36,7 @@ const LatestArticles = () => {
   return (
     <section>
       <h2 className="m-0 text-2xl uppercase text-salmon">Latest Articles</h2>
-      <p className="mt-0 mb-8 text-slate-300 text-base">
-        You can find the Latest Articles here, on the topic of vulnerabilities and CTF.
-      </p>
+
       <ul className="grid gap-8 list-none m-0 mb-8 p-0">
         {nodes.map((node, index) => {
           const {
