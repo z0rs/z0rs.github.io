@@ -35,10 +35,8 @@ const LatestCtfs = () => {
 
   return (
     <section>
-      <h2 className="m-0 text-2xl uppercase text-salmon">Latest Write Ctf</h2>
-      <p className="mt-0 mb-8 text-slate-300 text-base">
-        published here writeUps CTF.
-      </p>
+      <h2 className="m-0 text-2xl uppercase text-salmon">Latest Ctf Write</h2>
+      <p className="mt-0 mb-8 text-slate-300 text-base"></p>
       <ul className="grid gap-8 list-none m-0 mb-8 p-0">
         {nodes.map((node, index) => {
           const {
