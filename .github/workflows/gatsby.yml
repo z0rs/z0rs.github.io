@@ -95,3 +95,12 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v2
+      # Add npm deploy step here
+      - name: Setup Node for Deployment
+        uses: actions/setup-node@v2
+        with:
+          node-version: "14" # Choose the appropriate version
+      - name: Install Dependencies
+        run: npm ci
+      - name: Deploy with npm
+        run: npm run deploy # Replace with your actual deploy script or command
