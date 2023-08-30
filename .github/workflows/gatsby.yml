@@ -95,4 +95,4 @@ jobs:
       - name: Install gh-pages package
         run: npm install gh-pages
       - name: Deploy to GitHub Pages with npm
-        run: npx gh-pages -d public
+        run: npx gh-pages -d ./public
