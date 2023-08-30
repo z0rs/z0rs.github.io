@@ -10,7 +10,7 @@ featuredImage: https://res.cloudinary.com/partylabs/image/upload/c_thumb,w_200,g
 #### Executive Summary:
 I am happy to share vulnerability findings on Fortinet FortiMail, focusing on versions v7.0.1, v7.0.0, v6.4.5 & below, v6.3.7 & below, and v6.0.11 & below. During this assessment, I was able to identify an unpatched XSS (Cross-Site Scripting) vulnerability, tagged as `CVE-2021-43062`. The vulnerability allowed arbitrary code execution via a specially crafted HTTP GET request to the FortiGuard URI protection service.
 
-```
+
 | Product                 | Fortinet FortiMail    |
 | :---------------------- | :-------------------- |
 | Vendor                  | Fortinet              |
@@ -21,13 +21,12 @@ I am happy to share vulnerability findings on Fortinet FortiMail, focusing on ve
 | CVE Description         | Unpatched XSS vulnerability in Fortinet FortiMail v7.0.1, v7.0.0, v6.4.5 & below, v6.3.7 & below, v6.0.11 & below enables code execution via crafted HTTP GET requests to FortiGuard URI protection service. |
 | CWE Classification(s)   | CWE-79 (Improper Neutralization of Input During Web Page Generation ('Cross-site Scripting')) |
 | CAPEC Classification(s) | CAPEC-86 (Cross-Site Scripting) |
-```
+
 
 #### CVSS3.1 Scoring System:
 - CVSS Base Score: 6.1 (MEDIUM)
 - CVSS Vector: CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N
 
-```
 | Metric                      | Value                 | Explanation |
 | :------------------------ | :------------------- | :------------------- |
 | Attack Vector (AV)                      | Network           | vulnerability can be exploited remotely through a network connection. |
@@ -38,10 +37,9 @@ I am happy to share vulnerability findings on Fortinet FortiMail, focusing on ve
 | Confidentiality (C)                      | Low                  | vulnerability has a limited impact on confidentiality. |
 | Integrity (I)                      | Low           | vulnerability has a limited impact on integrity. |
 | Availability (A)                      | None              | vulnerability has no impact on availability |
-```
 
 #### Proof of Concept (PoC):
-As part of the assessment, I've developed a Proof of Concept (PoC) to demonstrate the presence and severity of XSS vulnerabilities. Please find the following URL: https://mail2.bssn.go.id/%3Cscript%3Ealert(%27XSS%27)%3C/script%3E
+As part of the assessment, I've developed a Proof of Concept (PoC) to demonstrate the presence and severity of XSS vulnerabilities. Please find the following URL: https://mail2.██████████/<script>alert('XSS')</script>
 
 ![Proof of Concep](https://raw.githubusercontent.com/z0rs/z0rs.github.io/master/Images/CVE-2021-43062.png)
 
