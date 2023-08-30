@@ -95,21 +95,7 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v2
-      # Langkah-langkah untuk deploy dengan npm
-      - name: Checkout kode
-        uses: actions/checkout@v2
-      - name: Setup Node.js
-        uses: actions/setup-node@v2
-        with:
-          node-version: "18" # Ganti dengan versi Node.js yang sesuai
-      - name: Install Dependencies
-        run: npm install
-      - name: Build with Gatsby
-        env:
-          PREFIX_PATHS: 'true'
-        run: npm run build
+
       - name: Deploy to GitHub Pages
         run: |
-          # Ganti perintah ini dengan perintah yang benar untuk mendeploy ke GitHub Pages
-          # Contoh: npx gh-pages -d public
           npx gh-pages -d public
