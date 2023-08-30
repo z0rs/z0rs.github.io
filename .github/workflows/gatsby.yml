@@ -1,5 +1,4 @@
-name: Deploy Gatsby site to Pages
-
+name: Deploy
 on:
   push:
     branches: ["master"]
@@ -40,9 +39,6 @@ jobs:
             echo "Unable to determine package manager"
             exit 1
           fi
-      # Add this step to install Gatsby CLI
-      - name: Install Gatsby CLI
-        run: npm install -g gatsby-cli
       - name: Setup Node
         uses: actions/setup-node@v3
         with:
@@ -83,5 +79,3 @@ jobs:
     steps:
     - name: Checkout kode
       uses: actions/checkout@v2
-    - name: Deploy to GitHub Pages with npm
-      run: npm run deploy
