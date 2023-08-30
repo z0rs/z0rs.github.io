@@ -40,6 +40,9 @@ jobs:
             echo "Unable to determine package manager"
             exit 1
           fi
+      # Add this step to install Gatsby CLI
+      - name: Install Gatsby CLI
+        run: npm install -g gatsby-cli
       - name: Setup Node
         uses: actions/setup-node@v3
         with:
@@ -69,10 +72,6 @@ jobs:
         uses: actions/upload-pages-artifact@v2
         with:
           path: ./public
-
-      # Add this step to install Gatsby CLI
-      - name: Install Gatsby CLI
-        run: npm install -g gatsby-cli
 
   # Deployment job
   deploy:
