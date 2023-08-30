@@ -80,7 +80,5 @@ jobs:
     steps:
     - name: Checkout kode
       uses: actions/checkout@v2
-    - name: Change working directory
-      run: cd z0rs.github.io # Ganti dengan nama direktori proyek Anda
     - name: Deploy to GitHub Pages with npm
       run: npm run deploy
