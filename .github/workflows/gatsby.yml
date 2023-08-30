@@ -70,6 +70,10 @@ jobs:
         with:
           path: ./public
 
+      # Add this step to install Gatsby CLI
+      - name: Install Gatsby CLI
+        run: npm install -g gatsby-cli
+
   # Deployment job
   deploy:
     environment:
