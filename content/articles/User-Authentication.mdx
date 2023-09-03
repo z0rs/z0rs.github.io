@@ -22,7 +22,7 @@ kamu mungkin pernah mendengar tentang <kbd>Top 10 OWASP</kbd> atau sepuluh keren
 - Improper Assets Management
 - Insufficient Logging & Monitoring
 
-Banyak dari kerentanan ini memengaruhi komponen aplikasi selain API, tetapi cenderung memanifestasikan dalam API. Terakhir kali, saya berbicara tentang salah satu kerentanan API yang paling umum: [**Broken Object Level Authorization.**](https://0x3n0.github.io/Object-Level-Authorization/)
+Banyak dari kerentanan ini memengaruhi komponen aplikasi selain API, tetapi cenderung memanifestasikan dalam API. Terakhir kali, saya berbicara tentang salah satu kerentanan API yang paling umum: **Broken Object Level Authorization.**
 
 ## OWASP API Security Broken User Authentication
 
@@ -46,7 +46,7 @@ access_token=RW5v==
 
 Token hanyalah pengkodean <kbd>base64</kbd> dari nama user, "Eno"!
 
-<kbd>API</kbd> yang tidak menggunakan string akses token sederhana juga bisa tidak aman. Misalnya, <kbd>JSON Web Tokens</kbd> (JWTs) juga dapat ditandatangani dengan tidak benar atau tidak ada tanda tangan sama sekali. Masalah ini sangat berbahaya jika token tidak aman digunakan untuk mengautentikasi `admin` atau orang lain dengan hak akses ke dalam API. Jika kamu tertarik untuk mempelajari lebih lanjut tentang potensi jebakan JWT, baca posting saya di sini: [**Token Web JSON**](https://0x3n0.github.io)
+<kbd>API</kbd> yang tidak menggunakan string akses token sederhana juga bisa tidak aman. Misalnya, <kbd>JSON Web Tokens</kbd> (JWTs) juga dapat ditandatangani dengan tidak benar atau tidak ada tanda tangan sama sekali. Masalah ini sangat berbahaya jika token tidak aman digunakan untuk mengautentikasi `admin` atau orang lain dengan hak akses ke dalam API. Jika kamu tertarik untuk mempelajari lebih lanjut tentang potensi jebakan JWT, baca posting saya di sini: **Token Web JSON**
 
 ## Token berumur panjang
 
@@ -70,10 +70,10 @@ Dan jika token ditransmisikan melalui trafic yang tidak terenkripsi, penyerang d
 
 User Authentication sangat merusak API karena satu kesalahan dapat memungkinkan penyerang mengambil alih akun user, mengakses data dan fungsionalitas yang dibatasi.
 
-Mencegah masalah ini membutuhkan pendekatan yang komprehensif. Pertama, Kamu perlu memastikan bahwa kamu menerapkan akses kontrol untuk semua data dan fungsi sensitif. Ini dibahas dalam posting blog terakhir saya tentang [**Broken Object Level Authorization**](hhttps://0x3n0.github.io/Object-Level-Authorization). Lagi pula, otentikasi sia-sia kecuali kamu menggunakannya untuk membatasi akses ke sistem!
+Mencegah masalah ini membutuhkan pendekatan yang komprehensif. Pertama, Kamu perlu memastikan bahwa kamu menerapkan akses kontrol untuk semua data dan fungsi sensitif. Ini dibahas dalam posting blog terakhir saya tentang **Broken Object Level Authorization**. Lagi pula, otentikasi sia-sia kecuali kamu menggunakannya untuk membatasi akses ke sistem!
 
 Selanjutnya, pastikan `API token` kamu berupa string yang `panjang`, `acak`, dan `tidak dapat diprediksi`. Jika kamu menggunakan token yang berasal dari informasi user, gunakan algoritme yang kuat dan <kbd>secret key</kbd> untuk memastikan bahwa user tidak dapat memalsukan token mereka sendiri. Terakhir, jika API kamu menggunakan autentikasi berbasis tanda tangan seperti JWT, terapkan tanda tangan yang kuat pada token dan validasikan dengan benar.
 
 Batalkan token secara berkala dan setelah tindakan seperti `logout`, `reset kata sandi`, `pemulihan akun`, dan `penghapusan akun`. Terakhir, perlakukan akses token sebagai key dan jangan pernah mengirimkannya dalam `URL` atau trafic yang tidak terenkripsi.
 
-Broken User Authentication dapat menyebabkan insiden keamanan yang serius, jadi mencegahnya harus menjadi prioritas utama kamu sebagai pengembang. Lain kali, mari kita lihat sepuluh besar API OWASP #3, [**Excessive Data Exposure**](https://0x3n0.github.io/Excessive-Data-Exposure/), kerentanan yang paling sering saya temukan di API.
+Broken User Authentication dapat menyebabkan insiden keamanan yang serius, jadi mencegahnya harus menjadi prioritas utama kamu sebagai pengembang. Lain kali, mari kita lihat sepuluh besar API OWASP #3, **Excessive Data Exposure**, kerentanan yang paling sering saya temukan di API.
