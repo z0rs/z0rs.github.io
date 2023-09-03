@@ -26,7 +26,7 @@ kamu mungkin pernah mendengar tentang <kbd>Top 10 OWASP</kbd> atau sepuluh keren
 
 ## Pesan kesalahan verbose
 
-Pertama-tama, salah satu `Security Misconfiguration` yang paling umum adalah mengirim pesan kesalahan verbose kepada user. Pesan kesalahan verbose ini mungkin berisi jejak, informasi tentang sistem, seperti versi server atau struktur `database`, dan memberikan wawasan kepada user tentang cara kerja aplikasi. 
+Pertama-tama, salah satu `Security Misconfiguration` yang paling umum adalah mengirim pesan kesalahan verbose kepada user. Pesan kesalahan verbose ini mungkin berisi jejak, informasi tentang sistem, seperti versi server atau struktur `database`, dan memberikan wawasan kepada user tentang cara kerja aplikasi.
 Dalam hal ini, penyerang dapat memaksa pesan kesalahan dari aplikasi (melalui penyediaan input yang salah atau ilegal) untuk mengumpulkan informasi tentang server.
 
 Banyak halaman `404` default juga berisi tanda tangan khusus yang memungkinkan penyerang untuk menandai teknologi yang digunakan, contohnya adalah **framework Ruby on Rails**.
@@ -35,13 +35,13 @@ Banyak halaman `404` default juga berisi tanda tangan khusus yang memungkinkan p
 
 configurasi umum lainnya adalah penyalahgunaan atau hilangnya <kbd>header HTTP</kbd>. Ada banyak header keamanan HTTP yang membantu meningkatkan keamanan aplikasi. Jika tidak diconfigurasi dengan benar, penyerang sering kali dapat menemukan celah keamanan yang memungkinkan mereka mengekstrak data, atau melakukan serangan pada user aplikasi.
 
-Misalnya, header **Content-Security-Policy (CSP)** mengontrol resource mana yang boleh dimuat oleh browser untuk sebuah halaman. 
+Misalnya, header **Content-Security-Policy (CSP)** mengontrol resource mana yang boleh dimuat oleh browser untuk sebuah halaman.
 browser harus diatur untuk melarang scrip dari domain random, dan atribut HTML penanganan peristiwa untuk mencegah serangan <kbd>XSS (cross site script)</kbd>. Untuk detail tentang cara mengconfigurasi CSP dengan aman, baca posting saya tentang topik di sini: [Content Security Policy (CSP)](https://0x3n0.github.io/)
 
 Kesalahan configurasi **CORS (Cross-Origin resource sharing)** juga merupakan masalah yang berasal dari kesalahan configurasi <kbd>header HTTP</kbd>.
 Cross-origin resource sharing **(CORS)** adalah cara aman untuk melonggarkan same-origin policy **(SOP)**. ini juga memungkinkan server untuk secara eksplisit menentukan daftar asal yang diizinkan untuk mengakses resourcenya melalui header <kbd>Access-Control-Allow-Origin<kbd>. 
 
-Access-Control-Allow-Origin harus diconfigurasi untuk mengizinkan komunikasi **cross-origin** dari situs tepercaya. Kebijakan CORS yang salah diconfigurasi memungkinkan penyerang mencuri data rahasia dengan mengacaukan komunikasi cross-origin. Anda dapat membaca lebih lanjut tentang bagaimana penyerang dapat mengeksploitasi CORS yang salah configurasi di sini: [**Hacking the Same-Origin Policy**](https://0x3n0.github.io/)
+Access-Control-Allow-Origin harus diconfigurasi untuk mengizinkan komunikasi **cross-origin** dari situs tepercaya. Kebijakan CORS yang salah diconfigurasi memungkinkan penyerang mencuri data rahasia dengan mengacaukan komunikasi cross-origin. Anda dapat membaca lebih lanjut tentang bagaimana penyerang dapat mengeksploitasi CORS yang salah configurasi di sini: [**Hacking the Same-Origin Policy**](https://z0rs.github.io/)
 
 ## Layanan yang tidak perlu atau HTTP methods
 
