@@ -1,0 +1,86 @@
+---
+type: article
+title: OWASP API Security Broken Function Level Authorization
+tags: [OWASP, Broken Function Level Authorization]
+date: 2018-01-30
+author: Eno Leriand
+featuredImage: https://raw.githubusercontent.com/0x3n0/0x3n0.github.io/master/assets/img/blogging/Function-Level-Authorization.jpg
+---
+
+![Desktop View](https://raw.githubusercontent.com/0x3n0/0x3n0.github.io/master/assets/img/blogging/Function-Level-Authorization.jpg)_Api Security Function Level Authorization_
+
+Kita semakin mengandalkan API untuk mendukung aplikasi kita. Dalam seri Keamanan API 101 ini, mari kita bahas kerentanan keamanan yang memengaruhi API, apa yang menyebabkan kerentanan ini, dan cara mencegahnya di aplikasi kamu sendiri.
+
+kamu mungkin pernah mendengar tentang `top 10 OWASP` atau sepuluh kerentanan teratas yang mengancam aplikasi web. OWASP juga secara berkala memilih daftar sepuluh besar kerentanan yang mengancam API, yang disebut **`OWASP API Security Top 10`**. Sepuluh besar API saat ini adalah 
+- Broken Object Level Authorization
+- Broken User Authentication
+- Excessive Data Exposure
+- Lack of Resources & Rate Limiting
+- Broken Function Level Authorization
+- Mass Assignment
+- Security Misconfiguration
+- Injection
+- Improper Asset Management
+- Insufficient Logging & Monitoring.
+ 
+Hari ini, mari kita bicara tentang: `OWASP API Security #5`, **Broken Function Level Authorization**.
+
+## OWASP API Security Broken Function Level Authorization.
+
+Sebelum kita menyelami kerentanan, kamu mungkin akan merasa terbantu untuk meninjau posting saya tentang [OWASP API Security Broken Object Level Authorization](https://itsec.ac.id/Object-Level-Authorization/) terlebih dahulu. Singkatnya, API sering kali mengekspos pengidentifikasi objek yang digunakan untuk mengakses resource. `Broken object level authorization` terjadi ketika kontrol akses tidak diterapkan dengan benar, dan penyerang dapat melihat atau mengoperasikan resource yang seharusnya tidak mereka akses.
+
+`Broken function level authorization` adalah masalah serupa. `Broken function level authorization` adalah ketika aplikasi gagal membatasi fungsi sensitif untuk user yang berwenang. Tidak seperti broken object level authorization, cacat ini secara khusus ketika user yang tidak sah dapat mengakses fungsi sensitif atau terbatas yang seharusnya tidak mereka akses.
+
+Misalnya, ketika satu user dapat mengubah akun user lain atau ketika user biasa dapat mengakses fungsionalitas admin di situs. Masalah ini disebabkan oleh kontrol akses yang hilang atau salah dikonfigurasi. Mereka dapat memanifestasikan dirinya dalam banyak cara, jadi mari kita lihat beberapa contohnya.
+
+### Contoh Broken Function Level Authorization #1: Menghapus postingan orang lain
+
+Katakanlah `API` memungkinkan usernya untuk mengambil posting blog dengan mengirimkan request `GET` titik seperti ini:
+
+```
+GET /api/v1.1/user/1337/posts?id=32
+```
+
+request ini akan menyebabkan `API` mengembalikan postingan 32 dari user `1337`. Karena semua postingan di platform ini bersifat publik, setiap user dapat mengirimkan request ini untuk mengakses postingan orang lain. Namun, karena hanya user itu sendiri yang boleh mengubah postingan blog, hanya user 1337 yang dapat mengirimkan request `POST` untuk mengubah atau mengedit postingan.
+
+Bagaimana jika `API` tidak memberikan batasan yang sama pada request yang dikirim dengan metode `PUT` dan `DELETE HTTP?` Dalam hal ini, user mungkin mengubah atau menghapus posting user lain dengan menggunakan metode `HTTP` yang berbeda. request ini menghapus postingan user lain.
+
+```
+DELETE /api/v1.1/user/1337/posts?id=32
+```
+
+### Contoh Broken Function Level Authorization #2: Berpura-pura menjadi admin
+
+Situs ini juga memungkinkan admin platform untuk mengubah atau menghapus postingan siapa pun. Jadi request ini semua akan berhasil jika dikirim dari akun admin.
+
+```
+DELETE /api/v1.1/user/1337/posts?id=32
+POST /api/v1.1/user/1337/posts?id=32
+PUT /api/v1.1/user/1337/posts?id=32
+```
+
+Tetapi situs menentukan siapa admin dengan hal khusus dalam request:
+
+```
+Admin: 1
+```
+
+Dalam hal ini, setiap user jahat dapat dengan mudah menambahkan `header` ini ke request mereka dan mendapatkan akses ke fungsi `admin` khusus! Broken functional level authorization dapat disebabkan oleh kontrol akses yang hilang dan implementasi kontrol akses yang buruk.
+
+### Contoh Broken Function Level Authorization #3: Tidak ada kunci di pintu
+
+Terakhir, situs memungkinkan admin untuk melihat statistik situs melalui titik `API` khusus:
+
+```
+GET /api/v1.1/site/stats/hd216zla
+```
+
+Titik admin ini tidak menerapkan batasan berbasis user apa pun. Situs bergantung pada fakta bahwa titik `URL` berisi string acak di akhir untuk mencegah user yang tidak sah mengaksesnya. Praktik ini disebut `“Security through Obscurity”`, yang berarti meningkatkan keamanan dengan menahan pengetahuan dari pihak luar.
+
+Tetapi keamanan melalui ke tidak jelasan tidak dapat diandalkan sebagai satu-satunya mekanisme keamanan. Jika penyerang dapat mengetahui `URL` yang tidak jelas melalui kebocoran informasi, penyerang dapat mengakses fungsionalitas sensitif yang tersembunyi.
+
+### Apa yang bisa dilakukan penyerang?
+
+Apa yang dapat dilakukan penyerang dengan kerentanan `broken function level authorization?` Itu akan tergantung pada fungsionalitas yang dapat diakses penyerang melalui `bug`. Penyerang mungkin dapat menyamar sebagai user lain, mendapatkan akses ke data yang dibatasi, memodifikasi akun orang lain, atau bahkan menjadi admin situs.
+
+Kunci untuk mencegah `broken function level authorization` adalah dengan menerapkan kontrol akses yang terperinci dan ketat berdasarkan sesi user dan memastikan bahwa kontrol akses ini diterapkan secara konsisten terlepas dari metode `request`, `header`, dan `parameter URL`.
