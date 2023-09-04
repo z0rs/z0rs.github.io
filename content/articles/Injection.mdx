@@ -9,7 +9,7 @@ featuredImage: https://0x3n0.github.io/assets/img/blogging/Injection.jpg
 
 ![img-description](https://0x3n0.github.io/assets/img/blogging/Injection.jpg)_OWASP API Security Injection_
 
-kamu mungkin pernah mendengar tentang <kbd>Top 10 OWASP</kbd> atau sepuluh kerentanan teratas yang mengancam `Webapps`. OWASP juga secara berkala memilih daftar sepuluh besar kerentanan yang mengancam <kbd>API</kbd>, yang disebut <kbd>OWASP API Security Top 10</kbd>. Sepuluh besar API saat ini adalah :
+kamu mungkin pernah mendengar tentang `Top 10 OWASP` atau sepuluh kerentanan teratas yang mengancam `Webapps`. OWASP juga secara berkala memilih daftar sepuluh besar kerentanan yang mengancam `API`, yang disebut `OWASP API Security Top 10`. Sepuluh besar API saat ini adalah :
 
 - Broken Object Level Authorization 
 - Broken User Authentication
@@ -32,15 +32,15 @@ Injection adalah masalah mendasar untuk sejumlah besar kerentanan, seperti `SQL 
 
 Dalam satu kalimat, injection terjadi ketika aplikasi tidak dapat membedakan dengan benar antara data dan code user yang tidak dipercaya.
 
-Data user yang tidak tepercaya dapat berupa parameter request <kbd>HTTP</kbd>, <kbd>header HTTP</kbd>, dan <kbd>cookie</kbd>. itu juga dapat berasal dari database atau file yang disimpan yang dapat dimodifikasi oleh user. Jika aplikasi tidak memproses data user yang tidak dipercaya dengan benar sebelum memasukkannya ke dalam perintah atau query, program akan mengacaukan masukan user sebagai bagian dari perintah atau query. Dalam hal ini, penyerang dapat mengirim data ke aplikasi dengan cara yang akan mengubah arti dari perintahnya.
+Data user yang tidak tepercaya dapat berupa parameter request `HTTP`, `header HTTP`, dan `cookie`. itu juga dapat berasal dari database atau file yang disimpan yang dapat dimodifikasi oleh user. Jika aplikasi tidak memproses data user yang tidak dipercaya dengan benar sebelum memasukkannya ke dalam perintah atau query, program akan mengacaukan masukan user sebagai bagian dari perintah atau query. Dalam hal ini, penyerang dapat mengirim data ke aplikasi dengan cara yang akan mengubah arti dari perintahnya.
 
-Dalam serangan <kbd>SQL Injection</kbd>, misalnya, penyerang menyuntikkan data untuk memanipulasi perintah SQL. Dan dalam serangan Injection, penyerang memasukkan data yang memanipulasi logika perintah sistem OS di server hosting. Program yang menggabungkan data user dengan perintah atau code pemrograman berpotensi rentan.
+Dalam serangan `SQL Injection`, misalnya, penyerang menyuntikkan data untuk memanipulasi perintah SQL. Dan dalam serangan Injection, penyerang memasukkan data yang memanipulasi logika perintah sistem OS di server hosting. Program yang menggabungkan data user dengan perintah atau code pemrograman berpotensi rentan.
 
-Kerentanan Injection juga dapat memengaruhi sistem `API` karena API hanyalah cara lain untuk memasukkan input user yang tidak tepercaya ke dalam aplikasi. Mari kita lihat bagaimana kerentanan Injection muncul di <kbd>API</kbd>.
+Kerentanan Injection juga dapat memengaruhi sistem `API` karena API hanyalah cara lain untuk memasukkan input user yang tidak tepercaya ke dalam aplikasi. Mari kita lihat bagaimana kerentanan Injection muncul di `API`.
 
 ### Contoh OWASP API Security Injection #1: Mengambil postingan blog
 
-Katakanlah <kbd>API</kbd> memungkinkan usernya untuk mengambil posting blog dengan mengirimkan request <kbd>GET</kbd> seperti ini:
+Katakanlah `API` memungkinkan usernya untuk mengambil posting blog dengan mengirimkan request `GET` seperti ini:
 
 ```
 GET /api/v1.1/posts?id=1337
@@ -58,13 +58,13 @@ Server `SQL` akan menafsirkan bagian `id` setelah titik koma sebagai perintah SQ
 SELECT * FROM posts WHERE post_id = 1337;
 ```
 
-Kemudian akan menjalankan perintah ini untuk menghapus <kbd>TABLE USERS</kbd>, menyebabkan aplikasi kehilangan data yang disimpan dalam <kbd>TABLE</kbd> itu.
+Kemudian akan menjalankan perintah ini untuk menghapus `TABLE USERS`, menyebabkan aplikasi kehilangan data yang disimpan dalam `TABLE` itu.
 
 ```
 DROP TABLE users
 ```
 
-ini disebut serangan `SQL Injection` dan dapat terjadi setiap kali input user diteruskan ke SQL query dengan cara yang tidak aman. Perhatikan bahwa input user dalam `API` tidak hanya berjalan melalui parameter <kbd>URL</kbd>, itu juga dapat mencapai aplikasi melalui request <kbd>POST</kbd>, parameter URL, dan sebagainya. Jadi, penting untuk mengamankan tempat-tempat itu juga.
+ini disebut serangan `SQL Injection` dan dapat terjadi setiap kali input user diteruskan ke SQL query dengan cara yang tidak aman. Perhatikan bahwa input user dalam `API` tidak hanya berjalan melalui parameter `URL`, itu juga dapat mencapai aplikasi melalui request `POST`, parameter URL, dan sebagainya. Jadi, penting untuk mengamankan tempat-tempat itu juga.
 
 ### Contoh OWASP API Security Injection #2: Membaca file sistem
 
@@ -86,7 +86,7 @@ Dalam hal ini, user dapat menyuntikkan perintah baru ke dalam perintah OS sistem
 GET /api/v1.1/files?id=1123581321; rm -rf /var/www/html/users
 ```
 
-Perintah ini akan memaksa server untuk menghapus folder yang terletak di <kbd>/var/www/html/users</kbd>, yang merupakan tempat aplikasi menyimpan informasi user.
+Perintah ini akan memaksa server untuk menghapus folder yang terletak di `/var/www/html/users`, yang merupakan tempat aplikasi menyimpan informasi user.
 
 ```
 rm -rf /var/www/html/users
@@ -114,4 +114,4 @@ Parameterisasi adalah salah satu pertahanan yang dapat digunakan untuk melawan I
 
 Dan akhirnya, kamu dapat melarikan diri dari karakter khusus sebagai gantinya. Melarikan diri berarti kamu menyandikan karakter khusus dalam input user sehingga diperlakukan sebagai data dan bukan sebagai karakter khusus. Dengan menggunakan penanda dan syntax khusus untuk menandai karakter khusus dalam input user, pelolosan memungkinkan mengetahui bahwa data tidak dimaksudkan untuk dieksekusi.
 
-Tetapi metode ini juga memiliki masalah. Pertama, kamu harus menggunakan syntax <kbd>Encode</kbd> yang tepat untuk setiap parser hilir atau nilai yang disandikan disalah artikan oleh parser. kamu mungkin juga lupa untuk menghindari beberapa karakter, yang dapat digunakan penyerang untuk menetralisir upaya penyandian kamu. Jadi, kunci untuk mencegah kerentanan Injection adalah memahami cara kerja parser dari berbagai bahasa, dan parser mana yang berjalan lebih dulu dalam proses kamu.
+Tetapi metode ini juga memiliki masalah. Pertama, kamu harus menggunakan syntax `Encode` yang tepat untuk setiap parser hilir atau nilai yang disandikan disalah artikan oleh parser. kamu mungkin juga lupa untuk menghindari beberapa karakter, yang dapat digunakan penyerang untuk menetralisir upaya penyandian kamu. Jadi, kunci untuk mencegah kerentanan Injection adalah memahami cara kerja parser dari berbagai bahasa, dan parser mana yang berjalan lebih dulu dalam proses kamu.
