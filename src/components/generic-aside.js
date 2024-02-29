@@ -18,7 +18,7 @@ const GenericAside = () => {
         </p>
       </div>
       <a
-        href="https://www.linkedin.com/in/0x3n0"
+        href="https://www.linkedin.com/in/enoleriand"
         target="_blank"
         rel="noreferrer"
         className="flex items-center justify-center gap-4 no-underline text-sm text-center py-2 px-2 transition-all duration-300 rounded border border-outline bg-surface hover:text-white hover:bg-muted/20"
