@@ -49,15 +49,10 @@ jobs:
         uses: actions/configure-pages@v3
         with:
           static_site_generator: gatsby
-      - name: Clear Yarn Cache
-        run: |
-          npm install -g yarn
-          yarn cache clean
           
       - name: Remove Node Modules
         run: |
           rm -rf node_modules yarn.lock
-          yarn install
           
       - name: Restore cache
         uses: actions/cache@v3
@@ -68,6 +63,7 @@ jobs:
           key: ${{ runner.os }}-gatsby-build-${{ hashFiles('public') }}
           restore-keys: |
             ${{ runner.os }}-gatsby-build-
+      
       - name: Install dependencies
         run: |
           if [ -f "/etc/ssl/certs/ca-certificates.crt" ]; then
@@ -75,7 +71,7 @@ jobs:
            cp /etc/ssl/certs/ca-certificates.crt ~/.npmrc
            cp /etc/ssl/certs/ca-certificates.crt ~/.yarnrc
           fi
-          NODE_OPTIONS=--max-old-space-size=4096 ${{ steps.detect-package-manager.outputs.manager }} ${{ steps.detect-package-manager.outputs.command }}
+          ${{ steps.detect-package-manager.outputs.manager }} ${{ steps.detect-package-manager.outputs.command }}
          
       - name: Build with Gatsby
         env:
