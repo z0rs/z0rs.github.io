@@ -50,9 +50,15 @@ jobs:
         with:
           static_site_generator: gatsby
       - name: Clear Yarn Cache
-        run: yarn cache clean
+        run: |
+          npm install -g yarn
+          yarn cache clean
+          
       - name: Remove Node Modules
-        run: rm -rf node_modules yarn.lock
+        run: |
+          rm -rf node_modules yarn.lock
+          yarn install
+          
       - name: Restore cache
         uses: actions/cache@v3
         with:
