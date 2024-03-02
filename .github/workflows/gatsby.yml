@@ -2,7 +2,6 @@ name: Deploy
 on:
   push:
     branches: ["master"]
-
   workflow_dispatch:
 
 permissions:
@@ -42,55 +41,44 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v3
         with:
-          node-version: "18"
+          node-version: "14"
           cache: ${{ steps.detect-package-manager.outputs.manager }}
-      - name: Setup Pages
-        id: pages
-        uses: actions/configure-pages@v3
-        with:
-          static_site_generator: gatsby
-          
       - name: Remove Node Modules
-        run: |
-          rm -rf node_modules yarn.lock
-          
+        run: rm -rf node_modules yarn.lock
       - name: Restore cache
         uses: actions/cache@v3
         with:
           path: |
-            public
-            .cache
-          key: ${{ runner.os }}-gatsby-build-${{ hashFiles('public') }}
+            ~/.npm
+            ~/.yarn
+          key: ${{ runner.os }}-node-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
-            ${{ runner.os }}-gatsby-build-
-      
+            ${{ runner.os }}-node-
       - name: Install dependencies
-        run: |
-          if [ -f "/etc/ssl/certs/ca-certificates.crt" ]; then
-           echo "Custom CA certificates found, copying to npm/yarn config"
-           cp /etc/ssl/certs/ca-certificates.crt ~/.npmrc
-           cp /etc/ssl/certs/ca-certificates.crt ~/.yarnrc
-          fi
-          ${{ steps.detect-package-manager.outputs.manager }} ${{ steps.detect-package-manager.outputs.command }}
-         
+        run: ${{ steps.detect-package-manager.outputs.manager }} ${{ steps.detect-package-manager.outputs.command }}
       - name: Build with Gatsby
         env:
           PREFIX_PATHS: 'true'
         run: ${{ steps.detect-package-manager.outputs.manager }} run build
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v2
+        uses: actions/upload-artifact@v2
         with:
+          name: gatsby-build
           path: ./public
 
-  # Deployment job
   deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     needs: build
     steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Download artifact
+        uses: actions/download-artifact@v2
+        with:
+          name: gatsby-build
+          path: ./public
       - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v2
-
+        uses: JamesIves/github-pages-deploy-action@4.1.4
+        with:
+          branch: gh-pages
+          folder: ./public
