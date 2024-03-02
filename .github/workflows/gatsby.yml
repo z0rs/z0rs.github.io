@@ -65,7 +65,7 @@ jobs:
            cp /etc/ssl/certs/ca-certificates.crt ~/.npmrc
            cp /etc/ssl/certs/ca-certificates.crt ~/.yarnrc
           fi
-          ${{ steps.detect-package-manager.outputs.manager }} ${{ steps.detect-package-manager.outputs.command }} --verbose=false --no-progress
+          ${{ steps.detect-package-manager.outputs.manager }} ${{ steps.detect-package-manager.outputs.command }} --frozen-lockfile
          
       - name: Build with Gatsby
         env:
