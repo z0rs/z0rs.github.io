@@ -59,7 +59,14 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gatsby-build-
       - name: Install dependencies
-        run: ${{ steps.detect-package-manager.outputs.manager }} ${{ steps.detect-package-manager.outputs.command }}
+        run: |
+          if [ -f "/etc/ssl/certs/ca-certificates.crt" ]; then
+           echo "Custom CA certificates found, copying to npm/yarn config"
+           cp /etc/ssl/certs/ca-certificates.crt ~/.npmrc
+           cp /etc/ssl/certs/ca-certificates.crt ~/.yarnrc
+          fi
+          ${{ steps.detect-package-manager.outputs.manager }} ${{ steps.detect-package-manager.outputs.command }}
+         
       - name: Build with Gatsby
         env:
           PREFIX_PATHS: 'true'
