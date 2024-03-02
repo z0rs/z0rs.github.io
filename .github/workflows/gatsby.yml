@@ -49,6 +49,10 @@ jobs:
         uses: actions/configure-pages@v3
         with:
           static_site_generator: gatsby
+      - name: Clear Yarn Cache
+        run: yarn cache clean
+      - name: Remove Node Modules
+        run: rm -rf node_modules yarn.lock
       - name: Restore cache
         uses: actions/cache@v3
         with:
