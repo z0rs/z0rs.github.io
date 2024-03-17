@@ -17,8 +17,8 @@ jobs:
         with:
           node-version: '18'
 
-      - name: Check SSL Certificate
-        run: npm install -g check-certificate && check-certificate
+      - name: Update SSL Certificate
+        run: sudo apt-get install --reinstall ca-certificates
 
       - name: Install dependencies
         run: npm install --legacy-peer-deps
