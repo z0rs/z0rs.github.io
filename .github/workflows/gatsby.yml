@@ -17,8 +17,11 @@ jobs:
         with:
           node-version: '18'
 
+      - name: Check SSL Certificate
+        run: npm install -g check-certificate && check-certificate
+
       - name: Install dependencies
-        run: npm install --legacy-peer-deps --strict-ssl false
+        run: npm install --legacy-peer-deps
 
       - name: Build Gatsby
         run: |
