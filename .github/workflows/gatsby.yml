@@ -17,11 +17,8 @@ jobs:
         with:
           node-version: '18'
 
-      - name: Update SSL Certificate
-        run: sudo apt-get install --reinstall ca-certificates
-
       - name: Install dependencies
-        run: npm install --legacy-peer-deps
+        run: npm install --legacy-peer-deps --strict-ssl=false
 
       - name: Build Gatsby
         run: |
