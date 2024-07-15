@@ -64,20 +64,24 @@ jobs:
       - name: Install dependencies
         run: ${{ steps.detect-package-manager.outputs.manager }} ${{ steps.detect-package-manager.outputs.command }}
 
-      - name: Monitor Memory Usage
+      - name: Start Memory Monitor
         run: |
           while true; do
             echo "Memory usage: $(free -m)";
             sleep 10;
           done &
-          MONITOR_PID=$!
+          echo "$!" > monitor_pid.txt
 
       - name: Build with Gatsby
         env:
           PREFIX_PATHS: 'true'
+          NODE_OPTIONS: "--max_old_space_size=8192" # Meningkatkan ukuran heap memori
+        run: ${{ steps.detect-package-manager.outputs.manager }} run build
+
+      - name: Stop Memory Monitor
         run: |
-          NODE_OPTIONS="--max_old_space_size=4096" ${{ steps.detect-package-manager.outputs.manager }} run build
-          kill $MONITOR_PID
+          kill $(cat monitor_pid.txt)
+          rm monitor_pid.txt
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v2
