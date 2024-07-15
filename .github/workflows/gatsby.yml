@@ -24,6 +24,7 @@ jobs:
       - name: Build Gatsby site
         env:
           NODE_TLS_REJECT_UNAUTHORIZED: 0
+          NODE_OPTIONS: "--max-old-space-size=4096"
         run: |
           sed -i 's/unstable_shouldOnCreateNode/shouldOnCreateNode/g' node_modules/gatsby-plugin-mdx/gatsby-node.js
           yarn build
