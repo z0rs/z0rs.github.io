@@ -22,7 +22,11 @@ jobs:
         run: yarn install
 
       - name: Build Gatsby site
-        run: yarn build
+        env:
+          NODE_TLS_REJECT_UNAUTHORIZED: 0
+        run: |
+          sed -i 's/unstable_shouldOnCreateNode/shouldOnCreateNode/g' node_modules/gatsby-plugin-mdx/gatsby-node.js
+          yarn build
 
       - name: Deploy to GitHub Pages
         if: success()
