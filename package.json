@@ -39,7 +39,7 @@
     "d3-geo": "^3.0.1",
     "dotted-map": "^2.2.3",
     "faunadb": "^4.6.0",
-    "gatsby": "^5.0.0",
+    "gatsby": "^4.0.0",
     "gatsby-plugin-gatsby-cloud": "^5.0.0",
     "gatsby-plugin-google-analytics": "^5.0.0",
     "gatsby-plugin-image": "^3.0.0",
