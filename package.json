@@ -16,17 +16,17 @@
     "prepare": "husky install"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=22.4.1"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Party-Labs/PartyLabs.git"
+    "url": "git+https://github.com/z0rs/z0rs.github.io.git"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/Party-Labs/PartyLabs-issues"
+    "url": "https://github.com/z0rs/z0rs.github.io-issues"
   },
   "dependencies": {
     "@google-analytics/data": "^3.0.0",
