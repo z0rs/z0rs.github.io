@@ -11,15 +11,15 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3  # Menggunakan versi terbaru
 
       - name: Set up Node.js
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v3  # Menggunakan versi terbaru
         with:
-          node-version: '18'
+          node-version: '18'  # Sesuaikan dengan versi Node.js dari .nvmrc
 
       - name: Cache dependencies
-        uses: actions/cache@v2
+        uses: actions/cache@v3  # Menggunakan versi terbaru
         with:
           path: |
             ~/.npm
@@ -29,14 +29,14 @@ jobs:
             ${{ runner.os }}-node-
 
       - name: Install dependencies
-        run: yarn install
+        run: yarn install  # Gunakan npm install jika Anda menggunakan npm
 
       - name: Build website
-        run: NODE_OPTIONS="--max-old-space-size=4096" yarn build
+        run: NODE_OPTIONS="--max-old-space-size=4096" yarn build  # Menambah alokasi memori hingga 4GB
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./public
-          cname: 'z0rs.github.io'
+          cname: 'z0rs.github.io'  # Ganti dengan domain Anda jika menggunakan custom domain
