@@ -1,8 +1,9 @@
-name: Deploy
+name: Deploy Gatsby site to Pages
+
 on:
   push:
-    branches: ["master"]
-
+    branches:
+      - "master"
   workflow_dispatch:
 
 permissions:
@@ -14,43 +15,29 @@ concurrency:
   group: "pages"
   cancel-in-progress: false
 
-defaults:
-  run:
-    shell: bash
-
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
-      - name: Detect package manager
-        id: detect-package-manager
-        run: |
-          if [ -f "${{ github.workspace }}/yarn.lock" ]; then
-            echo "manager=yarn" >> $GITHUB_OUTPUT
-            echo "command=install" >> $GITHUB_OUTPUT
-            exit 0
-          elif [ -f "${{ github.workspace }}/package.json" ]; then
-            echo "manager=npm" >> $GITHUB_OUTPUT
-            echo "command=ci" >> $GITHUB_OUTPUT
-            exit 0
-          else
-            echo "Unable to determine package manager"
-            exit 1
-          fi
+        uses: actions/checkout@v2
+
       - name: Setup Node
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v2
         with:
           node-version: "18"
-          cache: ${{ steps.detect-package-manager.outputs.manager }}
+
+      - name: Install Dependencies
+        run: npm install --legacy-peer-deps
+
       - name: Setup Pages
         id: pages
         uses: actions/configure-pages@v3
         with:
           static_site_generator: gatsby
+
       - name: Restore cache
-        uses: actions/cache@v3
+        uses: actions/cache@v2
         with:
           path: |
             public
@@ -58,18 +45,26 @@ jobs:
           key: ${{ runner.os }}-gatsby-build-${{ hashFiles('public') }}
           restore-keys: |
             ${{ runner.os }}-gatsby-build-
-      - name: Install dependencies
-        run: ${{ steps.detect-package-manager.outputs.manager }} ${{ steps.detect-package-manager.outputs.command }}
+
       - name: Build with Gatsby
         env:
+          NODE_OPTIONS: '--max_old_space_size=4096'  # Menambahkan opsi ini
           PREFIX_PATHS: 'true'
-        run: ${{ steps.detect-package-manager.outputs.manager }} run build
+        run: npm run build
+
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v2
+        uses: actions/upload-artifact@v2
         with:
+          name: public
           path: ./public
 
-  # Deployment job
+      - name: Deploy to GitHub Pages
+        uses: enriikke/gatsby-gh-pages-action@v2
+        with:
+          access-token: ${{ secrets.GITHUB_TOKEN }}
+          deploy-branch: master
+          publish-dir: ./public
+
   deploy:
     environment:
       name: github-pages
@@ -80,3 +75,10 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          timeout: 600000
+          error_count: 10
+          reporting_interval: 5000
+          artifact_name: public
+          preview: false
