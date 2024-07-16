@@ -16,7 +16,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v2
         with:
-          node-version: '18'  # Sesuaikan dengan versi Node.js dari .nvmrc
+          node-version: '18'
 
       - name: Cache dependencies
         uses: actions/cache@v2
@@ -29,14 +29,14 @@ jobs:
             ${{ runner.os }}-node-
 
       - name: Install dependencies
-        run: yarn install  # Gunakan npm install jika Anda menggunakan npm
+        run: yarn install
 
       - name: Build website
-        run: yarn build  # Gunakan npm run build jika Anda menggunakan npm
+        run: NODE_OPTIONS="--max-old-space-size=4096" yarn build
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./public
-          cname: 'z0rs.github.io'  # Ganti dengan domain Anda jika menggunakan custom domain
+          cname: 'z0rs.github.io'
