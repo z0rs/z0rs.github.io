@@ -40,12 +40,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gatsby-build-
 
-      - name: Build with Gatsby
-        env:
-          NODE_OPTIONS: '--max_old_space_size=4096'  # Menambahkan opsi ini
-          PREFIX_PATHS: 'true'
-        run: npm run build
-
       - name: Upload artifact
         uses: actions/upload-artifact@v2
         with:
