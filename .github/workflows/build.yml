@@ -1,0 +1,54 @@
+name: Build Gatsby site
+
+on:
+  push:
+    branches:
+      - "master"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Setup Node
+        uses: actions/setup-node@v2
+        with:
+          node-version: "18"
+
+      - name: Install Dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Setup Pages
+        id: pages
+        uses: actions/configure-pages@v3
+        with:
+          static_site_generator: gatsby
+
+      - name: Restore cache
+        uses: actions/cache@v2
+        with:
+          path: |
+            public
+            .cache
+          key: ${{ runner.os }}-gatsby-build-${{ hashFiles('public') }}
+          restore-keys: |
+            ${{ runner.os }}-gatsby-build-
+
+      - name: Build with Gatsby
+        env:
+          NODE_OPTIONS: '--max_old_space_size=4096'
+          PREFIX_PATHS: 'true'
+        run: npm run build
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: public
+          path: ./public
