@@ -5,7 +5,7 @@
   "homepage": "https://z0rs.github.io",
   "main": "index.js",
   "scripts": {
-    "deploy": "gatsby build && gh-pages -d public",
+    "deploy": "gatsby build && gh-pages -d public -b master",
     "develop": "gatsby develop",
     "clean": "gatsby clean",
     "start": "gatsby develop",
