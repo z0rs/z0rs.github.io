@@ -3,7 +3,7 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches:
-      - master  # Ganti dengan branch utama kamu
+      - master
 
 jobs:
   build:
@@ -17,7 +17,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '18'  # Ganti dengan versi Node.js yang sesuai
+          node-version: '18'
 
       - name: Install dependencies
         run: yarn install
