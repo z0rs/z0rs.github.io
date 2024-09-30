@@ -73,6 +73,10 @@ jobs:
           key: ${{ runner.os }}-gatsby-build-${{ hashFiles('public') }}
           restore-keys: |
             ${{ runner.os }}-gatsby-build-
+      - name: Increase memory limit and run build
+        run: |
+          export NODE_OPTIONS="--max-old-space-size=4096"
+          yarn run build
       - name: Install dependencies
         run: ${{ steps.detect-package-manager.outputs.manager }} ${{ steps.detect-package-manager.outputs.command }}
       - name: Build with Gatsby
