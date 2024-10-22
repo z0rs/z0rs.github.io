@@ -1,15 +1,14 @@
 {
-  "name": "EnoLeriand",
+  "name": "paulie-dev-2019",
   "version": "1.0.0",
-  "description": "Eno Leriand's Blog",
-  "homepage": "https://z0rs.github.io",
+  "description": "Eno",
   "main": "index.js",
   "scripts": {
-    "deploy": "gatsby build && gh-pages -d public -b master",
     "develop": "gatsby develop",
     "clean": "gatsby clean",
     "start": "gatsby develop",
     "build": "gatsby build && yarn robots",
+    "serve": "gatsby serve",
     "robots": "cp robots.txt public/",
     "prettier": "prettier --config ./.prettierrc.js --ignore-path ./.prettierignore --write \"**/*.{json,js,ts,tsx,mdx}\"",
     "prepare": "husky install"
@@ -19,13 +18,13 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/z0rs/z0rs.github.io.git"
+    "url": "git+https://github.com/PaulieScanlon/paulie-dev-2019.git"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/z0rs/z0rs.github.io-issues"
+    "url": "https://github.com/PaulieScanlon/paulie-dev-2019-issues"
   },
   "dependencies": {
     "@google-analytics/data": "^3.0.0",
@@ -38,7 +37,7 @@
     "d3-geo": "^3.0.1",
     "dotted-map": "^2.2.3",
     "faunadb": "^4.6.0",
-    "gatsby": "^4.0.0",
+    "gatsby": "^5.0.0",
     "gatsby-plugin-gatsby-cloud": "^5.0.0",
     "gatsby-plugin-google-analytics": "^5.0.0",
     "gatsby-plugin-image": "^3.0.0",
