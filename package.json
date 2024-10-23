@@ -1,5 +1,5 @@
 {
-  "name": "paulie-dev-2019",
+  "name": "Eno",
   "version": "1.0.0",
   "description": "Eno",
   "main": "index.js",
@@ -18,13 +18,13 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/PaulieScanlon/paulie-dev-2019.git"
+    "url": "git+https://github.com/PaulieScanlon/z0rs/z0rs.github.io.git"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/PaulieScanlon/paulie-dev-2019-issues"
+    "url": "https://github.com/z0rs.github.io/issues"
   },
   "dependencies": {
     "@google-analytics/data": "^3.0.0",
