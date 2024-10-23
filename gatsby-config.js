@@ -19,7 +19,7 @@ module.exports = {
   trailingSlash: 'always',
   siteMetadata: {
     name: 'Eno Leriand',
-    description: 'Vulnerability Research',
+    description: 'Security & Research',
     keywords: [
       'React',
       'Gatsby',
