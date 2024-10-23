@@ -14,7 +14,7 @@ const GenericAside = () => {
       <div className="mb-4">
         <h5 className="mb-0 text-base text-center leading-6 font-semibold uppercase text-secondary">Eno Leriand</h5>
         <p className="mb-0 text-slate-300 text-sm text-center m-0">
-          Vulnerability Research{' '}
+          Security & Research{' '}
         </p>
       </div>
       <a
