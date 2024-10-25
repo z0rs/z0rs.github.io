@@ -1,15 +1,16 @@
+```mdx
 ---
 type: article
-title: OWASP API Security Excessive Data Exposure
+title: OWASP API Security - Excessive Data Exposure
 tags: [OWASP, Excessive Data Exposure]
-date: 2018-01-29
+date: 2024-10-25
 author: Eno Leriand
 featuredImage: https://raw.githubusercontent.com/0x3n0/0x3n0.github.io/master/assets/img/blogging/owasp.jpg
 ---
 
 ![Desktop View](https://raw.githubusercontent.com/0x3n0/0x3n0.github.io/master/assets/img/blogging/owasp.jpg)
 
-Anda mungkin pernah mendengar tentang `Top 10 OWASP` atau sepuluh kerentanan teratas yang mengancam `Webapps`. OWASP juga secara berkala memilih daftar sepuluh besar kerentanan yang mengancam `API`, yang disebut `OWASP API Security Top 10`. Sepuluh besar API saat ini adalah :
+You might be familiar with the `OWASP Top 10`, the list spotlighting critical vulnerabilities affecting `web applications`. OWASP also publishes a `Top 10` specifically focused on API vulnerabilities, known as the `OWASP API Security Top 10`. This list, essential for securing modern API-driven architectures, includes:
 
 - Broken Object Level Authorization 
 - Broken User Authentication
@@ -19,64 +20,59 @@ Anda mungkin pernah mendengar tentang `Top 10 OWASP` atau sepuluh kerentanan ter
 - Mass Assignment
 - Security Misconfiguration 
 - Injection
-- Improper Assets Management
+- Improper Asset Management
 - Insufficient Logging & Monitoring
 
-Banyak dari kerentanan ini mempengaruhi komponen aplikasi selain `API`, tetapi mereka cenderung memanifestasikan dirinya dalam API. Kali ini, mari kita selami kerentanan di `API: OWASP API #3`, **Excessive Data Exposure**.
+Many of these vulnerabilities impact components beyond just `APIs`, but they frequently emerge in API environments. Today, we’re diving into `OWASP API #3`, **Excessive Data Exposure**, a risk often overlooked yet critically exploitable.
 
-Mengapa paparan data yang berlebihan merupakan kerentanan `API`? Karena saya menyadari bahwa saya telah mencarinya sepanjang waktu untuk mencari bug dan tanpa menyadari bahwa itu adalah salah satu kerentanan teratas yang memengaruhi API! mari kita bicara tentang kerentanan ini, bagaimana saya biasanya mencarinya, dan bagaimana kamu dapat mencegahnya.
+### OWASP API Security #3 - Excessive Data Exposure
 
-## OWASP API Security #3 Excessive Data Exposure
-Apa itu OWASP API Security #3, **Excessive Data Exposure**? Saat itulah aplikasi mengungkapkan lebih banyak informasi dari yang diperlukan kepada user melalui respons `API`.
+**Excessive Data Exposure** arises when an API response reveals more information than intended or necessary for end users. It's a frequent vulnerability that I've encountered while bug hunting and often overlooked as an API-specific threat. Let’s break down what this vulnerability entails, how I typically detect it, and practical steps to mitigate it.
 
-Mari kita pertimbangkan kasus penggunaan API yang sederhana. Aplikasi web mengambil informasi menggunakan layanan API, kemudian menggunakan informasi tersebut untuk mengisi halaman web dan ditampilkan ke browser user.
+Consider a typical scenario where a web application requests data from an API service, which then populates a web page with this data in a user’s browser.
 
 ```
-displays data           requests data
 user <----------------- application -------------------> API service
-(browser)               (API client) 
+         (browser)                (API client) 
 ```
 
-Untuk banyak layanan API, aplikasi `API client`. tidak memiliki kemampuan untuk memilih bidang data mana yang dikembalikan dalam panggilan API. Katakanlah sebuah aplikasi mengambil informasi user dari API untuk mengisi profil user. Panggilan API untuk mengambil informasi user terlihat seperti ini:
+For many APIs, the `API client` lacks control over which specific data fields are returned. Take, for instance, a case where an API is used to retrieve user profile information for a web page:
 
 ```
 https://api.example.com/v1.1/users/show?user_id=12
 ```
 
-Server API akan merespons dengan seluruh objek user yang sesuai:
+An API response might return the entire user object, as follows:
 
-```
+```json
 { 
   "id": 6253282, 
   "username": "z0rs", 
   "screen_name": "Eno", 
   "location": "Blk 335 Smith Street", 
-  "bio": "Hacker. .", 
+  "bio": "Hacker.",
   "api_token": "8a48c14b04d94d81ca484e8f32daf6dc", 
   "phone_number": "123-456-7890", 
   "address": "Blk 335 Smith Street, SG" 
 }
-
 ```
 
-Kamu melihat bahwa selain informasi dasar tentang user, panggilan API ini juga mengembalikan `token API`, `nomor telepon`, dan `alamat user` tersebut. Karena panggilan ini digunakan untuk mengambil data untuk mengisi halaman profil user, aplikasi hanya perlu mengirimkan username, screen_name, location, dan bio ke browser.
+In this example, the response includes sensitive fields (`API token`, `phone number`, and `address`) that the client-side application doesn’t need to display. This becomes problematic when developers assume unneeded fields won’t be visible to users, relying on client-side code to filter sensitive data before rendering it. But, if the entire API response reaches the browser, anyone can intercept it and view the sensitive data. 
 
-Beberapa pengembang aplikasi berasumsi bahwa jika mereka tidak menampilkan informasi sensitif di halaman web, user tidak dapat melihatnya. Jadi mereka pada gilirannya mengirim seluruh respons API ini ke browser user tanpa menyaring informasi sensitif terlebih dahulu dan mengandalkan code dari sisi client untuk menyaring informasi pribadi. Ketika ini terjadi, siapa pun yang mengunjungi halaman profil akan dapat mencegat respons API ini dan membaca info sensitif tentang user itu!
+Attackers might also exploit this by intercepting API traffic (e.g., through MITM attacks) to extract sensitive data from other users.
 
-Penyerang mungkin juga dapat membaca data sensitif dengan mengunjungi halaman tertentu yang membocorkan informasi atau melakukan serangan `MITM` untuk mencuri respons API yang dikirim ke korban.
+### Preventing Excessive Data Exposure
 
-## Mencagah excessive data exposure
+Excessive data exposure typically happens when the API client doesn’t filter out unneeded data fields before rendering the response. Here’s how to address it:
 
-Eksposur data yang berlebihan terjadi ketika aplikasi `cliet API` tidak memfilter hasil yang didapatnya sebelum mengembalikan data ke user aplikasi.
+1. **Client-Side Filtering:** Ensure the client application only displays essential data. Filter sensitive fields in the client code before sending data to the user interface.
 
-Saat API mengirim data yang sensitif, aplikasi client harus memfilter data sebelum meneruskannya ke user. Tentukan dengan cermat apa yang harus diketahui user dan pastikan untuk memfilter apa pun yang tidak boleh diakses oleh user. Idealnya, kembalikan jumlah minimum data yang diperlukan untuk merender halaman web.
+2. **Server-Side Optimization:** When possible, configure the `API server` to return only the fields needed for each specific request. In flexible APIs like `GraphQL`, for example, you can define precise fields in queries to limit response data. This way, the API server sends only essential data, minimizing exposure risks.
 
-Jika API mengizinkannya, Kamu juga dapat meminta jumlah minimum data yang diperlukan dari `server API`. Misalnya, `GraphQL API` memungkinkan kamu menentukan bidang objek persis yang kamu butuhkan dalam request API.
+3. **Secure Data Transmission:** Ensure all sensitive data is encrypted in transit using secure protocols (e.g., HTTPS/TLS) to prevent exposure through network traffic interception.
 
-Terakhir, hindari pengiriman informasi sensitif dengan trafic yang tidak terenkripsi.
+### Practical Bug Hunting for Data Exposure
 
-saya selalu memperhatikan kerentanan ini ketika saya mencari `bug`. Sebagai bug hunter dan penguji, saya terbiasa menangkap setiap respons server untuk kata kunci seperti `key`, `token`, dan `secret`. Dan lebih sering daripada tidak, saya menemukan kebocoran informasi sensitif dengan cara ini.
+As a bug hunter and tester, I’m always on the lookout for `keywords` like `key`, `token`, and `secret` in API responses to detect data leaks. Too often, sensitive information slips through due to unfiltered `API server` responses, where the entire object is returned without filtering out unneeded fields before sending it to the client.
 
-Sering kali, kebocoran info sensitif ini disebabkan oleh masalah yang saya jelaskan di sini: server terlalu mengembalikan seluruh `respons API` dari server API alih-alih memfilternya sebelum meneruskannya ke user.
-
-Excessive Data Exposure, sayangnya, sangat umum. Dan ketika dikombinasikan dengan OWASP API #4, Lack of Resources & Rate Limiting, bisa menjadi masalah yang lebih besar.
+Excessive Data Exposure is, unfortunately, a pervasive issue. When combined with `OWASP API #4` (Lack of Resources & Rate Limiting), it can amplify risks significantly, leading to more complex attack vectors and potential data breaches.

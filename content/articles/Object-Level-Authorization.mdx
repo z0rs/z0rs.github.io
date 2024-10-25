@@ -1,19 +1,19 @@
 ---
 type: article
-title: OWASP API Security Broken Object Level Authorization
-tags: [OWASP, Broken Object Level Authorization]
-date: 2018-02-03
+title: OWASP API Security - Broken Object Level Authorization
+tags: [OWASP, Broken Object Level Authorization, API Security]
+date: 2024-10-25
 author: Eno Leriand
 featuredImage: https://raw.githubusercontent.com/0x3n0/0x3n0.github.io/master/assets/img/blogging/API_Security.jpg
 ---
 
 ![Desktop View](https://raw.githubusercontent.com/0x3n0/0x3n0.github.io/master/assets/img/blogging/API_Security.jpg)_API Security Object Level Authorization_
 
-Saat aplikasi modern menjadi lebih kompleks, mereka semakin dibangun menggunakan API. Terlebih lagi, API memiliki kemampuan untuk melakukan tindakan penting atau mengomunikasikan informasi sensitif. Ini menjadikan bug API sebagai sumber keamanan dan kebocoran data yang tersebar luas. Itu berarti ada baiknya memahami API, kerentanan yang termanifestasi di dalamnya, dan cara bertahan dari kerentanan ini.
+As modern applications grow more complex, APIs are often central to their design, enabling essential operations and transmitting sensitive data. This prevalence makes API vulnerabilities a widespread source of security risk and data breaches. Thus, understanding API vulnerabilities and how to safeguard against them is crucial.
 
-## OWASP API Security Broken Object Level Authorization
+## OWASP API Security - Broken Object Level Authorization
 
-Kamu mungkin pernah mendengar tentang `Top 10 OWASP` atau sepuluh kerentanan teratas yang mengancam aplikasi web. OWASP juga secara berkala memilih daftar sepuluh besar kerentanan yang mengancam API, yang disebut **`OWASP API Security Top 10`**. `API` teratas saat ini adalah 
+You may already know of the **Top 10 OWASP** list of critical web application vulnerabilities. Similarly, OWASP also curates an **API Security Top 10** list highlighting vulnerabilities specific to APIs. Among these, the top API vulnerability is **Broken Object Level Authorization**. Here’s the current list:
 
 - Broken Object Level Authorization
 - Broken User Authentication
@@ -24,49 +24,48 @@ Kamu mungkin pernah mendengar tentang `Top 10 OWASP` atau sepuluh kerentanan ter
 - Security Misconfiguration
 - Injection
 - Improper Asset Management
-- Insufficient Logging & Monitoring.
+- Insufficient Logging & Monitoring
 
-Banyak dari kerentanan ini mempengaruhi komponen aplikasi selain `API`, tetapi mereka cenderung memanifestasikan dirinya dalam `API`. mari kita bicara tentang kerentanan `OWASP API Security #1`, **Broken Object Level Authorization**.
+While many of these vulnerabilities can affect components beyond APIs, they frequently appear within APIs. Let's dive deeper into **OWASP API Security #1: Broken Object Level Authorization**.
 
-### OWASP API Security Broken Object Level Authorization Vulnerability
+### Understanding Broken Object Level Authorization Vulnerability
 
-API sering kali mengekspos pengidentifikasi objek yang digunakan untuk mengakses resource. Dan ketika akses kontrol tidak diterapkan dengan benar, penyerang dapat melihat atau mengoperasikan resource yang seharusnya tidak mereka akses. Kerentanan ini memengaruhi semua jenis arsitektur `API`, termasuk `SOAP`, `REST`, dan `GraphQL`.
+APIs often expose object identifiers that users rely on to access resources. When proper access control is not implemented, attackers can view or manipulate resources they’re unauthorized to access. This vulnerability impacts all API architectures, including `SOAP`, `REST`, and `GraphQL`.
 
-Mari kita lihat sebuah contoh! Katakanlah bahwa `API` memungkinkan `user` untuk mengambil detail tentang metode pembayaran mereka berdasarkan `ID` user mereka:
+Here’s an example: Suppose an API allows users to retrieve payment details based on their `user_id`:
 
-```
-https://api.contoh.com/v1.1/users/payment/show?user_id=12
-```
-Di sini, jika aplikasi tidak memerlukan bukti identitas tambahan dalam `API` dan hanya mengembalikan data yang diminta kepada siapa pun, aplikasi akan memaparkan informasi sensitif kepada penyerang. Penyerang dapat menebak, membocorkan, atau memaksa ID korban dan mencuri informasi pembayaran mereka melalui `API`.
-
-Seringkali, aplikasi mengizinkan user untuk mengakses objek data berdasarkan `ID` objek, bukan ID user mereka. `contoh.com` juga memiliki `API` yang memungkinkan pengguna mengambil konten pesan pribadi mereka. Pesan direferensikan menggunakan `ID` numerik:
-
-```
-https://api.contoh.com/v1.1/messages/show?id=1337
+```url
+https://api.example.com/v1.1/users/payment/show?user_id=12
 ```
 
-Jika server tidak menerapkan akses kontrol, penyerang dapat memaksa `ID` numerik ini dan mengambil pesan user lain!
+If this API doesn’t enforce additional identity verification, returning the requested data to anyone who calls it, sensitive information could be exposed to attackers. By guessing or brute-forcing victim IDs, an attacker could steal payment information.
 
-kerentanan ini adalah contoh **Broken Object Level Authorization.**. Tidak ada pemeriksaan identitas sebelum user mengakses objek data individual. Server tidak memverifikasi apakah Anda adalah user yang sah. Itu hanya mengembalikan informasi, seperti yang Anda minta.
+In many cases, applications allow users to access data objects using an object `ID` rather than user IDs. For example, `example.com` might have an API that lets users retrieve private messages by referencing a numeric `ID`:
 
-Selain yang membaca objek data, masalah ini juga dapat memengaruhi `API` yang `memperbarui`, `menghapus`, atau membuat `entri data`. Misalnya, masalah umum dalam implementasi `GraphQL` adalah bahwa API mengizinkan user yang tidak sah untuk mengedit data dengan mengganti `ID` dalam request.
-
-Apa yang bisa salah?
-
-Dampak dari **Broken Object-Level Access** tergantung pada objek data yang diekspos. Jika objek penting seperti `PII` dan kredensial user terekspos, `bug` dapat menyebabkan penyalhgunaan data atau kompromi aplikasi.
-
-Kerentanan ini dapat dieksploitasi lebih dalam: penyerang dapat menulis skrip untuk menanyakan semua `ID` user dan mengikis data secara otomatis. Jika kerentanan ini terjadi di situs **Ecommerce**, penyerang mungkin dapat mengambil jutaan rekening bank, nomor kartu kredit, dan alamat. Jika kerentanan ini ditemukan di situs perbankan, penyerang dapat membocorkan informasi kredit dan formulir pajak semua orang!
-
-## Bagaimana cara mencegahnya ?
-
-Cara ideal untuk mencegah masalah **broken object level authorization vulnerability** adalah menyimpulkan identitas user `API` dari akses token atau bentuk rahasia lainnya. Kemudian, terapkan akses kontrol pada semua `API sensitif` yang memerlukan beberapa hak akses, ingat bahwa setiap API dan metode request perlu diaudit dengan benar. Misalnya, saya sering melihat implementasi API di mana hanya mengubah ke metode request yang berbeda akan melewati kontrol.
-
-Jika tidak memungkinkan, objek data dengan nilai acak alih-alih `ID` numerik sederhana. Namun, hanya menggunakan `ID` acak tidak dapat dianggap sebagai perlindungan menyeluruh karena ID dapat bocor atau dicuri. Katakanlah API tidak dibatasi oleh akses kontrol:
-
-```
-https://api.contoh.com/v1.1/messages/show?id= d0c240ea139206019f692d
+```url
+https://api.example.com/v1.1/messages/show?id=1337
 ```
 
-Meskipun sulit untuk menebak ID yang digunakan untuk mereferensikan pesan, penyerang mungkin dapat mencuri atau membocorkan ID. ID ini mungkin juga tersedia untuk ekstensi browser dan riwayat penjelajahan.
+If the server lacks access controls, an attacker could brute-force this numeric `ID` and retrieve other users' messages. This is a clear instance of **Broken Object Level Authorization**—a lack of identity checks allows users to access individual data objects without verification.
 
-Mencegah `Object Level Authorization` harus menjadi prioritas utama kamu sebagai developer. Tetapi bahkan API dengan `Object Level Authorization` yang tepat dapat rentan terhadap serangan. Menerapkan mekanisme otentikasi yang tepat untuk layanan API juga bisa rumit.
+Beyond reading data objects, this vulnerability can also impact APIs that `update`, `delete`, or `create` data entries. In some `GraphQL` implementations, unauthorized users might alter data by simply changing the `ID` within the request.
+
+### Why Broken Object Level Authorization is Dangerous
+
+The impact of **Broken Object-Level Authorization** depends on the sensitivity of the data object exposed. If key objects like user PII (Personally Identifiable Information) or credentials are accessible, the vulnerability could result in significant data misuse or full application compromise.
+
+More advanced attacks could involve automated scripts that scrape all user IDs and extract data in bulk. On an **eCommerce** site, for instance, attackers could potentially collect millions of bank account numbers, credit card details, and addresses. On a banking site, attackers might compromise users’ credit histories and tax forms.
+
+## How to Prevent Broken Object Level Authorization
+
+To prevent **Broken Object Level Authorization** vulnerabilities, it’s crucial to derive the `API` user's identity from an access token or other secret form. Then apply access control consistently across all sensitive `APIs` and request methods, auditing each endpoint thoroughly. Often, API implementations lack proper access controls, where merely switching request methods bypasses them.
+
+If necessary, substitute random data values in place of simple numeric `IDs`. However, random IDs alone are not a foolproof solution, as they may leak or be compromised. Take this scenario where the API lacks access control:
+
+```url
+https://api.example.com/v1.1/messages/show?id=d0c240ea139206019f692d
+```
+
+While guessing this type of ID might be challenging, attackers could still compromise it through leaks or extensions monitoring browser history.
+
+Ensuring **Object Level Authorization** is critical for developers. Even with adequate Object Level Authorization, APIs can remain vulnerable to other attacks. Implementing robust authentication mechanisms for API services can be complex but is essential for protecting sensitive data and preventing unauthorized access.

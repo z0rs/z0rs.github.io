@@ -1,72 +1,70 @@
 ---
 type: article
-title: OWASP API Security Lack of Resources & Rate Limiting
-tags: [OWASP, Lack of Resources and Rate Limiting]
-date: 2018-02-01
+title: Understanding OWASP API Security Risks: Lack of Resources & Rate Limiting
+tags: [OWASP, API Security, Rate Limiting]
+date: 2024-10-25
 author: Eno Leriand
 featuredImage: https://raw.githubusercontent.com/0x3n0/0x3n0.github.io/master/assets/img/blogging/Lack-of-Resources-%26-Rate-Limiting.jpg
 ---
 
-![img-description](https://raw.githubusercontent.com/0x3n0/0x3n0.github.io/master/assets/img/blogging/Lack-of-Resources-%26-Rate-Limiting.jpg)_API SECURITY 101 Lack of Resources & Rate Limiting_
+![API Security - Lack of Resources & Rate Limiting](https://raw.githubusercontent.com/0x3n0/0x3n0.github.io/master/assets/img/blogging/Lack-of-Resources-%26-Rate-Limiting.jpg)  
+_API Security Fundamentals: Lack of Resources & Rate Limiting_
 
-kamu mungkin pernah mendengar tentang `Top 10 OWASP` atau sepuluh kerentanan teratas yang mengancam `Webapps`. OWASP juga secara berkala memilih daftar sepuluh besar kerentanan yang mengancam `API`, yang disebut `OWASP API Security Top 10`. Sepuluh besar API saat ini adalah :
+You’re probably familiar with the `OWASP Top 10`, highlighting the most critical web application vulnerabilities. In addition to general web application risks, OWASP has also released an `API Security Top 10` that specifically addresses API vulnerabilities. Here’s the current list:
 
-- Broken Object Level Authorization 
+- Broken Object Level Authorization
 - Broken User Authentication
 - Excessive Data Exposure
 - Lack of Resources & Rate Limiting
 - Broken Function Level Authorization
 - Mass Assignment
-- Security Misconfiguration 
+- Security Misconfiguration
 - Injection
 - Improper Assets Management
 - Insufficient Logging & Monitoring
 
-Banyak dari kerentanan ini mempengaruhi komponen aplikasi selain `API`, tetapi mereka cenderung memanifestasikan dirinya dalam `API`. mari kita bicara tentang kerentanan `OWASP API Secururity #4`, **Lack of Resources & Rate Limiting.**.
+Many of these issues impact not just APIs but other application components, though APIs are particularly susceptible. In this article, we’ll break down `OWASP API Security #4`: **Lack of Resources & Rate Limiting**.
 
-### OWASP API Security Lack of Resources & Rate Limiting
+## What Is OWASP API Security Lack of Resources & Rate Limiting?
 
-OWASP API Security Lack of Resources & Rate Limiting adalah ketika `API` tidak membatasi jumlah atau frekuensi request dari client `API` tertentu. Jadi client API dapat membuat ribuan atau bahkan lebih panggilan API per detik, atau meminta ratusan atau ribuan catatan data sekaligus, dan server akan tetap berusaha memenuhi request.
+Lack of Resources & Rate Limiting in API security occurs when the API fails to enforce limits on the volume or frequency of requests from a given API client. Without such controls, clients can potentially make thousands of API calls per second or request extensive data records in a single request, overwhelming the server.
 
-terdengar cukup menarik? Dalam banyak kasus, kurangnya resource dan Limit bukanlah masalah. Tapi terkadang, bisa membiarkan penyerang melakukan sesuatu yang lebih.
+### Why Is Lack of Resources & Rate Limiting a Problem?
 
-### kenapa Lack of Resources & Rate Limiting menjadi masalah?
+Firstly, not enforcing rate limits can severely affect `API server` performance, exposing systems to Denial of Service (DoS) attacks. A client (or multiple clients) making numerous simultaneous requests can exceed the server’s capacity, slowing it down or rendering it inaccessible to legitimate users.
 
-Pertama-tama, kurangnya pembatasan kecepatan dapat memengaruhi kinerja `server API` dan memungkinkan penyerang melakukan serangan DoS. Ketika satu client atau beberapa client terlalu banyak request sekaligus, request dari client tersebut dapat membebani kemampuan server untuk memproses request dan menjadi lambat atau tidak tersedia untuk user lain.
+Additionally, without rate limiting, attackers can launch brute-force attacks targeting authentication and authorization, particularly if `Broken Object Level Authorization` vulnerabilities exist. For example, if the API does not limit login attempts, an attacker can brute-force passwords by sending repeated login requests until a match is found.
 
-Masalah lainnya adalah kurangnya pembatasan kecepatan dapat menyebabkan serangan paksa otentikasi dan dengan `Broken Object Level Authorization`. Misalnya, jika tidak ada batasan berapa kali user dapat mengirimkan request masuk, penyerang dapat memaksa kata sandi user dengan mencoba masuk dengan kata sandi yang berbeda hingga berhasil. 
+Another issue is sensitive data exposure. When `Rate Limiting` is absent, attackers can exploit the vulnerability to harvest large amounts of sensitive data quickly, especially if the API lacks robust access controls. Consider an API that retrieves user emails without restrictions, returning a batch of emails with a single call.
 
-Di sisi lain, jika aplikasi `Object Level Authorization`, penyerang dapat menggunakan yang tidak membatasi kecepatan untuk memaksa `ID` yang mengarah ke data sensitif.
+### OWASP API Security Example: Lack of Resources & Rate Limiting in Injection Attacks
 
-Terakhir, kurangnya pembatasan kecepatan dapat membantu penyerang mengekstrak data sensitif lebih cepat jika `API` membocorkan informasi. Misalnya, digunakan untuk mengambil email user dan tidak dibatasi oleh akses kontrol. ini akan mengembalikan 20 konten email:
+The following example demonstrates how resource limits can expose sensitive data.
 
-### Contoh OWASP API Security Injection Lack of Resources & Rate Limiting
-
-```
+```http
 https://api.example.com/v1.1/emails/view?user_id=123&entries=20
 ```
 
-dia akan mengembalikan 5000, memungkinkan penyerang membaca semua email user dalam satu panggilan API:
+In cases without rate limits, an attacker could escalate this to request a larger batch:
 
+```http
+https://api.example.com/v1.1/emails/view?user_id=123&entries=5000
 ```
+
+Additionally, an attacker can loop through multiple `user_id`s to scrape emails, running numerous requests as follows:
+
+```http
 https://api.example.com/v1.1/profile/email/view?user_id=1337
+https://api.example.com/v1.1/profile/email/view?user_id=124
+https://api.example.com/v1.1/profile/email/view?user_id=125
+...
+https://api.example.com/v1.1/profile/email/view?user_id=2345
 ```
 
-Penyerang menjalankan sejumlah besar request `API` untuk memanenkan alamat email user:
+### How to Prevent Lack of Resources & Rate Limiting Issues
 
-```
-https://api.example.com/v1.1/profile/email/view?user_id=1337 
-https://api.example.com/v1.1/profile/email/view?user_id=124 
-https:// api.example.com/v1.1/profile/email/view?user_id=125 
-=============
-https://api.example.com/v1.1/profile/email/view?user_id= 2345
-```
+So, what steps can help prevent these issues? Enforcing strict access limits is crucial, though implementing it correctly can be challenging.
 
-### Mencegah masalah Lack of Resources & Rate Limiting
+Different functions require unique thresholds. For example, authentication-related endpoints should have lower rate limits to deter `brute-forcing` attacks. A good first step is identifying what constitutes "normal usage" for each function and blocking requests that significantly exceed this baseline.
 
-Jadi bagaimana kamu bisa mencegah masalah ini? 
-kamu perlu membatasi akses user ke resource! Tapi itu lebih mudah diucapkan daripada dilakukan.
-
-Tingkat yang sesuai dan batas resource untuk setiap fungsi seringkali harus berbeda. Misalnya, batas kecepatan untuk otentikasi harus jauh lebih rendah untuk mencegah serangan `brute-forcing`. Hal pertama yang dapat kamu lakukan adalah menentukan apa itu "penggunaan normal" untuk fungsi tertentu itu. Kemudian, blokir user yang meminta resource pada tingkat yang jauh lebih tinggi dari biasanya.
-
-Menentukan resiko masalah Rate Limit adalah di mana kerentanan berada dalam konteks aplikasi. Lain kali, mari kita lihat masalah `API` lain yang juga berarti berbeda dalam konteks yang berbeda: `OWASP API Security #5`, [**Broken Function Level Authorization**](https://0x3n0.github.io/Function-Level-Authorizationd), dan cara menentukan dampaknya pada aplikasi. Lain kali, mengapa kamu harus mengaudit fungsionalitas sensitif di `OWASP API` kamu terlebih dahulu.
+When determining rate limit thresholds, consider the risks unique to your API context. Stay tuned for the next part, where we’ll explore another critical API issue: `OWASP API Security #5` - [**Broken Function Level Authorization**](https://0x3n0.github.io/Function-Level-Authorizationd), and why it’s essential to audit sensitive functions in your API.
