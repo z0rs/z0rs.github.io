@@ -1,34 +1,34 @@
 ---
 type: article
-title: OWASP API Security Mass Assignment
-tags: [OWASP, Mass Assignment]
+title: OWASP API Security - Mass Assignment Vulnerability
+tags: [OWASP, Mass Assignment, API Security]
 date: 2018-02-02
 author: Eno Leriand
 featuredImage: https://raw.githubusercontent.com/0x3n0/0x3n0.github.io/master/assets/img/blogging/Mass-Assignment.jpg
 ---
 
-![img-description](https://raw.githubusercontent.com/0x3n0/0x3n0.github.io/master/assets/img/blogging/Mass-Assignment.jpg)_API OWASP Security_
+![img-description](https://raw.githubusercontent.com/0x3n0/0x3n0.github.io/master/assets/img/blogging/Mass-Assignment.jpg)_OWASP API Security_
 
-kamu mungkin pernah mendengar tentang `Top 10 OWASP` atau sepuluh kerentanan teratas yang mengancam `Webapps`. OWASP juga secara berkala memilih daftar sepuluh besar kerentanan yang mengancam `API`, yang disebut `OWASP API Security Top 10`. Sepuluh besar API saat ini adalah :
+You might have heard of the `OWASP Top 10`, a widely recognized list of the most critical security risks affecting web applications. Similarly, OWASP also publishes a list of the `Top 10 API Security Risks` that are specific to APIs, known as the `OWASP API Security Top 10`. Here’s the current list:
 
-- Broken Object Level Authorization 
+- Broken Object Level Authorization
 - Broken User Authentication
 - Excessive Data Exposure
 - Lack of Resources & Rate Limiting
 - Broken Function Level Authorization
 - Mass Assignment
-- Security Misconfiguration 
+- Security Misconfiguration
 - Injection
 - Improper Assets Management
 - Insufficient Logging & Monitoring
 
-Kerentanan yang akan kita bicarakan adalah `OWASP API Security Top 10`, **Mass Assignment**. (_Penugasan massal_) mengacu pada praktik pemberian nilai ke beberapa variabel atau properti objek sekaligus. Tetapi bagaimana fitur ini dapat menyebabkan kerentanan keamanan? Mari kita mulai dengan melihat contoh objek.
+In this article, we’ll focus on one of the top API security vulnerabilities, **Mass Assignment**. Mass Assignment occurs when an application assigns values to multiple object properties simultaneously. But how does this feature turn into a security vulnerability? Let’s dive into an example.
 
-## OWASP API Security Properti object
+## Understanding API Security and Object Properties
 
-Objek aplikasi seringkali memiliki banyak properti yang menggambarkan objek tersebut. Misalnya, katakanlah objek `user` digunakan untuk menyimpan informasi user di aplikasi kamu. objek ini berisi properti yang menggambarkan user seperti `ID user`, `name`, `location`, dan sebagainya.
+Application objects often come with numerous properties defining their attributes. For example, consider a `user` object used to store user information in an application. This object might contain properties such as `user ID`, `name`, `location`, and so forth.
 
-```
+```json
 { 
   "id": 1337, 
   "name": "eno", 
@@ -37,38 +37,39 @@ Objek aplikasi seringkali memiliki banyak properti yang menggambarkan objek ters
   "group_membership": [121, 322, 457] 
 }
 ```
-Dalam hal ini, user harus dapat memodifikasi beberapa properti yang disimpan di objek mereka, seperti properti `location` dan `name`. Tetapi bagian lain dari objek user ini harus dibatasi dari user, seperti properti `admin`, yang menunjukkan apakah user adalah admin, dan properti `group_membership`, yang mencatat grup user mana yang menjadi anggotanya.
 
-## OWASP API Security Mass Assignment
+In this case, users should only be allowed to modify certain properties, such as `location` and `name`. However, other parts of this user object, like `admin` (indicating whether the user has administrative rights) and `group_membership` (tracking user group affiliations), should be restricted from user modification.
 
-Mass Assignment adalah kerentanan di mana catatan aktif dalam sebuah website disalahgunakan untuk mengubah item data yang biasanya tidak boleh diakses oleh `user` seperti `password`, `permission`, atau status `admin`.
+## API Security Mass Assignment Vulnerability
 
-Kerentanan Mass Assignment terjadi ketika aplikasi secara otomatis memberikan input user ke beberapa variabel atau objek program. Ini adalah fitur dalam banyak framework aplikasi yang dirancang untuk menyederhanakan pengembangan aplikasi.
+Mass Assignment is a vulnerability where user input is improperly assigned to sensitive data fields like `password`, `permissions`, or `admin status`, leading to unauthorized modifications.
 
-Namun fitur ini terkadang memungkinkan penyerang untuk menimpa, memodifikasi, atau membuat variabel program atau properti objek baru sesuka hati. Misalnya, katakanlah situs mengizinkan user untuk mengubah nama mereka melalui request PUT seperti ini. request ini akan memperbarui name user `1337` dari `eno` menjadi `enogans`.
+This vulnerability surfaces when an application automatically maps user inputs to multiple program variables or object properties without validation. While this feature can simplify application development in many frameworks, it also enables attackers to overwrite, alter, or create new properties within objects. For instance, consider a scenario where a site allows users to update their name with a PUT request like this, changing user `1337`'s name from `eno` to `enogans`.
 
-### Contoh OWASP API Security #1 Mass Assignment
+### OWASP API Security Example #1: Mass Assignment
 
-```
+```http
 PUT /api/v1.1/user/1337
 { 
   "name": "eno" 
 }
 ```
-Sekarang, bagaimana jika user mengirimkan request ini?
 
-```
+Now, what happens if the user sends a request like this?
+
+```http
 PUT /api/v1.1/user/1337
 { 
   "name": "enogans", 
   "admin": true 
 }
 ```
-Jika aplikasi menggunakan Mass Assignment untuk memperbarui properti objek user secara otomatis, request ini juga akan mengupdate bidang `admin`, dan memberikan hak admin kepada user `1337`. Seperti inilah kerentanan Mass Assignment. Demikian pula, user mungkin dapat menambahkan  sendiri ke grup user pribadi dengan menetapkan diri mereka sendiri ke grup baru.
 
-### Contoh OWASP API Security #2 Mass Assignment
+If the application relies on Mass Assignment to update object properties, this request could also update the `admin` field, granting administrative rights to user `1337`. This is the essence of the Mass Assignment vulnerability, where unauthorized fields are open for user modification. Similarly, users might add themselves to restricted groups by assigning new group values.
 
-```
+### OWASP API Security Example #2: Mass Assignment
+
+```http
 PUT /api/v1.1/user/1337
 { 
   "name": "eno", 
@@ -76,6 +77,7 @@ PUT /api/v1.1/user/1337
   "group_membership": [1, 35, 121, 322, 457] 
 }
 ```
-## Cara Mencegah Mass Assignment
 
-Untuk cara mencegah Mass Assignment, kamu dapat menonaktifkan fitur Mass Assignment dengan framework yang kamu gunakan, atau menggunakan daftar putih untuk mengizinkan pada properti atau variabel tertentu.
+## Preventing Mass Assignment
+
+To mitigate Mass Assignment vulnerabilities, disable Mass Assignment in your application framework or implement whitelisting to control accessible properties or variables. Ensuring that only specified fields are assignable by the user can prevent unauthorized modifications and significantly strengthen security.

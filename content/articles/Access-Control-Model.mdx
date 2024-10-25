@@ -1,132 +1,83 @@
 ---
 type: article
 title: OWASP API Security Access Control Model
-tags: [OWASP, Access Control Model]
-date: 2018-01-25
+tags: [OWASP, Access Control Model, API Security]
+date: 2023-10-25
 author: Eno Leriand
 featuredImage: https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ6DsQsJfRgJQGGY78eiYbavHIALSTrPUBL8qKmoFaeHS9h7qXE3bIljTQfRfSDwR_EQjc&usqp=CAU
 ---
 
-![img-description](https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ6DsQsJfRgJQGGY78eiYbavHIALSTrPUBL8qKmoFaeHS9h7qXE3bIljTQfRfSDwR_EQjc&usqp=CAU)_Access Control Model_
+![Access Control Model](https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ6DsQsJfRgJQGGY78eiYbavHIALSTrPUBL8qKmoFaeHS9h7qXE3bIljTQfRfSDwR_EQjc&usqp=CAU)
 
-Sejauh ini kamu mungkin telah menemukan berbagai web aplikasi di mana kamu dapat mengundang anggota dengan akses terbatas ke informasi dalam organisasi. developer dapat membuat aplikasi atau layanan tersebut dengan menerapkan Access Control Model dalam aplikasi mereka.
+Modern web applications often require complex access control models, allowing developers to define granular permissions for users within an organization. This capability is fundamental to API security, as it restricts access based on defined roles, minimizing attack surfaces while enabling seamless collaboration.
 
+## What is an Access Control Model?
 
-## Apa itu Access Control Model
+An Access Control Model regulates user access to resources, defining how they can interact with them. Within a web application context, it’s the underlying framework that restricts access based on user roles. For instance, an administrator might be granted access to all organizational resources, whereas regular members have access to a subset of data based on their specific role permissions.
 
-Access Control Model adalah untuk mengontrol akses user ke resource dan bagaimana mereka berinteraksi dengannya. Dalam konteks web aplikasi, Access Control Model digunakan untuk mengontrol akses user ke resource dan bagaimana mereka berinteraksi dengannya. Misalnya, jika user adalah administrator, dia mungkin diizinkan untuk mengakses semua resource dalam aplikasi. Namun, jika user adalah anggota, dia mungkin hanya diizinkan untuk mengakses resource yang sangat spesifik dalam aplikasi.
+![Role-Based Access Control](https://raw.githubusercontent.com/0x3n0/0x3n0.github.io/master/assets/img/Access-Control-Model/Access_Control_Model1.png)
 
-![img-description](https://raw.githubusercontent.com/0x3n0/0x3n0.github.io/master/assets/img/Access-Control-Model/Access_Control_Model1.png)_Access Control Model_
+In a Role-Based Access Control (RBAC) example, three roles could be set up with distinct permissions. An admin, for instance, would access `All(users, documents, logs, and reports)`, while a manager might access `users`, `documents`, and `reports`. Regular users would be limited further, perhaps only able to view `users` and `documents`.
 
-Dalam contoh Access Control Model Berbasis Peran berikut, kamu dapat melihatnya memiliki 3 peran berbeda yang ditentukan dengan set izin berbeda yang ditetapkan untuk setiap peran, Misalnya, peran admin memiliki akses ke `All(users, Documents, logs, dan Reports)` dalam Organisasi tetapi manajer hanya memiliki akses `users`, `documents` dan `reports` saat karena peran user dibatasi lebih lanjut dan hanya diizinkan untuk mengakses users dan documents dalam organisasi.
+To gain a clearer understanding, let’s explore the types of Access Control Models commonly used today:
 
-Mari kita gali lebih dalam untuk mengetahui berbagai jenis Access Control Model yang diimplementasikan dalam aplikasi sehari-hari yang kita gunakan:
+- **Role-Based Access Control (RBAC)**: Grants permissions based on a user’s role within the organization, streamlining permission management by grouping users with similar access needs.
 
-- **Role-Based access controls(RBAC)**: Model ini memberikan hak akses kepada user berdasarkan pekerjaan yang mereka lakukan dalam suatu organisasi. Dalam Access Control Model ini, administrator dapat menetapkan user ke satu atau beberapa peran sesuai dengan tugas kerja mereka. Setiap peran memungkinkan akses ke resource tertentu
+- **Discretionary Access Control (DAC)**: Permissions are assigned based on access policies set by the asset owner, providing flexibility but introducing risks when misconfigured.
 
-- **Discretionary Access Control (DAC)**: Dalam jenis akses kontrol izin diberikan atau dibatasi berdasarkan kebijakan akses yang ditentukan oleh pemilik organisasi atau aset.
+- **Mandatory Access Control (MAC)**: Common in government or military systems, MAC assigns sensitivity labels to resources (e.g., confidential, secret, top-secret) and restricts access accordingly.
 
-- **Mandatory Access Control (MAC)**: Model ini memungkinkan pengelompokan resource menurut model sensitivitas. Model ini terutama ditemukan di lingkungan militer atau pemerintah di mana dapat dipahami dalam kelompok-kelompok seperti confidential, secret, top-secret dll.
+## Broken Access Control: A Critical Vulnerability
 
-## Broken Access Control Model(rusak):
+Web applications have become more sophisticated and, consequently, harder to secure. Misconfigurations or poor design in an Access Control Model often lead to vulnerabilities known as `Broken Access Control`. This flaw can grant unauthorized users access to restricted information, making the application an attractive target for attackers.
 
-Seperti yang kita ketahui dengan baik akan fakta bahwa web aplikasi telah berkembang jauh lebih kompleks dan besar dalam hal penanganan dan pemrosesan informasi. jadi tidak diragukan lagi meningkatkan kompleksitas dalam implementasi Access Control Model yang aman dan sempurna dalam aplikasi ini.
+## Common Access Control Errors
 
-Access Control Model yang memungkinkan user dengan permission terbatas dalam organisasi untuk mengakses informasi terbatas dalam organisasi itu dianggap rusak dan cacat. Dari situlah lahir istilah `Broken Access Control`. Dan apa pun yang rusak itu membuka jalan bagi `HACKER JAHAT` untuk mengeksploitasinya.
+When implementing an Access Control Model, missteps can result in critical security gaps. Common issues include:
 
-## Kesalahan yang terjadi
+- **Permissions Not Applied Correctly**: Permissions might not be enforced properly, allowing unauthorized access. For instance, if `/api/users` requires `read:users` permission, an attacker could potentially access it without having the proper `read:users` permission.
 
-Kamu mungkin bertanya `masalah apa yang dapat muncul jika Access Control Model tidak diimplementasikan dengan benar` ? dan `apa dampaknya jika isu-isu tersebut dieksploitasi dalam skenario dunia nyata`? Jawabannya cukup sederhana, setiap kali model permission gagal mengimplementasikan dengan benar, kemungkinan eskalasi privilege muncul di dalam sistem dan tingkat serangan akan tergantung pada bagian mana dari sistem atau aplikasi yang terpengaruh atau terpapar. user/peran.
+- **Permission X Overrides Permission Y**: An unintended privilege might override another, allowing access to broader resources. For example, a `read:users` permission granting implicit access to `/api/reports`, enabling `read:reports` unintentionally.
 
-Sekarang, Kembali ke pertanyaan kami apa yang bisa salah saat menerapkan `Access Control Model`. Selama pengalaman saya, ada 3 kemungkinan berbeda:
+- **Random Permission Combinations**: Certain combinations of permissions might unintentionally grant additional access, allowing permissions like `read:X` and `read:Y` to also grant `read:Z`.
 
-- **Permission tidak diterapkan dengan Benar** Dalam kasus ini beberapa terpapar ke peran/user yang tidak sah tanpa Permission yang diperlukan diterapkan dengan benar pada mereka, Misalnya jika `/api/users` diperlukan Permission `read:users`, penyerang akan dapat menjelajah `/api/users` tanpa Permission `read:users`.
+The challenge lies in designing a penetration testing methodology that addresses these potential issues effectively. We can apply specific techniques to simulate each scenario, covering as many variations of access control failures as possible.
 
-- **Permission X override Permission Y**: Dalam hal ini jika user diberikan Permission `read:users` untuk mengakses `/api/user` API Endpoint, dia juga secara otomatis diberikan akses ke `/api/reports` endpoint. Jadi, kita dapat mengatakan Permission `read:users` mengesampingkan `read:reports`.
+## Testing Broken Access Control Models
 
-- **Set of Permission override Permission X** : Dalam hal ini, jika user diberikan `read:users` dan Permission `read:reports` untuk mengakses `/api/user` dan `/api/reports` API, dia juga secara otomatis diberikan akses ke `/api/files`, Harap dicatat bahwa kombinasi random Permission mengarah ke masalah Permission di sini, Jadi dalam hal ini, kita dapat mengatakan kombinasi random dari Permission `read:W` `read:X` dan `read:Y` memungkinkan akses `read:Z` juga.
+Let’s dive into techniques for testing broken access controls. Over the years, as pentesters and analysts, we’ve identified some highly effective methods to assess API access control weaknesses:
 
-Sekarang, challage sebenarnya adalah membangun metodologi penetratin testing yang mencakup semua skenario ini dan memberi cakupan penuh dari model target. Untuk melakukan itu, kita merancang teknik yang berbeda untuk setiap jenis skenario yang dapat muncul dalam sistem. Yang akhirnya membawa kita ke teknik yang disebut berikut.
+- **Forward Approach**: Users are granted access to one permission at a time and test for unauthorized access to restricted APIs sequentially. This ensures that permissions are restricted to intended endpoints only.
 
-## testing Access Control Model yang Rusak
+#### Example of Forward Approach:
 
-bagian favorit saya di mana saya akan memaparkan berbagai teknik dan strategi untuk menguji `Access Control Model` yang rusak dalam aplikasi. Dengan pengalaman selama beberapa tahun sebagai pentester dan menganalisis `BACM(broken access control models)`, kita telah menemukan beberapa teknik efektif untuk pentest Access Control Model.
+A user is granted `read:users` permission and attempts to access other restricted APIs within the permission model.
 
-Tiga teknik/pendekatan utama kami yang efektif adalah sebagai berikut:
+![Forward Approach Example 1](https://raw.githubusercontent.com/0x3n0/0x3n0.github.io/master/assets/img/Access-Control-Model/Access_Control_Model3.png)
 
-- Forwards Approach
-- PBackword Approach
-- Mixed Approach
+- **Backward Approach**: Users are assigned all permissions except one, then try to access the restricted API associated with the omitted permission. This tests if the absence of a specific permission restricts access appropriately.
 
-Untuk memahami pendekatan ini secara efektif, mari kita asumsikan kita sedang pentest ke web aplikasi (dengan menerapkan Access Control Model) yang memungkinkan kita sebagai `admin` mengundang `user` ke organisasi kita dengan Permission khusus. Permission digambarkan dalam gambar di bawah bersama dengan API yang dapat diakses. Harus jelas bahwa user dengan Permission saja akan dapat mengakses API terkait yang berdekatan dengannya. Jika dengan cara apa pun dia dapat mengakses API lain, Access Control Model akan dianggap rusak.
+#### Example of Backward Approach:
 
-![img-description](https://raw.githubusercontent.com/0x3n0/0x3n0.github.io/master/assets/img/Access-Control-Model/Access_Control_Model2.png)_Access Control Model_
+A user is granted all permissions except `read:users`, then attempts to access user data from `GET /api/users`.
 
-Mari kita mulai :
+![Backward Approach Example](https://raw.githubusercontent.com/0x3n0/0x3n0.github.io/master/assets/img/Access-Control-Model/Access_Control_Model6.png)
 
-### Forward Approach
+- **Mixed Approach**: Users are invited with a random combination of permissions to test against restricted API endpoints associated with other roles. This ensures no unintentional privilege escalations.
 
-Dalam strategi `Forward Approach`, user harus diundang hanya dengan satu permission (misalkan adalah permission berwarna hijau pertama) dan Kemudian user yang diundang dengan hanya satu permission akan mencoba mengakses semua API terbatas lainnya secara berurutan. Setelah menyelesaikan kasus penetest pertama, user harus diundang dengan permission ke-2 dan kemudian akan mencoba mengakses semua API terbatas lainnya secara berurutan dan seterusnya.
+#### Example of Mixed Approach:
 
-Beberapa kasus testing yang dihasilkan oleh Forward Approach seperti yang tercantum di bawah ini:
+A user is given permissions `read:users`, `write:docs`, and `write:logs` and then tested against restricted endpoints.
 
-#### Contoh Forward Approach 1 :
+![Mixed Approach Example](https://raw.githubusercontent.com/0x3n0/0x3n0.github.io/master/assets/img/Access-Control-Model/Access_Control_Model8.png)
 
-Dalam kasus Forward Approach berikut, user diberikan permission `read:users` dalam model dan kemudian dia mencoba mengakses API yang dibatasi lainnya dalam model permission.
+## Closing Thoughts
 
-![img](https://raw.githubusercontent.com/0x3n0/0x3n0.github.io/master/assets/img/Access-Control-Model/Access_Control_Model3.png)
+API endpoints should reference identifiers (name, ID, or UID) only within intended scopes. Insecure Direct Object References (IDOR) are a form of access control weakness, though not all access control issues are classified as IDORs.
 
-#### Contoh Forward Approach 2 :
-
-Dalam kasus Forward Approach berikut, user diberikan permission `write:users` dalam model dan kemudian dia mencoba mengakses API yang dibatasi lainnya dalam model permission.
-
-![img](https://raw.githubusercontent.com/0x3n0/0x3n0.github.io/master/assets/img/Access-Control-Model/Access_Control_Model4.png)
-
-#### Contoh Forward Approach 3 :
-
-Dalam kasus Forward Approach berikut, user diberikan permission `read:documents` dalam model dan kemudian dia mencoba mengakses API yang dibatasi lainnya dalam model permission.
-
-![img](https://raw.githubusercontent.com/0x3n0/0x3n0.github.io/master/assets/img/Access-Control-Model/Access_Control_Model5.png)
-
-### Backword Approach:
-
-Dalam Backword Approach, user harus diberikan semua permission dalam model kecuali satu permission dan kita akan mencoba mengakses API masing-masing dari permission tanpa permission.
-
-#### Contoh Backword Approach 1 :
-
-Dalam kasus Backword Approach berikut, user diberikan semua permission kecuali permission `read:user` dalam model dan kemudian ia mencoba mengakses informasi user dari `GET /api/users` seperti yang ditunjukkan pada gambar di bawah ini.
-
-![img](https://raw.githubusercontent.com/0x3n0/0x3n0.github.io/master/assets/img/Access-Control-Model/Access_Control_Model6.png)
-
-#### Contoh Backword Approach 2 :
-
-Dalam kasus Backword Approach berikut, user diberikan semua permission kecuali permission `write:users` dalam model dan kemudian ia mencoba untuk mengubah informasi user dari  titik `POST /api/users` yang tidak memiliki permission.
-
-![img](https://raw.githubusercontent.com/0x3n0/0x3n0.github.io/master/assets/img/Access-Control-Model/Access_Control_Model7.png)
-
-### Mixed Approach
-
-Dalam Mixed Approach, user harus diundang dengan serangkaian permission campuran dari daftar permission dan kemudian dia akan mencoba mengakses titik API terkait dari peran terbatas.
-
-#### contoh Mixed Approach 1 :
-
-Dalam kasus Mixed Approach berikut, user diberikan permission `read:users`, `write:docs`, `write:logs` kemudian semua titik API terbatas lainnya harus diuji terhadap permission campuran ini untuk memeriksa kontrol yang rusak.
-
-![img](https://raw.githubusercontent.com/0x3n0/0x3n0.github.io/master/assets/img/Access-Control-Model/Access_Control_Model8.png)
-
-#### Contoh Mixed Approach 2 :
-
-Dalam kasus Mixed Approach berikut user diberikan permission `write:docs`, `read:logs`, `write:logs` maka semua titik API yang dibatasi harus diuji terhadap permission ini seperti yang ditunjukkan pada gambar di bawah ini.
-
-![img](https://raw.githubusercontent.com/0x3n0/0x3n0.github.io/master/assets/img/Access-Control-Model/Access_Control_Model9.png)
-
-## Penutup
-Dalam hal ini, titik API harus memiliki penunjuk yang dapat berupa nama, id, atau Uid ketika direferensikan ke organisasi lain atau user dari organisasi lain mengarah ke `IDOR`. Oleh karena itu, semua IDOR adalah masalah Access control Tetapi semua masalah Access control bukan milik IDOR. .
-
-Saya harap bisa membantu. Jika kamu memiliki pertanyaan, saran, atau permintaan, silakan hubungi kami melalui
+For further discussion, questions, or insights, reach out at:
 
 [z0rs.github.io](mailto:z0rs.github.io)
 
 See you next time.
-
 
