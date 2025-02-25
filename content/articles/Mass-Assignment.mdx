@@ -9,7 +9,7 @@ featuredImage: https://raw.githubusercontent.com/0x3n0/0x3n0.github.io/master/as
 
 ![img-description](https://raw.githubusercontent.com/0x3n0/0x3n0.github.io/master/assets/img/blogging/Mass-Assignment.jpg)_OWASP API Security_
 
-You might have heard of the `OWASP Top 10`, a widely recognized list of the most critical security risks affecting web applications. Similarly, OWASP also publishes a list of the `Top 10 API Security Risks` that are specific to APIs, known as the `OWASP API Security Top 10`. Here’s the current list:
+Alright, you’ve probably heard about the `OWASP Top 10`, the ultimate hall of shame for web app security nightmares. But did you know OWASP also has a hit list just for API security? Yup, it’s called the `OWASP API Security Top 10`, and here’s the rundown:
 
 - Broken Object Level Authorization
 - Broken User Authentication
@@ -22,11 +22,11 @@ You might have heard of the `OWASP Top 10`, a widely recognized list of the most
 - Improper Assets Management
 - Insufficient Logging & Monitoring
 
-In this article, we’ll focus on one of the top API security vulnerabilities, **Mass Assignment**. Mass Assignment occurs when an application assigns values to multiple object properties simultaneously. But how does this feature turn into a security vulnerability? Let’s dive into an example.
+Today, we’re zooming in on one of the sneakiest API security flaws—**Mass Assignment**. Sounds harmless, right? But this bad boy can straight-up wreck your app’s security. Let’s break it down with an example.
 
-## Understanding API Security and Object Properties
+## API Security and Object Properties 101
 
-Application objects often come with numerous properties defining their attributes. For example, consider a `user` object used to store user information in an application. This object might contain properties such as `user ID`, `name`, `location`, and so forth.
+So, apps usually deal with objects that hold a bunch of properties. Think of a `user` object in an app—could look something like this:
 
 ```json
 { 
@@ -38,13 +38,13 @@ Application objects often come with numerous properties defining their attribute
 }
 ```
 
-In this case, users should only be allowed to modify certain properties, such as `location` and `name`. However, other parts of this user object, like `admin` (indicating whether the user has administrative rights) and `group_membership` (tracking user group affiliations), should be restricted from user modification.
+Now, a regular user should only be tweaking harmless fields like `name` and `location`, not touching serious stuff like `admin` status or `group_membership`. But here’s where things get dicey.
 
-## API Security Mass Assignment Vulnerability
+## Mass Assignment: The Silent Killer
 
-Mass Assignment is a vulnerability where user input is improperly assigned to sensitive data fields like `password`, `permissions`, or `admin status`, leading to unauthorized modifications.
+Mass Assignment is what happens when an app just blindly accepts whatever the user throws at it and updates object properties without checking. If your API isn’t carefully filtering inputs, a sneaky attacker can go from "just another user" to "admin boss mode" in seconds.
 
-This vulnerability surfaces when an application automatically maps user inputs to multiple program variables or object properties without validation. While this feature can simplify application development in many frameworks, it also enables attackers to overwrite, alter, or create new properties within objects. For instance, consider a scenario where a site allows users to update their name with a PUT request like this, changing user `1337`'s name from `eno` to `enogans`.
+Let’s say your app lets users update their names with a simple request:
 
 ### OWASP API Security Example #1: Mass Assignment
 
@@ -55,7 +55,7 @@ PUT /api/v1.1/user/1337
 }
 ```
 
-Now, what happens if the user sends a request like this?
+Looks innocent enough. But what if someone gets a little creative?
 
 ```http
 PUT /api/v1.1/user/1337
@@ -65,7 +65,7 @@ PUT /api/v1.1/user/1337
 }
 ```
 
-If the application relies on Mass Assignment to update object properties, this request could also update the `admin` field, granting administrative rights to user `1337`. This is the essence of the Mass Assignment vulnerability, where unauthorized fields are open for user modification. Similarly, users might add themselves to restricted groups by assigning new group values.
+If your app isn’t locking down which fields can be changed, boom—this user just upgraded themselves to admin status. Not exactly what you had in mind, huh?
 
 ### OWASP API Security Example #2: Mass Assignment
 
@@ -78,6 +78,15 @@ PUT /api/v1.1/user/1337
 }
 ```
 
-## Preventing Mass Assignment
+Now they’re adding themselves to VIP groups too? Yeah, this is why Mass Assignment is a total disaster if not handled right.
 
-To mitigate Mass Assignment vulnerabilities, disable Mass Assignment in your application framework or implement whitelisting to control accessible properties or variables. Ensuring that only specified fields are assignable by the user can prevent unauthorized modifications and significantly strengthen security.
+## How to Keep Mass Assignment in Check
+
+If you don’t want your app getting played like a cheap fiddle, here’s what you gotta do:
+
+- Disable Mass Assignment in your framework if possible.
+- Use whitelists to specify exactly which fields users can update.
+- Double-check and sanitize inputs like your security depends on it—because it does.
+
+Stay sharp, lock down your API, and don’t let Mass Assignment turn your app into a hacker’s playground!
+
