@@ -2,7 +2,7 @@
 type: article
 title: Lack of Resources & Rate Limiting
 tags: [OWASP, API Security, Rate Limiting]
-date: 2024-10-25
+date: 2018-02-01
 author: Eno Leriand
 featuredImage: https://raw.githubusercontent.com/0x3n0/0x3n0.github.io/master/assets/img/blogging/Lack-of-Resources-%26-Rate-Limiting.jpg
 ---
@@ -10,7 +10,7 @@ featuredImage: https://raw.githubusercontent.com/0x3n0/0x3n0.github.io/master/as
 ![API Security - Lack of Resources & Rate Limiting](https://raw.githubusercontent.com/0x3n0/0x3n0.github.io/master/assets/img/blogging/Lack-of-Resources-%26-Rate-Limiting.jpg)  
 _API Security Fundamentals: Lack of Resources & Rate Limiting_
 
-You’re probably familiar with the `OWASP Top 10`, highlighting the most critical web application vulnerabilities. In addition to general web application risks, OWASP has also released an `API Security Top 10` that specifically addresses API vulnerabilities. Here’s the current list:
+Alright, if you're into security, you’ve probably heard of the `OWASP Top 10`. It’s basically the Hall of Shame for web app vulnerabilities. But APIs got their own set of nightmares—meet the `API Security Top 10`. Here’s the list:
 
 - Broken Object Level Authorization
 - Broken User Authentication
@@ -23,35 +23,35 @@ You’re probably familiar with the `OWASP Top 10`, highlighting the most critic
 - Improper Assets Management
 - Insufficient Logging & Monitoring
 
-Many of these issues impact not just APIs but other application components, though APIs are particularly susceptible. In this article, we’ll break down `OWASP API Security #4`: **Lack of Resources & Rate Limiting**.
+Most of these don’t just mess with APIs but can wreck entire applications. But today, we’re zooming in on `#4`: **Lack of Resources & Rate Limiting**. Let’s break it down.
 
-## What Is OWASP API Security Lack of Resources & Rate Limiting?
+## What’s the Deal with Lack of Resources & Rate Limiting?
 
-Lack of Resources & Rate Limiting in API security occurs when the API fails to enforce limits on the volume or frequency of requests from a given API client. Without such controls, clients can potentially make thousands of API calls per second or request extensive data records in a single request, overwhelming the server.
+This happens when an API doesn’t put a cap on how many requests a client can make. No brakes = free-for-all. If there’s no rate limiting, an API client could spam thousands of requests per second or pull ridiculous amounts of data in one go, turning your server into a smoldering wreck.
 
-### Why Is Lack of Resources & Rate Limiting a Problem?
+### Why Should You Care?
 
-Firstly, not enforcing rate limits can severely affect `API server` performance, exposing systems to Denial of Service (DoS) attacks. A client (or multiple clients) making numerous simultaneous requests can exceed the server’s capacity, slowing it down or rendering it inaccessible to legitimate users.
+First off, no rate limits = easy DoS (Denial of Service) attack. A single overenthusiastic client—or worse, an army of bots—can flood your API, making it unusable for legit users.
 
-Additionally, without rate limiting, attackers can launch brute-force attacks targeting authentication and authorization, particularly if `Broken Object Level Authorization` vulnerabilities exist. For example, if the API does not limit login attempts, an attacker can brute-force passwords by sending repeated login requests until a match is found.
+Second, attackers love APIs with no limits. No rate caps mean brute-force attacks on login endpoints become a cakewalk. If `Broken Object Level Authorization` is also in play, it’s a buffet for hackers.
 
-Another issue is sensitive data exposure. When `Rate Limiting` is absent, attackers can exploit the vulnerability to harvest large amounts of sensitive data quickly, especially if the API lacks robust access controls. Consider an API that retrieves user emails without restrictions, returning a batch of emails with a single call.
+And let’s not forget data scraping. If your API dishes out sensitive info without restrictions, someone’s gonna take advantage. Imagine an endpoint that returns emails—without limits, an attacker could scoop up thousands in minutes.
 
-### OWASP API Security Example: Lack of Resources & Rate Limiting in Injection Attacks
+### Real-World Example: API Abuse in Injection Attacks
 
-The following example demonstrates how resource limits can expose sensitive data.
+Check out this API call:
 
 ```http
 https://api.example.com/v1.1/emails/view?user_id=123&entries=20
 ```
 
-In cases without rate limits, an attacker could escalate this to request a larger batch:
+Now, if there’s no rate limiting, an attacker could max out the request:
 
 ```http
 https://api.example.com/v1.1/emails/view?user_id=123&entries=5000
 ```
 
-Additionally, an attacker can loop through multiple `user_id`s to scrape emails, running numerous requests as follows:
+Or just loop through a bunch of user IDs and scrape everything:
 
 ```http
 https://api.example.com/v1.1/profile/email/view?user_id=1337
@@ -61,10 +61,11 @@ https://api.example.com/v1.1/profile/email/view?user_id=125
 https://api.example.com/v1.1/profile/email/view?user_id=2345
 ```
 
-### How to Prevent Lack of Resources & Rate Limiting Issues
+### How to Not Screw This Up
 
-So, what steps can help prevent these issues? Enforcing strict access limits is crucial, though implementing it correctly can be challenging.
+So, how do you stop your API from becoming a hacker’s playground? Enforce rate limits. Sounds easy, but getting it right is another story.
 
-Different functions require unique thresholds. For example, authentication-related endpoints should have lower rate limits to deter `brute-forcing` attacks. A good first step is identifying what constitutes "normal usage" for each function and blocking requests that significantly exceed this baseline.
+Not all API endpoints are equal. Login endpoints need stricter limits than, say, a public news feed. The trick is figuring out “normal” behavior and flagging requests that go off the rails.
 
-When determining rate limit thresholds, consider the risks unique to your API context. Stay tuned for the next part, where we’ll explore another critical API issue: `OWASP API Security #5` - [**Broken Function Level Authorization**](https://0x3n0.github.io/Function-Level-Authorizationd), and why it’s essential to audit sensitive functions in your API.
+When setting limits, think about what’s at risk. Stay sharp, because in the next part, we’ll talk about another API security fail: `OWASP API Security #5` - [**Broken Function Level Authorization**](https://0x3n0.github.io/Function-Level-Authorizationd). You’ll wanna stick around for that one. 🚀
+

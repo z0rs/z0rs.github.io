@@ -2,7 +2,7 @@
 type: article  
 title: Broken Function Level Authorization  
 tags: [OWASP, Broken Function Level Authorization]  
-date: 2023-10-25  
+date: 2018-01-30 
 author: Eno Leriand  
 featuredImage: https://raw.githubusercontent.com/0x3n0/0x3n0.github.io/master/assets/img/blogging/Function-Level-Authorization.jpg  
 ---
@@ -10,9 +10,9 @@ featuredImage: https://raw.githubusercontent.com/0x3n0/0x3n0.github.io/master/as
 ![Desktop View](https://raw.githubusercontent.com/0x3n0/0x3n0.github.io/master/assets/img/blogging/Function-Level-Authorization.jpg)  
 *API Security: Function Level Authorization*
 
-As modern applications increasingly depend on APIs, securing these interfaces is essential. In this *API Security 101* series, we’ll dive into common API vulnerabilities, the reasons behind them, and the best ways to protect your application.
+In today’s app-driven world, APIs are the backbone of everything. But if your API security is weak, you might as well be handing hackers a VIP pass. In this *API Security 101* series, we’re breaking down common API flaws, why they happen, and how to lock ‘em down.
 
-You've likely heard of the OWASP Top 10 for web applications, which covers critical security vulnerabilities. Similarly, OWASP has a Top 10 list specifically for APIs, the **OWASP API Security Top 10**, which currently includes:
+You’ve probably heard of the OWASP Top 10 for web security. Well, APIs got their own hit list—the **OWASP API Security Top 10**, featuring these usual suspects:
 
 - Broken Object Level Authorization
 - Broken User Authentication
@@ -25,35 +25,35 @@ You've likely heard of the OWASP Top 10 for web applications, which covers criti
 - Improper Asset Management
 - Insufficient Logging & Monitoring  
 
-Today, let’s take a closer look at: **OWASP API Security #5: Broken Function Level Authorization.**
+Today, we’re zooming in on **OWASP API Security #5: Broken Function Level Authorization.** Let’s get into it.
 
-## Understanding Broken Function Level Authorization
+## What’s the Deal with Broken Function Level Authorization?
 
-Before diving into this vulnerability, you might find it useful to read my post on [OWASP API Security Broken Object Level Authorization](https://z0rs.github.io/object-level-authorization/). In brief, APIs often expose object identifiers that provide access to resources, and when access control isn’t properly enforced, attackers may gain access to unauthorized resources.
+Before we go deep, you might wanna check out my post on [OWASP API Security Broken Object Level Authorization](https://z0rs.github.io/object-level-authorization/). Quick recap: APIs expose object identifiers to grant access, and if the right controls aren’t in place, attackers can snatch what ain't theirs.
 
-Similarly, **Broken Function Level Authorization** occurs when applications fail to restrict sensitive functions to authorized users. Unlike object-level authorization issues, function-level vulnerabilities specifically allow unauthorized users to access restricted functions, often due to missing or misconfigured access controls.
+Now, **Broken Function Level Authorization** is a whole different beast. This flaw lets unauthorized users perform restricted actions—think regular users doing admin-level stuff. It happens when apps don’t enforce strict function-based access control, either due to bad config or straight-up missing checks.
 
-For example, this flaw might allow a standard user to modify another user’s account or enable a user to access admin-level functionality on the site. Let’s examine a few real-world scenarios where these flaws might appear.
+That means someone could edit, delete, or access admin functions just by tweaking their request. Let’s check out some real-world screw-ups.
 
-### Example 1: Deleting Another User’s Post
+### Example 1: Hijacking Someone’s Post
 
-Imagine an API that lets users retrieve blog posts with a `GET` request to an endpoint like this:
+Say an API lets users fetch blog posts like this:
 
 ```
 GET /api/v1.1/user/1337/posts?id=32
 ```
 
-This request returns post 32 from user 1337. Since all posts are public, any user can send this request to view others' posts. However, only the original author (user 1337) should be able to edit or delete their own post.
-
-What if the API doesn’t apply the same restrictions on `PUT` and `DELETE` methods? In this case, any user could modify or delete someone else’s post by simply changing the HTTP method, like so:
+That’s cool—public posts should be viewable. But what if the API doesn’t check permissions for `DELETE` and `PUT` methods? Then any random user could do this:
 
 ```
 DELETE /api/v1.1/user/1337/posts?id=32
 ```
 
-### Example 2: Impersonating an Admin
+Boom. Someone else’s post just vanished. Not a good look.
 
-Let’s say the platform allows admins to manage users’ posts, with requests that only succeed when sent from an admin account:
+### Example 2: Playing Pretend as an Admin
+
+Imagine a platform where admins manage user posts through special API requests:
 
 ```
 DELETE /api/v1.1/user/1337/posts?id=32
@@ -61,30 +61,34 @@ POST /api/v1.1/user/1337/posts?id=32
 PUT /api/v1.1/user/1337/posts?id=32
 ```
 
-The platform identifies admins based on a specific header in the request:
+The system “knows” it’s an admin by checking a request header:
 
 ```
 Admin: 1
 ```
 
-A malicious user could add this header to their requests to gain access to admin functions. This type of vulnerability exposes sensitive functionality due to poorly implemented or missing access controls.
+See the problem? If an attacker slaps `Admin: 1` onto their request, congrats—now they’re an admin. If access control isn’t enforced properly, you just gave them the keys to the kingdom.
 
-### Example 3: Leaving the Door Unlocked
+### Example 3: Security Through Obscurity Ain’t It
 
-Finally, consider an admin-only API endpoint that provides site statistics:
+Now picture an admin-only endpoint for site stats:
 
 ```
 GET /api/v1.1/site/stats/hd216zla
 ```
 
-This endpoint does not enforce user-based restrictions, relying instead on an obscure string at the URL’s end to prevent unauthorized access. This tactic, called *Security through Obscurity*, attempts to enhance security by concealing information from unauthorized users.
+No user authentication, no role checks, just a long, weird-looking URL string. The devs might think, “Nobody will guess this.” Spoiler: someone *will* guess it. If an attacker stumbles upon this URL, it’s game over.
 
-However, security through obscurity is unreliable. If an attacker finds this URL, they could access sensitive functionality and data.
+## How Bad Can It Get?
 
-### Potential Impact of Broken Function Level Authorization
+The impact of **Broken Function Level Authorization** depends on what’s exposed. Attackers could:
 
-The extent of damage an attacker can cause with `broken function level authorization` depends on the accessible functionality. Attackers might impersonate other users, access restricted data, modify others' accounts, or even gain site admin privileges.
+- Impersonate other users
+- Access restricted data
+- Modify accounts that ain’t theirs
+- Take full admin control
 
-To prevent `broken function level authorization`, it’s crucial to implement detailed, role-based access controls. These controls should be consistently applied, regardless of request method, header, or URL parameters.
+Yeah, it’s that bad. So what’s the move? Enforce *strict* role-based access control (RBAC) across **all** API functions. No shortcuts, no weak checks based on headers or parameters. Lock it down properly or risk getting wrecked.
 
+Stay sharp, stay secure.
 

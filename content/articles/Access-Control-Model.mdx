@@ -2,82 +2,82 @@
 type: article
 title: OWASP API Security Access Control Model
 tags: [OWASP, Access Control Model, API Security]
-date: 2023-10-25
+date: 2018-01-25
 author: Eno Leriand
 featuredImage: https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ6DsQsJfRgJQGGY78eiYbavHIALSTrPUBL8qKmoFaeHS9h7qXE3bIljTQfRfSDwR_EQjc&usqp=CAU
 ---
 
 ![Access Control Model](https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ6DsQsJfRgJQGGY78eiYbavHIALSTrPUBL8qKmoFaeHS9h7qXE3bIljTQfRfSDwR_EQjc&usqp=CAU)
 
-Modern web applications often require complex access control models, allowing developers to define granular permissions for users within an organization. This capability is fundamental to API security, as it restricts access based on defined roles, minimizing attack surfaces while enabling seamless collaboration.
+Yo, in today’s world, web apps ain’t just static pages anymore—they’re beasts with complex access control setups. Devs gotta set up tight permissions so users don’t go where they shouldn’t. That’s where API security comes in: keeping stuff locked down while still letting legit users do their thing.
 
-## What is an Access Control Model?
+## What’s an Access Control Model?
 
-An Access Control Model regulates user access to resources, defining how they can interact with them. Within a web application context, it’s the underlying framework that restricts access based on user roles. For instance, an administrator might be granted access to all organizational resources, whereas regular members have access to a subset of data based on their specific role permissions.
+Think of it as the bouncer for your API. It decides who gets in, what they can touch, and how much power they have. In a web app, this model defines the rules based on user roles. Like, an admin gets the golden key to everything, but a regular user? Nah, they only get what they need—no VIP access.
 
 ![Role-Based Access Control](https://raw.githubusercontent.com/0x3n0/0x3n0.github.io/master/assets/img/Access-Control-Model/Access_Control_Model1.png)
 
-In a Role-Based Access Control (RBAC) example, three roles could be set up with distinct permissions. An admin, for instance, would access `All(users, documents, logs, and reports)`, while a manager might access `users`, `documents`, and `reports`. Regular users would be limited further, perhaps only able to view `users` and `documents`.
+A classic example is **Role-Based Access Control (RBAC)**—where users get permissions based on their role. Picture this:
 
-To gain a clearer understanding, let’s explore the types of Access Control Models commonly used today:
+- **Admin**: Gets access to `All(users, documents, logs, and reports)`. Basically, they run the show.
+- **Manager**: Can mess with `users`, `documents`, and `reports`, but logs? Not their business.
+- **Regular User**: Just here to see `users` and `documents`, no funny business.
 
-- **Role-Based Access Control (RBAC)**: Grants permissions based on a user’s role within the organization, streamlining permission management by grouping users with similar access needs.
+Alright, now let’s break down the common types of Access Control Models:
 
-- **Discretionary Access Control (DAC)**: Permissions are assigned based on access policies set by the asset owner, providing flexibility but introducing risks when misconfigured.
+- **RBAC (Role-Based Access Control)**: Keeps it simple by grouping users with similar access needs. No need to micromanage every single user.
+- **DAC (Discretionary Access Control)**: The asset owner decides who gets in. More flexibility, but also more room for screw-ups.
+- **MAC (Mandatory Access Control)**: Used in high-security environments (think gov/military). Data is labeled like `confidential`, `secret`, `top-secret`, and only the right peeps get access.
 
-- **Mandatory Access Control (MAC)**: Common in government or military systems, MAC assigns sensitivity labels to resources (e.g., confidential, secret, top-secret) and restricts access accordingly.
+## Broken Access Control: The Big Oops
 
-## Broken Access Control: A Critical Vulnerability
+Web apps are getting wild, and security ain’t getting any easier. When access controls aren’t set up right, you get `Broken Access Control`—basically, an all-you-can-eat buffet for attackers. They slip in and get their hands on restricted info. Not a good look.
 
-Web applications have become more sophisticated and, consequently, harder to secure. Misconfigurations or poor design in an Access Control Model often lead to vulnerabilities known as `Broken Access Control`. This flaw can grant unauthorized users access to restricted information, making the application an attractive target for attackers.
+## Classic Access Control Fails
 
-## Common Access Control Errors
+Mess up your access control, and you’ve got some real problems. Here are the usual suspects:
 
-When implementing an Access Control Model, missteps can result in critical security gaps. Common issues include:
+- **Permissions Gone Wrong**: If `/api/users` needs `read:users`, but an attacker can still get in without it? Yeah, you got a problem.
+- **Permission Clash**: One permission accidentally overrides another. Like, if `read:users` sneakily gives access to `/api/reports` too? Whoops.
+- **Weird Permission Combos**: Some funky mix of permissions unlocks extra access by accident. Like `read:X` + `read:Y` somehow also giving `read:Z`? Yikes.
 
-- **Permissions Not Applied Correctly**: Permissions might not be enforced properly, allowing unauthorized access. For instance, if `/api/users` requires `read:users` permission, an attacker could potentially access it without having the proper `read:users` permission.
+The real challenge? Testing for all these mess-ups before someone else finds them first.
 
-- **Permission X Overrides Permission Y**: An unintended privilege might override another, allowing access to broader resources. For example, a `read:users` permission granting implicit access to `/api/reports`, enabling `read:reports` unintentionally.
+## Breaking Access Controls (Like a Pro, But Ethically)
 
-- **Random Permission Combinations**: Certain combinations of permissions might unintentionally grant additional access, allowing permissions like `read:X` and `read:Y` to also grant `read:Z`.
+Now, let’s talk about testing these bad boys. Security pros have a few tricks up their sleeves to spot broken access control:
 
-The challenge lies in designing a penetration testing methodology that addresses these potential issues effectively. We can apply specific techniques to simulate each scenario, covering as many variations of access control failures as possible.
-
-## Testing Broken Access Control Models
-
-Let’s dive into techniques for testing broken access controls. Over the years, as pentesters and analysts, we’ve identified some highly effective methods to assess API access control weaknesses:
-
-- **Forward Approach**: Users are granted access to one permission at a time and test for unauthorized access to restricted APIs sequentially. This ensures that permissions are restricted to intended endpoints only.
+- **Forward Approach**: Start with just one permission and test if you can sneak into restricted areas.
 
 #### Example of Forward Approach:
 
-A user is granted `read:users` permission and attempts to access other restricted APIs within the permission model.
+Give a user `read:users`, then see if they can wander into unauthorized API endpoints.
 
 ![Forward Approach Example 1](https://raw.githubusercontent.com/0x3n0/0x3n0.github.io/master/assets/img/Access-Control-Model/Access_Control_Model3.png)
 
-- **Backward Approach**: Users are assigned all permissions except one, then try to access the restricted API associated with the omitted permission. This tests if the absence of a specific permission restricts access appropriately.
+- **Backward Approach**: Give a user all permissions except one, then check if they’re locked out of what they should be.
 
 #### Example of Backward Approach:
 
-A user is granted all permissions except `read:users`, then attempts to access user data from `GET /api/users`.
+Take away `read:users`, then see if they can still pull user data from `GET /api/users`.
 
 ![Backward Approach Example](https://raw.githubusercontent.com/0x3n0/0x3n0.github.io/master/assets/img/Access-Control-Model/Access_Control_Model6.png)
 
-- **Mixed Approach**: Users are invited with a random combination of permissions to test against restricted API endpoints associated with other roles. This ensures no unintentional privilege escalations.
+- **Mixed Approach**: Throw in a random mix of permissions and see if it leads to unexpected access. It’s like stress-testing the system for accidental privilege escalations.
 
 #### Example of Mixed Approach:
 
-A user is given permissions `read:users`, `write:docs`, and `write:logs` and then tested against restricted endpoints.
+A user with `read:users`, `write:docs`, and `write:logs` should not be able to access restricted API endpoints. But can they?
 
 ![Mixed Approach Example](https://raw.githubusercontent.com/0x3n0/0x3n0.github.io/master/assets/img/Access-Control-Model/Access_Control_Model8.png)
 
-## Closing Thoughts
+## Final Thoughts
 
-API endpoints should reference identifiers (name, ID, or UID) only within intended scopes. Insecure Direct Object References (IDOR) are a form of access control weakness, though not all access control issues are classified as IDORs.
+Locking down APIs means keeping everything scoped properly—no loose ends. Stuff like **Insecure Direct Object References (IDOR)** is just one type of access control fail, but trust me, there are plenty more ways to screw it up.
 
-For further discussion, questions, or insights, reach out at:
+Got questions, wanna nerd out about API security? Hit me up:
 
 [z0rs.github.io](mailto:z0rs.github.io)
 
-See you next time.
+Catch ya later.
 

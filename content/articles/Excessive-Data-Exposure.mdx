@@ -2,76 +2,79 @@
 type: article
 title: OWASP API Security - Excessive Data Exposure
 tags: [OWASP, Excessive Data Exposure]
-date: 2024-10-25
+date: 2018-01-29
 author: Eno Leriand
 featuredImage: https://raw.githubusercontent.com/0x3n0/0x3n0.github.io/master/assets/img/blogging/owasp.jpg
 ---
 
 ![Desktop View](https://raw.githubusercontent.com/0x3n0/0x3n0.github.io/master/assets/img/blogging/owasp.jpg)
 
-You might be familiar with the `OWASP Top 10`, the list spotlighting critical vulnerabilities affecting `web applications`. OWASP also publishes a `Top 10` specifically focused on API vulnerabilities, known as the `OWASP API Security Top 10`. This list, essential for securing modern API-driven architectures, includes:
+If you’re even remotely into web security, you’ve definitely heard of the `OWASP Top 10`. Think of it as the hall of fame for the worst security disasters haunting `web applications`. But here’s the catch—APIs got their own horror show, and that’s where the `OWASP API Security Top 10` steps in. This bad boy lays out the biggest threats lurking in API-driven systems, like:
 
-- Broken Object Level Authorization 
+- Broken Object Level Authorization
 - Broken User Authentication
 - Excessive Data Exposure
 - Lack of Resources & Rate Limiting
 - Broken Function Level Authorization
 - Mass Assignment
-- Security Misconfiguration 
+- Security Misconfiguration
 - Injection
 - Improper Asset Management
 - Insufficient Logging & Monitoring
 
-Many of these vulnerabilities impact components beyond just `APIs`, but they frequently emerge in API environments. Today, we’re diving into `OWASP API #3`, **Excessive Data Exposure**, a risk often overlooked yet critically exploitable.
+Some of these threats aren’t exclusive to APIs, but trust me, they hit different when APIs are involved. Today, we’re shining the spotlight on `OWASP API #3`, **Excessive Data Exposure**—a sneaky little menace that devs often overlook, but for attackers? It’s a freaking goldmine.
 
 ### OWASP API Security #3 - Excessive Data Exposure
 
-**Excessive Data Exposure** arises when an API response reveals more information than intended or necessary for end users. It's a frequent vulnerability that I've encountered while bug hunting and often overlooked as an API-specific threat. Let’s break down what this vulnerability entails, how I typically detect it, and practical steps to mitigate it.
+**Excessive Data Exposure** is what happens when an API spills way more tea than it should, handing out sensitive info like it’s a clearance sale. I see this slip-up all the time when bug hunting, and honestly, not enough devs take it seriously. Let’s break it down—how it happens, how I spot it, and how you can lock it down before it turns into a disaster.
 
-Consider a typical scenario where a web application requests data from an API service, which then populates a web page with this data in a user’s browser.
+Imagine this: a web app pings an API for user data, and the API fires back a response. That response gets displayed in the user’s browser. Simple, right?
 
 ```
 user <----------------- application -------------------> API service
-         (browser)                (API client) 
+         (browser)                (API client)
 ```
 
-For many APIs, the `API client` lacks control over which specific data fields are returned. Take, for instance, a case where an API is used to retrieve user profile information for a web page:
+Here’s the problem—most `API clients` don’t get to cherry-pick which data fields they receive. Let’s say an app calls an API for user profile info:
 
 ```
 https://api.example.com/v1.1/users/show?user_id=12
 ```
 
-An API response might return the entire user object, as follows:
+And instead of keeping it minimal, the API straight-up dumps the entire user object:
 
 ```json
-{ 
-  "id": 6253282, 
-  "username": "z0rs", 
-  "screen_name": "Eno", 
-  "location": "Blk 335 Smith Street", 
+{
+  "id": 6253282,
+  "username": "z0rs",
+  "screen_name": "Eno",
+  "location": "Blk 335 Smith Street",
   "bio": "Hacker.",
-  "api_token": "8a48c14b04d94d81ca484e8f32daf6dc", 
-  "phone_number": "123-456-7890", 
-  "address": "Blk 335 Smith Street, SG" 
+  "api_token": "8a48c14b04d94d81ca484e8f32daf6dc",
+  "phone_number": "123-456-7890",
+  "address": "Blk 335 Smith Street, SG"
 }
 ```
 
-In this example, the response includes sensitive fields (`API token`, `phone number`, and `address`) that the client-side application doesn’t need to display. This becomes problematic when developers assume unneeded fields won’t be visible to users, relying on client-side code to filter sensitive data before rendering it. But, if the entire API response reaches the browser, anyone can intercept it and view the sensitive data. 
+See the issue? This API is serving up sensitive data (`API token`, `phone number`, `address`) like it’s on an all-you-can-eat buffet. Devs assume that since the frontend doesn’t show those fields, it’s all good. But nah—if that full API response hits the browser, it’s open season. Anyone with basic dev tools or an interception tool can snatch that data straight out of the response.
 
-Attackers might also exploit this by intercepting API traffic (e.g., through MITM attacks) to extract sensitive data from other users.
+And if an attacker gets spicy with MITM (Man-in-the-Middle) attacks, they can lift sensitive data from other users too. That’s nightmare fuel right there.
 
-### Preventing Excessive Data Exposure
+### How to Stop Your API from Snitching
 
-Excessive data exposure typically happens when the API client doesn’t filter out unneeded data fields before rendering the response. Here’s how to address it:
+So, how do you keep your API from spilling secrets like a messy gossip column? Here’s what you gotta do:
 
-1. **Client-Side Filtering:** Ensure the client application only displays essential data. Filter sensitive fields in the client code before sending data to the user interface.
+1. **Frontend Filters Are Cute, But Don’t Rely on Them** – Sure, the client app should only display what’s needed, but don’t think for a second that this makes you safe. Attackers don’t play by UI rules.
 
-2. **Server-Side Optimization:** When possible, configure the `API server` to return only the fields needed for each specific request. In flexible APIs like `GraphQL`, for example, you can define precise fields in queries to limit response data. This way, the API server sends only essential data, minimizing exposure risks.
+2. **Trim the Fat on the Backend** – The `API server` should only return what’s absolutely necessary. If you’re working with `GraphQL`, use precise queries to keep responses tight. Less data sent = less risk.
 
-3. **Secure Data Transmission:** Ensure all sensitive data is encrypted in transit using secure protocols (e.g., HTTPS/TLS) to prevent exposure through network traffic interception.
+3. **Encrypt Everything** – Lock down sensitive data with proper encryption (think HTTPS/TLS). That way, even if someone sniffs your traffic, all they get is a bunch of useless gibberish.
 
-### Practical Bug Hunting for Data Exposure
+### Bug Hunting 101: Catching Excessive Data Exposure
 
-As a bug hunter and tester, I’m always on the lookout for `keywords` like `key`, `token`, and `secret` in API responses to detect data leaks. Too often, sensitive information slips through due to unfiltered `API server` responses, where the entire object is returned without filtering out unneeded fields before sending it to the client.
+When I’m on the hunt, I’m always on the lookout for anything that screams “sensitive info.” Keywords like `key`, `token`, and `secret` in API responses? Huge red flags. Most of the time, these leaks happen because APIs lazily dump entire objects instead of scrubbing out private data.
 
-Excessive Data Exposure is, unfortunately, a pervasive issue. When combined with `OWASP API #4` (Lack of Resources & Rate Limiting), it can amplify risks significantly, leading to more complex attack vectors and potential data breaches.
+Excessive Data Exposure is everywhere. And if you mix it with `OWASP API #4` (Lack of Resources & Rate Limiting), you’re looking at a full-scale disaster. Attackers can automate scraping of exposed data, turning a simple oversight into a catastrophic breach. Not exactly a flex.
+
+So yeah, don’t sleep on this. Audit your API responses, lock down your sensitive fields, and keep your data exposure to a bare minimum. Because once it’s out there, there’s no hitting undo.
+
