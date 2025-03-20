@@ -1,0 +1,111 @@
+---
+type: article
+title: "Connect Magic Mouse 2 on Arch Linux (Without Losing Your Mind)"
+tags: [Arch Linux, Magic Mouse 2, Bluetooth]
+date: 2025-03-20
+author: Eno Leriand
+featuredImage: https://raw.githubusercontent.com/z0rs/get/refs/heads/master/Images/250320-1451-14.png
+---
+
+So, you got yourself a **Magic Mouse 2** and you're running **Arch Linux**? Good luck, buddy. Unlike macOS, this ain't plug-and-play. But no worries, I got you covered. Let's get that slick Apple mouse working properly.
+
+## 🔧 Step 1: Connect via Bluetoothctl
+
+First things first, fire up a terminal and run:
+
+```bash
+bluetoothctl
+```
+
+Once inside, make sure Bluetooth is up and running:
+
+```bash
+power on
+agent on
+scan on
+```
+
+Wait for your **Magic Mouse 2** to pop up (you’ll see something like this):
+
+```bash
+[NEW] Device A8:91:3D:40:CB:7A Magic Mouse 2
+```
+
+Now, pair it up:
+
+```bash
+pair A8:91:3D:40:CB:7A
+trust A8:91:3D:40:CB:7A
+connect A8:91:3D:40:CB:7A
+```
+
+Boom! You should see `Connection successful`. If not, you probably need to sacrifice a goat to the Arch gods. 🐐
+
+## 🛠️ Step 2: Load the Right Driver
+
+If the mouse connects but **won’t move**, you gotta make sure the **hid-magicmouse** module is loaded:
+
+```bash
+sudo modprobe hid-magicmouse
+```
+
+To make it **persistent** across reboots:
+
+```bash
+echo 'hid-magicmouse' | sudo tee -a /etc/modules-load.d/hid-magicmouse.conf
+```
+
+## ⚡ Step 3: Prevent Auto-Suspend (Annoying as Hell)
+
+By default, Linux tries to save power by putting Bluetooth devices to sleep. Bad idea for a mouse. Let’s disable that:
+
+```bash
+echo "options hid-magicmouse scroll_acceleration=1 scroll_speed=50" | sudo tee /etc/modprobe.d/magicmouse.conf
+```
+
+Then reload the module:
+
+```bash
+sudo modprobe -r hid-magicmouse && sudo modprobe hid-magicmouse
+```
+
+## 🚀 Step 4: Auto-Connect on Boot
+
+Hate reconnecting manually every time you restart? Let’s automate it with **systemd**.
+
+Create a new service:
+
+```bash
+sudo nano /etc/systemd/system/bluetooth-autoconnect.service
+```
+
+Paste this in:
+
+```ini
+[Unit]
+Description=Auto-connect Magic Mouse 2
+After=bluetooth.target
+
+[Service]
+ExecStart=/usr/bin/bluetoothctl connect A8:91:3D:40:CB:7A
+Restart=always
+User=root
+
+[Install]
+WantedBy=default.target
+```
+
+Save and exit (CTRL+X, Y, ENTER), then enable it:
+
+```bash
+sudo systemctl enable bluetooth-autoconnect.service
+sudo systemctl start bluetooth-autoconnect.service
+```
+
+Now, your **Magic Mouse 2 will auto-connect on startup** like it’s supposed to. 🎉
+
+## 🎯 Done!
+
+That’s it, folks! Now you can enjoy using your **Magic Mouse 2 on Arch Linux** without going insane. If something breaks (because it’s Linux, duh), drop into **bluetoothctl** and reconnect manually.
+
+Now go flex on your friends who still use Windows. 😎
