@@ -1,0 +1,79 @@
+---
+type: ctf
+title: Decrypt n Parse HTTP/3 Traffic in Wireshark
+tags: [forensics, http3, wireshark, quic]
+date: 2025-09-07
+author: Eno
+featuredImage: https://blog.elmo.sg/assets/posts/2025-09-07-parsing-decrypted-quic-traffic-in-wireshark/tlskeylogfile.png
+---
+
+So I was tryna cook a 4n6 CTF chall 4 [ISC2 SG Youth Wing](https://www.isc2chapter.sg/youth-wing).  
+Plan was: ppl gotta decrypt HTTPS traffic w/ `SSLKEYLOGFILE` n pull out the HTTP objs.  
+
+But bruh… HTTP/3 pulled up. New browsers n servers already vibin w/ it, so sht got messy fast.  
+So here’s some quick tips n hacks I found when playin w/ QUIC + TLS 1.3 in Wireshark 🕵️‍♂️  
+
+## HTTP/3 (QUIC + TLS1.3)  
+
+> Born 2018, locked as std 2022, now >95% browsers n ~36% top sites rollin w/ it.  
+{:.prompt-tip}  
+
+Diff from HTTP/2?  
+- HTTP/2 = TCP + TLS stack  
+- HTTP/3 = QUIC (UDP) + TLS1.3, all fused up, faster n harder to kill  
+
+Sample files if u wanna vibe along:  
+- [traffic.pcapng](https://blog.elmo.sg/assets/posts/2025-09-07-parsing-decrypted-quic-traffic-in-wireshark/traffic.pcapng)  
+- [sslkey.log](https://blog.elmo.sg/assets/posts/2025-09-07-parsing-decrypted-quic-traffic-in-wireshark/sslkey.log)  
+
+## Wireshark deep dive  
+
+Open `traffic.pcapng` → u see QUIC spam. Still encrypted cuz TLS1.3.  
+No decrypt, no fun.  
+
+### Decrypting  
+
+Same drill like old TLS stuff.  
+Load ur `sslkeylog` in Wireshark:  
+`Edit > Prefs > Protocols > TLS > (Pre)-Master-Secret log filename`  
+
+![sslkeylog](https://blog.elmo.sg/assets/posts/2025-09-07-parsing-decrypted-quic-traffic-in-wireshark/tlskeylogfile.png)  
+
+Now u see HTTP/3 frames, yay. But ctrl+F? nah fam. Export objects? nope. Streams? dead end.  
+
+### Parsing headers  
+
+Peek a pkt → Wireshark shows HTTP headers. Cool but digging 1by1 = pain.  
+
+![http3 pkt](https://blog.elmo.sg/assets/posts/2025-09-07-parsing-decrypted-quic-traffic-in-wireshark/decrypted_http3_packet.png)  
+
+Quick hack: right-click `http3.headers.header.value` → apply as column.  
+Boom, all headers side-by-side.  
+
+![headers col](https://blog.elmo.sg/assets/posts/2025-09-07-parsing-decrypted-quic-traffic-in-wireshark/getting_the_response_file.png) 
+
+Still noisy af tho. Best move:  
+`File > Export Packet Dissections > As CSV` → clean it up later in Excel/Python/whatever.  
+
+### Extracting files via HTTP/3  
+
+Export Objects still dead. So… manual grind:  
+
+1. Find GET req of ur file  
+2. Click resp pkt  
+3. Spot the DOT pkt (last frag)  
+4. Click that → bottom right: `Reassembled QUIC` → file shows up  
+
+![resp](https://blog.elmo.sg/assets/posts/2025-09-07-parsing-decrypted-quic-traffic-in-wireshark/identifying_the_response.png)  
+![reasm](https://blog.elmo.sg/assets/posts/2025-09-07-parsing-decrypted-quic-traffic-in-wireshark/getting_the_response_file.png)  
+
+Copy raw bytes → save as hex stream → Python `bytes.fromhex()` → boom u got ur file back.  
+
+## Wrap up  
+
+Honestly looked ez on paper but ate my time ngl 💀.  
+These tricks lowkey saved me when playin w/ QUIC.  
+
+If u got cooler hacks or smoother Wireshark workflows, hmu on Discord `@0x3n0`{:.filepath}.  
+
+Peace out ✌️
