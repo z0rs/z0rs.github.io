@@ -1,0 +1,1417 @@
+---
+type: article
+title: OpenClaw on Arch Linux — Red Team AI Assistant
+tags: [OpenClaw, Arch Linux, Team AI Assistant, Ctf]
+date: 2026-03-07
+author: Eno
+featuredImage: https://raw.githubusercontent.com/z0rs/z0rs.github.io/refs/heads/master/content/Images/OpenClaw.png
+---
+
+# OpenClaw on Arch Linux — Red Team AI Assistant
+> **Ethical Scope Reminder:** This guide is strictly for authorized penetration testing, owned lab environments, CTF challenges, and intentionally vulnerable platforms (DVWA, Metasploitable, Juice Shop, etc.). Unauthorized access to systems you do not own or have explicit written permission to test is illegal.
+
+---
+
+> **⚠️ Note on OpenClaw:** "OpenClaw" is not a widely documented public project as of my knowledge cutoff. Throughout this guide, steps referencing the OpenClaw repo assume a Node.js/pnpm-based AI agent framework. **Verify the exact repo URL and build steps from the official source before proceeding.** Everything else in this guide (system prep, tooling, systemd, lab setup) is accurate for Arch Linux.
+
+---
+
+## SECTION 1 — System Preparation
+
+### 1.1 Full System Update
+
+```bash
+sudo pacman -Syu --noconfirm
+```
+
+### 1.2 Install Core Build Dependencies
+
+```bash
+sudo pacman -S --noconfirm \
+  base-devel \
+  git \
+  curl \
+  wget \
+  unzip \
+  zip \
+  jq \
+  python \
+  python-pip \
+  python-virtualenv \
+  go \
+  gcc \
+  make \
+  cmake \
+  openssl \
+  libffi \
+  zlib
+```
+
+### 1.3 Install Node.js LTS
+
+Arch's `nodejs` package tracks current, not LTS. Use `nvm` for version control:
+
+```bash
+# Install nvm
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+
+# Reload shell
+source ~/.bashrc
+
+# Install and use Node.js LTS
+nvm install --lts
+nvm use --lts
+nvm alias default lts/*
+
+# Verify
+node --version   # Should show v20.x.x or v22.x.x
+npm --version
+```
+
+### 1.4 Install pnpm
+
+```bash
+npm install -g pnpm
+
+# Or via the standalone installer (preferred on Arch)
+curl -fsSL https://get.pnpm.io/install.sh | sh -
+
+# Reload shell
+source ~/.bashrc
+
+# Verify
+pnpm --version
+```
+
+### 1.5 Install Security Testing Tools
+
+```bash
+# Core recon & scanning tools from official repos
+sudo pacman -S --noconfirm \
+  nmap \
+  nikto \
+  sqlmap \
+  gobuster \
+  wireshark-qt \
+  tcpdump \
+  net-tools \
+  whois \
+  bind-tools \
+  openssl \
+  curl \
+  httpie
+
+# Install yay (AUR helper) if not already installed
+git clone https://aur.archlinux.org/yay.git /tmp/yay
+cd /tmp/yay && makepkg -si --noconfirm
+cd ~ && rm -rf /tmp/yay
+```
+
+### 1.6 Install Go-Based Tools (nuclei, amass, subfinder, ffuf)
+
+These are Go tools installed via `go install` or AUR:
+
+```bash
+# Ensure Go bin is in PATH
+echo 'export PATH=$PATH:$(go env GOPATH)/bin' >> ~/.bashrc
+source ~/.bashrc
+
+# nuclei — fast vulnerability scanner
+go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest
+
+# subfinder — passive subdomain discovery
+go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest
+
+# amass — attack surface mapping
+go install -v github.com/owasp-amass/amass/v4/...@master
+
+# ffuf — web fuzzer
+go install github.com/ffuf/ffuf/v2@latest
+
+# httpx — HTTP probing
+go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest
+
+# katana — web crawler
+go install github.com/projectdiscovery/katana/cmd/katana@latest
+
+# Verify all are accessible
+nuclei -version
+subfinder -version
+ffuf -V
+httpx -version
+```
+
+### 1.7 Install Docker (Optional — for Lab Containers)
+
+```bash
+sudo pacman -S --noconfirm docker docker-compose
+
+# Enable and start Docker
+sudo systemctl enable docker
+sudo systemctl start docker
+
+# Add your user to docker group (re-login required)
+sudo usermod -aG docker $USER
+
+# Verify after re-login
+docker --version
+docker compose version
+```
+
+---
+
+## SECTION 2 — Secure Isolated Setup
+
+### 2.1 Create a Dedicated AI Agent User
+
+Running OpenClaw as a dedicated user limits blast radius if the agent is ever compromised or misused:
+
+```bash
+# Create the dedicated user (no login shell by default)
+sudo useradd -m -s /bin/bash -c "OpenClaw AI Agent" openclaw
+
+# Set a strong password
+sudo passwd openclaw
+
+# Create the agent's working directories
+sudo -u openclaw mkdir -p /home/openclaw/{ai/openclaw,ai/tools,ai/recon,ai/reports,ai/logs}
+
+# Set tight permissions — only owner can read/write
+sudo chmod 700 /home/openclaw/ai
+sudo chmod -R 750 /home/openclaw/ai/reports
+```
+
+### 2.2 Filesystem Access Restrictions
+
+Use Linux filesystem permissions and optionally systemd's `ReadWritePaths` to confine the agent:
+
+```bash
+# The openclaw user should NEVER have sudo
+# Verify no sudo entry exists
+sudo grep openclaw /etc/sudoers  # Should return nothing
+
+# Lock down the home directory from other users
+sudo chmod 750 /home/openclaw
+
+# Set ACLs to restrict the agent from accessing your main user's home
+sudo setfacl -m u:openclaw:--- /home/$(whoami)
+
+# Verify
+getfacl /home/$(whoami)
+```
+
+### 2.3 Recommended Directory Structure
+
+```bash
+sudo -u openclaw bash -c '
+mkdir -p ~/ai/openclaw       # Application source
+mkdir -p ~/ai/tools          # Tool configs and wordlists
+mkdir -p ~/ai/recon          # Recon output storage
+mkdir -p ~/ai/recon/subdomains
+mkdir -p ~/ai/recon/ports
+mkdir -p ~/ai/recon/web
+mkdir -p ~/ai/reports        # Generated reports
+mkdir -p ~/ai/logs           # Agent logs
+mkdir -p ~/ai/nuclei-templates
+'
+```
+
+Resulting tree:
+
+```
+/home/openclaw/ai/
+├── openclaw/           ← Application code
+├── tools/              ← Tool configs, wordlists
+├── recon/
+│   ├── subdomains/
+│   ├── ports/
+│   └── web/
+├── reports/            ← Pentest reports
+├── logs/               ← Agent logs
+└── nuclei-templates/   ← Custom nuclei templates
+```
+
+### 2.4 Switch to the OpenClaw User for Setup
+
+For all subsequent installation steps, work as the dedicated user:
+
+```bash
+sudo -i -u openclaw
+# or
+su - openclaw
+```
+
+---
+
+## SECTION 3 — Installing OpenClaw
+
+> **Verify the correct repository URL from the official OpenClaw project page before running these commands.**
+
+### 3.1 Clone the Repository
+
+```bash
+# As the openclaw user:
+cd ~/ai
+
+# Replace with the actual verified repo URL
+git clone https://github.com/<openclaw-org>/openclaw.git openclaw
+
+cd openclaw
+```
+
+### 3.2 Install Node.js Dependencies via pnpm
+
+```bash
+# Ensure nvm is sourced in the openclaw user's shell
+echo 'export NVM_DIR="$HOME/.nvm"' >> ~/.bashrc
+echo '[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"' >> ~/.bashrc
+source ~/.bashrc
+
+# Install nvm for this user
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+source ~/.bashrc
+
+nvm install --lts
+nvm use --lts
+
+# Install pnpm
+npm install -g pnpm
+source ~/.bashrc
+
+# Install project dependencies
+cd ~/ai/openclaw
+pnpm install
+```
+
+### 3.3 Build the Project
+
+```bash
+cd ~/ai/openclaw
+
+# Most Node.js AI frameworks use one of:
+pnpm run build
+# or
+pnpm build
+# or
+pnpm run compile
+
+# Verify the build output
+ls -la dist/ || ls -la .next/ || ls -la build/
+```
+
+### 3.4 Arch Linux Specific Troubleshooting
+
+**Problem: `node-gyp` native module failures**
+```bash
+# Install Python 2 compatibility shim if needed
+sudo pacman -S --noconfirm python2
+npm config set python /usr/bin/python3
+
+# Rebuild native modules
+pnpm rebuild
+```
+
+**Problem: `EACCES` permission errors with pnpm store**
+```bash
+# Set pnpm store to user-local directory
+pnpm config set store-dir ~/.local/share/pnpm/store
+
+# Clear and reinstall
+pnpm store prune
+pnpm install
+```
+
+**Problem: Node version mismatch**
+```bash
+# Check required version in package.json
+cat package.json | grep '"node"'
+
+# Switch to exact required version
+nvm install 20.11.0
+nvm use 20.11.0
+pnpm install
+```
+
+**Problem: `canvas` or `sharp` native deps fail**
+```bash
+sudo pacman -S --noconfirm \
+  cairo \
+  pango \
+  libpng \
+  libjpeg-turbo \
+  giflib \
+  librsvg \
+  pixman
+
+pnpm rebuild canvas sharp
+```
+
+**Problem: `better-sqlite3` fails to build**
+```bash
+sudo pacman -S --noconfirm sqlite
+pnpm rebuild better-sqlite3
+```
+
+---
+
+## SECTION 4 — Environment Configuration
+
+### 4.1 Create the `.env` Configuration File
+
+```bash
+cd ~/ai/openclaw
+cp .env.example .env   # If template exists
+# or create from scratch:
+nano .env
+```
+
+### 4.2 Full `.env` Example
+
+```dotenv
+# ============================================================
+# OpenClaw — Penetration Testing AI Assistant
+# CONFIDENTIAL — Do not commit to version control
+# ============================================================
+
+# --- Application ---
+NODE_ENV=production
+PORT=3000
+HOST=127.0.0.1              # IMPORTANT: Localhost only, never 0.0.0.0 in a lab
+
+# --- AI Provider (choose one) ---
+# Option A: OpenAI
+OPENAI_API_KEY=sk-...
+OPENAI_MODEL=gpt-4o
+
+# Option B: Anthropic Claude
+ANTHROPIC_API_KEY=sk-ant-...
+ANTHROPIC_MODEL=claude-opus-4-20250514
+
+# Option C: Local Ollama (no API key needed)
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=llama3.1:70b
+# or for security-focused model:
+# OLLAMA_MODEL=llama3.1:8b
+
+# Option D: OpenRouter (access to many models)
+OPENROUTER_API_KEY=sk-or-...
+OPENROUTER_MODEL=anthropic/claude-3.5-sonnet
+
+# --- Local Model Settings ---
+USE_LOCAL_MODEL=false          # Set true to use Ollama
+LOCAL_MODEL_FALLBACK=true      # Fall back to local if API fails
+
+# --- Security Tool Paths ---
+NMAP_PATH=/usr/bin/nmap
+NUCLEI_PATH=/home/openclaw/go/bin/nuclei
+SUBFINDER_PATH=/home/openclaw/go/bin/subfinder
+FFUF_PATH=/home/openclaw/go/bin/ffuf
+GOBUSTER_PATH=/usr/bin/gobuster
+SQLMAP_PATH=/usr/bin/sqlmap
+NIKTO_PATH=/usr/bin/nikto
+AMASS_PATH=/home/openclaw/go/bin/amass
+HTTPX_PATH=/home/openclaw/go/bin/httpx
+
+# --- Tool Configuration ---
+NUCLEI_TEMPLATES_PATH=/home/openclaw/ai/nuclei-templates
+WORDLISTS_PATH=/home/openclaw/ai/tools/wordlists
+RECON_OUTPUT_PATH=/home/openclaw/ai/recon
+REPORTS_OUTPUT_PATH=/home/openclaw/ai/reports
+
+# --- Scope Control (CRITICAL for ethical use) ---
+# Comma-separated list of authorized target IPs/CIDRs/domains
+# The agent must REFUSE requests outside this scope
+AUTHORIZED_TARGETS=192.168.56.0/24,10.10.10.0/24,dvwa.local
+AUTHORIZED_DOMAINS=dvwa.local,juice.local,metasploitable.local
+
+# --- Logging ---
+LOG_LEVEL=info
+LOG_FILE=/home/openclaw/ai/logs/openclaw.log
+LOG_MAX_SIZE=50m
+LOG_MAX_FILES=10
+
+# --- Rate Limiting ---
+MAX_CONCURRENT_SCANS=3
+SCAN_RATE_LIMIT=100             # requests per second for fuzzing
+NMAP_MAX_RATE=1000              # packets per second
+
+# --- Token Control ---
+MAX_TOKENS_PER_REQUEST=4096
+CONTEXT_WINDOW=8192
+TEMPERATURE=0.3                 # Lower = more deterministic for technical tasks
+
+# --- Browser Automation ---
+BROWSER_PATH=/usr/bin/chromium
+BROWSER_HEADLESS=true
+BROWSER_NO_SANDBOX=false        # Keep false unless in container
+
+# --- Database (local storage) ---
+DATABASE_PATH=/home/openclaw/ai/openclaw/data/openclaw.db
+```
+
+### 4.3 Secure the `.env` File
+
+```bash
+# Only the openclaw user should read this
+chmod 600 ~/ai/openclaw/.env
+
+# Verify
+ls -la ~/ai/openclaw/.env
+# Should show: -rw------- 1 openclaw openclaw
+```
+
+---
+
+## SECTION 5 — Tool Integration & Orchestration
+
+### 5.1 Wordlist Setup
+
+```bash
+# Install SecLists (comprehensive wordlists)
+cd ~/ai/tools
+git clone --depth 1 https://github.com/danielmiessler/SecLists.git wordlists
+
+# Key wordlist paths you'll reference:
+# ~/ai/tools/wordlists/Discovery/DNS/
+# ~/ai/tools/wordlists/Discovery/Web-Content/
+# ~/ai/tools/wordlists/Usernames/
+# ~/ai/tools/wordlists/Passwords/
+```
+
+### 5.2 Nuclei Template Setup
+
+```bash
+# Update official nuclei templates
+nuclei -update-templates -update-template-dir ~/ai/nuclei-templates
+
+# Verify template count
+ls ~/ai/nuclei-templates/ | wc -l
+```
+
+### 5.3 Tool Integration Wrapper Scripts
+
+Create wrapper scripts that OpenClaw can invoke:
+
+```bash
+mkdir -p ~/ai/openclaw/scripts
+```
+
+**`~/ai/openclaw/scripts/scan-ports.sh`**
+```bash
+#!/bin/bash
+# Usage: scan-ports.sh <target> <output-prefix>
+# Scope validation — only run against authorized targets
+TARGET="$1"
+OUTPUT_PREFIX="${2:-scan}"
+OUTPUT_DIR=~/ai/recon/ports
+
+mkdir -p "$OUTPUT_DIR"
+
+echo "[*] Starting port scan on $TARGET"
+
+# Full port SYN scan with service/version detection
+nmap -sS -sV -sC -O \
+     --open \
+     -p- \
+     -T4 \
+     --min-rate=1000 \
+     -oA "$OUTPUT_DIR/${OUTPUT_PREFIX}-$(date +%Y%m%d-%H%M%S)" \
+     "$TARGET"
+
+echo "[+] Scan complete. Output saved to $OUTPUT_DIR"
+```
+
+**`~/ai/openclaw/scripts/web-enum.sh`**
+```bash
+#!/bin/bash
+# Usage: web-enum.sh <url> <output-prefix>
+URL="$1"
+PREFIX="${2:-web}"
+OUTPUT_DIR=~/ai/recon/web
+
+mkdir -p "$OUTPUT_DIR"
+
+echo "[*] Starting web enumeration on $URL"
+
+# Directory brute force
+ffuf -u "${URL}/FUZZ" \
+     -w ~/ai/tools/wordlists/Discovery/Web-Content/raft-medium-directories.txt \
+     -mc 200,301,302,401,403 \
+     -t 50 \
+     -o "$OUTPUT_DIR/${PREFIX}-dirs-$(date +%Y%m%d-%H%M%S).json" \
+     -of json
+
+# Virtual host discovery
+ffuf -u "$URL" \
+     -H "Host: FUZZ.$(echo $URL | cut -d/ -f3)" \
+     -w ~/ai/tools/wordlists/Discovery/DNS/subdomains-top1million-5000.txt \
+     -mc 200,301,302 \
+     -o "$OUTPUT_DIR/${PREFIX}-vhosts-$(date +%Y%m%d-%H%M%S).json" \
+     -of json
+
+echo "[+] Web enumeration complete."
+```
+
+**`~/ai/openclaw/scripts/vuln-scan.sh`**
+```bash
+#!/bin/bash
+# Usage: vuln-scan.sh <target-url>
+TARGET="$1"
+OUTPUT_DIR=~/ai/recon/web
+
+mkdir -p "$OUTPUT_DIR"
+
+echo "[*] Running nuclei vulnerability scan on $TARGET"
+
+nuclei -u "$TARGET" \
+       -t ~/ai/nuclei-templates/ \
+       -severity low,medium,high,critical \
+       -o "$OUTPUT_DIR/nuclei-$(date +%Y%m%d-%H%M%S).txt" \
+       -j \
+       -stats
+
+echo "[+] Nuclei scan complete."
+```
+
+```bash
+# Make all scripts executable
+chmod +x ~/ai/openclaw/scripts/*.sh
+```
+
+---
+
+## SECTION 6 — Recon Automation Examples
+
+### 6.1 Subdomain Discovery Pipeline
+
+```bash
+#!/bin/bash
+# ~/ai/openclaw/scripts/recon-full.sh
+# Full recon pipeline for a target domain
+
+DOMAIN="$1"
+OUTPUT_DIR=~/ai/recon/subdomains/$(date +%Y%m%d)_${DOMAIN}
+mkdir -p "$OUTPUT_DIR"
+
+echo "[*] === FULL RECON PIPELINE: $DOMAIN ==="
+
+# 1. Passive subdomain enumeration
+echo "[*] Running subfinder..."
+subfinder -d "$DOMAIN" \
+          -o "$OUTPUT_DIR/subfinder.txt" \
+          -silent
+
+# 2. Active DNS bruteforce
+echo "[*] Running amass..."
+amass enum -d "$DOMAIN" \
+           -o "$OUTPUT_DIR/amass.txt" \
+           -passive
+
+# 3. Merge and deduplicate
+echo "[*] Merging results..."
+cat "$OUTPUT_DIR/"*.txt | sort -u > "$OUTPUT_DIR/all-subdomains.txt"
+TOTAL=$(wc -l < "$OUTPUT_DIR/all-subdomains.txt")
+echo "[+] Found $TOTAL unique subdomains"
+
+# 4. Probe which are alive
+echo "[*] Probing live hosts with httpx..."
+httpx -l "$OUTPUT_DIR/all-subdomains.txt" \
+      -o "$OUTPUT_DIR/live-hosts.txt" \
+      -status-code \
+      -title \
+      -tech-detect \
+      -silent
+
+echo "[+] Full recon complete. Results in $OUTPUT_DIR"
+```
+
+### 6.2 Service Fingerprinting
+
+```bash
+#!/bin/bash
+# ~/ai/openclaw/scripts/fingerprint.sh
+TARGET="$1"
+
+echo "[*] Service fingerprinting: $TARGET"
+
+# Deep service scan
+nmap -sV \
+     --version-intensity 9 \
+     -sC \
+     -p 21,22,23,25,53,80,110,111,135,139,143,443,445,993,995,1723,3306,3389,5900,8080,8443 \
+     --script=banner,http-headers,ssh-hostkey,ssl-cert \
+     -oN ~/ai/recon/ports/fingerprint-${TARGET}-$(date +%Y%m%d).txt \
+     "$TARGET"
+```
+
+### 6.3 Web Application Enumeration
+
+```bash
+#!/bin/bash
+# ~/ai/openclaw/scripts/webapp-enum.sh
+TARGET_URL="$1"
+
+echo "[*] Web app enumeration: $TARGET_URL"
+
+# Nikto web server scan
+nikto -h "$TARGET_URL" \
+      -output ~/ai/recon/web/nikto-$(date +%Y%m%d-%H%M%S).txt \
+      -Format txt
+
+# Gobuster directory scan
+gobuster dir \
+  -u "$TARGET_URL" \
+  -w ~/ai/tools/wordlists/Discovery/Web-Content/directory-list-2.3-medium.txt \
+  -x php,html,txt,js,json,asp,aspx \
+  -t 50 \
+  -o ~/ai/recon/web/gobuster-$(date +%Y%m%d-%H%M%S).txt
+
+# SQLMap for SQL injection detection (use only on authorized targets)
+# sqlmap -u "$TARGET_URL" --batch --level=2 --risk=1
+```
+
+---
+
+## SECTION 7 — Reporting Automation
+
+### 7.1 Report Template Structure
+
+```bash
+mkdir -p ~/ai/reports/templates
+```
+
+**`~/ai/reports/templates/pentest-report-template.md`**
+```markdown
+# Penetration Test Report
+
+**Target:** [TARGET_NAME]
+**Date:** [DATE]
+**Tester:** [YOUR_NAME]
+**Scope:** [SCOPE_DEFINITION]
+**Authorization Reference:** [AUTH_DOC_REF]
+
+---
+
+## Executive Summary
+[AI-GENERATED SUMMARY]
+
+## Scope and Methodology
+### In-Scope Assets
+- [LIST_TARGETS]
+
+### Out-of-Scope
+- [LIST_EXCLUSIONS]
+
+### Testing Methodology
+- Reconnaissance
+- Enumeration
+- Vulnerability Analysis
+- Exploitation (where authorized)
+- Post-Exploitation (where authorized)
+- Reporting
+
+---
+
+## Findings Summary
+
+| ID | Severity | Title | CVSS | Status |
+|----|----------|-------|------|--------|
+| F-001 | Critical | | | Open |
+| F-002 | High | | | Open |
+
+---
+
+## Detailed Findings
+
+### F-001: [FINDING TITLE]
+**Severity:** Critical / High / Medium / Low / Informational
+**CVSS Score:** X.X
+**CVE Reference:** CVE-XXXX-XXXXX (if applicable)
+
+**Description:**
+[AI-ASSISTED DESCRIPTION]
+
+**Evidence:**
+```
+[TOOL OUTPUT / SCREENSHOTS]
+```
+
+**Impact:**
+[BUSINESS IMPACT]
+
+**Remediation:**
+[RECOMMENDED FIX]
+
+**References:**
+- [LINKS]
+
+---
+
+## Appendix A: Tool Output
+[RAW SCAN OUTPUT]
+
+## Appendix B: Timeline
+[TESTING TIMELINE]
+```
+
+### 7.2 AI-Assisted Report Generation Script
+
+```bash
+#!/bin/bash
+# ~/ai/openclaw/scripts/generate-report.sh
+# Collects all scan outputs and prepares them for AI summarization
+
+TARGET="$1"
+REPORT_DATE=$(date +%Y%m%d)
+REPORT_DIR=~/ai/reports/${REPORT_DATE}_${TARGET}
+mkdir -p "$REPORT_DIR"
+
+echo "[*] Collecting evidence for report..."
+
+# Aggregate all scan outputs
+cp ~/ai/recon/ports/*${TARGET}* "$REPORT_DIR/" 2>/dev/null
+cp ~/ai/recon/web/*${TARGET}* "$REPORT_DIR/" 2>/dev/null
+cp ~/ai/recon/subdomains/*${TARGET}* "$REPORT_DIR/" 2>/dev/null
+
+# Generate report data summary
+cat > "$REPORT_DIR/evidence-summary.txt" << EOF
+Target: $TARGET
+Date: $(date)
+Scan Files:
+$(ls -la $REPORT_DIR/)
+
+Port Scan Summary:
+$(grep "open" $REPORT_DIR/*nmap*.txt 2>/dev/null | head -50)
+
+Nuclei Findings:
+$(cat $REPORT_DIR/*nuclei*.txt 2>/dev/null | head -100)
+
+Web Directories Found:
+$(cat $REPORT_DIR/*gobuster*.txt 2>/dev/null | grep "Status: 200" | head -30)
+EOF
+
+echo "[+] Evidence collected in $REPORT_DIR"
+echo "[*] Pass evidence-summary.txt to OpenClaw for AI report generation"
+```
+
+---
+
+## SECTION 8 — Running as a Persistent systemd User Service
+
+### 8.1 Create the systemd User Service File
+
+```bash
+# Create systemd user directory
+mkdir -p ~/.config/systemd/user
+
+nano ~/.config/systemd/user/openclaw.service
+```
+
+**`~/.config/systemd/user/openclaw.service`**
+```ini
+[Unit]
+Description=OpenClaw AI Red Team Assistant
+Documentation=https://github.com/<openclaw-org>/openclaw
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/openclaw/ai/openclaw
+ExecStart=/home/openclaw/.nvm/versions/node/v20.19.0/bin/node dist/index.js
+ExecReload=/bin/kill -HUP $MAINPID
+
+# Restart policy
+Restart=on-failure
+RestartSec=10s
+StartLimitIntervalSec=120
+StartLimitBurst=5
+
+# Environment
+EnvironmentFile=/home/openclaw/ai/openclaw/.env
+Environment=NODE_ENV=production
+
+# Logging
+StandardOutput=append:/home/openclaw/ai/logs/openclaw.log
+StandardError=append:/home/openclaw/ai/logs/openclaw-error.log
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/home/openclaw/ai
+ProtectHome=read-only
+ReadWritePaths=/home/openclaw/ai/openclaw
+ReadWritePaths=/home/openclaw/ai/recon
+ReadWritePaths=/home/openclaw/ai/reports
+ReadWritePaths=/home/openclaw/ai/logs
+ProtectKernelTunables=true
+ProtectKernelModules=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=false
+RestrictRealtime=true
+
+[Install]
+WantedBy=default.target
+```
+
+> **Note:** Update the Node.js path in `ExecStart` to match your actual `nvm` node version path. Run `which node` as the openclaw user to confirm.
+
+### 8.2 Enable Lingering and Start the Service
+
+```bash
+# Enable lingering (service survives user logout)
+sudo loginctl enable-linger openclaw
+
+# Reload systemd user daemon
+systemctl --user daemon-reload
+
+# Enable service at user login
+systemctl --user enable openclaw
+
+# Start the service
+systemctl --user start openclaw
+
+# Check status
+systemctl --user status openclaw
+
+# View live logs
+journalctl --user -u openclaw -f
+
+# Or tail the log file directly
+tail -f ~/ai/logs/openclaw.log
+```
+
+### 8.3 Log Rotation
+
+```bash
+nano ~/.config/systemd/user/openclaw-logrotate.conf
+```
+
+```
+/home/openclaw/ai/logs/*.log {
+    daily
+    rotate 14
+    compress
+    delaycompress
+    missingok
+    notifempty
+    sharedscripts
+    postrotate
+        systemctl --user reload openclaw || true
+    endscript
+}
+```
+
+---
+
+## SECTION 9 — Safe Lab Environment Setup
+
+### 9.1 Docker-Based Vulnerable Applications
+
+```bash
+# DVWA — Damn Vulnerable Web Application
+docker run -d \
+  --name dvwa \
+  --network lab-network \
+  -p 8080:80 \
+  vulnerables/web-dvwa
+
+# OWASP Juice Shop
+docker run -d \
+  --name juiceshop \
+  --network lab-network \
+  -p 3001:3000 \
+  bkimminich/juice-shop
+
+# WebGoat
+docker run -d \
+  --name webgoat \
+  --network lab-network \
+  -p 8888:8080 \
+  webgoat/goat-and-wolf
+
+# Metasploitable 3 (via Vagrant — see below)
+# OWASP WebGoat NodeJS
+docker run -d \
+  --name nodegoat \
+  --network lab-network \
+  -p 4000:4000 \
+  owasp/nodegoat
+```
+
+### 9.2 Create an Isolated Docker Lab Network
+
+```bash
+# Create isolated bridge network for all lab containers
+# This prevents lab traffic from touching real interfaces
+docker network create \
+  --driver bridge \
+  --subnet 192.168.200.0/24 \
+  --gateway 192.168.200.1 \
+  --opt "com.docker.network.bridge.name"="br-lab" \
+  lab-network
+
+# Verify
+docker network inspect lab-network
+
+# Add iptables rule to prevent lab network from accessing real internet
+# (optional but recommended for realism)
+sudo iptables -I FORWARD -s 192.168.200.0/24 -d 0.0.0.0/0 \
+  ! -d 192.168.200.0/24 -j DROP
+```
+
+### 9.3 KVM/QEMU Virtual Machines (for Metasploitable 2)
+
+```bash
+# Install KVM stack
+sudo pacman -S --noconfirm \
+  qemu-full \
+  libvirt \
+  virt-manager \
+  dnsmasq \
+  bridge-utils \
+  iptables-nft \
+  edk2-ovmf
+
+# Enable libvirt
+sudo systemctl enable --now libvirtd
+sudo usermod -aG libvirt $USER
+
+# Download Metasploitable 2 image (from official source)
+# https://sourceforge.net/projects/metasploitable/
+
+# Import into virt-manager or run directly:
+qemu-system-x86_64 \
+  -name Metasploitable2 \
+  -m 1024 \
+  -netdev user,id=net0,net=10.10.10.0/24,host=10.10.10.1 \
+  -device e1000,netdev=net0 \
+  -drive file=Metasploitable.vmdk,format=vmdk \
+  -display none \
+  -daemonize
+```
+
+### 9.4 Full Lab `docker-compose.yml`
+
+```yaml
+# ~/ai/lab/docker-compose.yml
+version: '3.8'
+
+networks:
+  lab-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 192.168.200.0/24
+
+services:
+  dvwa:
+    image: vulnerables/web-dvwa
+    container_name: dvwa
+    networks:
+      lab-network:
+        ipv4_address: 192.168.200.10
+    ports:
+      - "127.0.0.1:8080:80"
+    restart: unless-stopped
+
+  juiceshop:
+    image: bkimminich/juice-shop
+    container_name: juiceshop
+    networks:
+      lab-network:
+        ipv4_address: 192.168.200.11
+    ports:
+      - "127.0.0.1:3001:3000"
+    restart: unless-stopped
+
+  webgoat:
+    image: webgoat/goat-and-wolf
+    container_name: webgoat
+    networks:
+      lab-network:
+        ipv4_address: 192.168.200.12
+    ports:
+      - "127.0.0.1:8888:8080"
+    restart: unless-stopped
+
+  vulhub-base:
+    image: vulhub/base
+    container_name: vulhub
+    networks:
+      lab-network:
+        ipv4_address: 192.168.200.20
+    privileged: true
+    restart: unless-stopped
+```
+
+```bash
+# Start the full lab
+mkdir -p ~/ai/lab
+cd ~/ai/lab
+# (save above docker-compose.yml here)
+docker compose up -d
+
+# Verify all targets are running
+docker compose ps
+```
+
+---
+
+## SECTION 10 — Browser Automation for Web App Testing
+
+### 10.1 Install Chromium
+
+```bash
+sudo pacman -S --noconfirm chromium
+
+# Optional: Brave Browser (AUR)
+yay -S brave-bin --noconfirm
+```
+
+### 10.2 Playwright for Headless Web Automation
+
+```bash
+cd ~/ai/openclaw
+
+# Install Playwright
+pnpm add playwright
+
+# Install browser binaries (Chromium)
+npx playwright install chromium
+
+# Verify
+npx playwright --version
+```
+
+### 10.3 Chromium Security Testing Configuration
+
+```bash
+# Create a dedicated testing browser profile
+mkdir -p ~/ai/tools/browser-profile
+
+# Launch Chromium with security testing flags:
+chromium \
+  --user-data-dir=~/ai/tools/browser-profile \
+  --no-sandbox \
+  --disable-web-security \
+  --allow-running-insecure-content \
+  --ignore-certificate-errors \
+  --proxy-server=http://127.0.0.1:8080 \
+  --new-window \
+  http://localhost:8080
+```
+
+> **Note:** The flags `--disable-web-security` and `--ignore-certificate-errors` should **only** be used with your dedicated testing profile pointed at lab targets. Never use them as your daily browser.
+
+### 10.4 Burp Suite Community Edition (AUR)
+
+```bash
+# Install Java first
+sudo pacman -S --noconfirm jdk17-openjdk
+
+# Install Burp Suite Community (AUR)
+yay -S burpsuite --noconfirm
+
+# Launch
+burpsuite &
+
+# Configure Chromium to proxy through Burp on 127.0.0.1:8080
+```
+
+---
+
+## SECTION 11 — Performance Optimization
+
+### 11.1 Node.js Memory Tuning
+
+```bash
+# In your .env or service file, tune V8 heap for your 16GB RAM system
+export NODE_OPTIONS="--max-old-space-size=4096"
+
+# Add to the systemd service Environment= line:
+# Environment=NODE_OPTIONS=--max-old-space-size=4096
+```
+
+### 11.2 CPU Concurrency Control
+
+```bash
+# In your .env:
+MAX_CONCURRENT_SCANS=3          # Don't overwhelm the ThinkPad
+NMAP_MAX_RATE=2000              # Safe for local lab
+FFUF_THREADS=50                 # Balanced for i7-8650U
+GOBUSTER_THREADS=30
+NUCLEI_CONCURRENCY=25
+NUCLEI_RATE_LIMIT=150
+```
+
+### 11.3 CPU Governor for Sustained Performance
+
+```bash
+# Install cpupower
+sudo pacman -S --noconfirm cpupower
+
+# Set performance governor during active testing sessions
+sudo cpupower frequency-set -g performance
+
+# Check current governor
+cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor
+
+# Revert to powersave when done
+sudo cpupower frequency-set -g powersave
+```
+
+### 11.4 Token Budget Control
+
+In your AI prompts to OpenClaw, use structured prompts to control token usage:
+
+```
+System context: You are a penetration testing assistant.
+Target: [SPECIFIC TARGET]
+Task: [ONE SPECIFIC TASK]
+Output format: Concise technical bullet points only.
+Max response: 500 tokens.
+```
+
+---
+
+## SECTION 12 — Troubleshooting (Arch Linux Specific)
+
+### 12.1 pnpm Store Corruption
+
+```bash
+# Clear pnpm store and cache completely
+pnpm store prune
+rm -rf ~/.local/share/pnpm/store
+rm -rf node_modules
+pnpm install --force
+```
+
+### 12.2 Node Version Conflicts
+
+```bash
+# Check what version package.json requires
+cat package.json | python -m json.tool | grep '"node"'
+
+# List all installed nvm versions
+nvm ls
+
+# Use exact version
+nvm use 20.11.0
+
+# Set it as default
+nvm alias default 20.11.0
+
+# Verify pnpm uses correct node
+which node && node --version
+```
+
+### 12.3 Permission Errors on `/home/openclaw`
+
+```bash
+# Fix ownership recursively
+sudo chown -R openclaw:openclaw /home/openclaw
+
+# Fix directory permissions
+find /home/openclaw/ai -type d -exec chmod 750 {} \;
+find /home/openclaw/ai -type f -exec chmod 640 {} \;
+chmod +x /home/openclaw/ai/openclaw/scripts/*.sh
+```
+
+### 12.4 `ENOSPC: System limit for number of file watchers reached`
+
+```bash
+# Increase inotify watchers (common on Arch with many projects)
+echo fs.inotify.max_user_watches=524288 | sudo tee /etc/sysctl.d/40-inotify.conf
+sudo sysctl --system
+```
+
+### 12.5 Go Tools Not Found in PATH
+
+```bash
+# Verify Go paths are set correctly for openclaw user
+echo $GOPATH
+echo $PATH | tr ':' '\n' | grep go
+
+# Ensure these are in ~/.bashrc:
+export GOPATH=$HOME/go
+export PATH=$PATH:$GOPATH/bin
+
+source ~/.bashrc
+
+# Verify
+which nuclei && nuclei -version
+```
+
+### 12.6 systemd Service Fails to Start
+
+```bash
+# Get detailed failure info
+systemctl --user status openclaw -l
+
+# Check journal
+journalctl --user -u openclaw -n 50 --no-pager
+
+# Common issue: wrong Node path in ExecStart
+# Find actual path:
+which node   # as openclaw user
+
+# Update ExecStart in the service file accordingly
+systemctl --user daemon-reload
+systemctl --user restart openclaw
+```
+
+---
+
+## SECTION 13 — Advanced: Ollama Local LLMs
+
+### 13.1 Install Ollama
+
+```bash
+# Install from AUR
+yay -S ollama --noconfirm
+
+# Or official install script
+curl -fsSL https://ollama.ai/install.sh | sh
+
+# Enable and start Ollama service
+sudo systemctl enable --now ollama
+
+# Verify
+ollama --version
+```
+
+### 13.2 Pull Security-Relevant Models
+
+```bash
+# General purpose — good for report writing
+ollama pull llama3.1:8b
+
+# Larger, better reasoning (needs ~40GB RAM — use with swap or 70B quantized)
+ollama pull llama3.1:70b-instruct-q4_K_M
+
+# Code-focused model (good for exploit PoC review)
+ollama pull deepseek-coder-v2:16b
+
+# Fast, lightweight
+ollama pull mistral:7b
+
+# Verify models
+ollama list
+```
+
+### 13.3 Test Ollama API
+
+```bash
+curl http://localhost:11434/api/generate -d '{
+  "model": "llama3.1:8b",
+  "prompt": "Summarize common web application vulnerabilities in 5 bullet points.",
+  "stream": false
+}'
+```
+
+### 13.4 OpenClaw Configured for Local Ollama
+
+In your `.env`:
+```dotenv
+USE_LOCAL_MODEL=true
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=llama3.1:8b
+```
+
+### 13.5 Running OpenClaw in a Docker Container (Isolated)
+
+```bash
+# Create Dockerfile for OpenClaw
+cat > ~/ai/openclaw/Dockerfile << 'EOF'
+FROM node:20-slim
+
+WORKDIR /app
+
+# Install pnpm
+RUN npm install -g pnpm
+
+# Copy source
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
+
+COPY . .
+RUN pnpm build
+
+# Run as non-root
+RUN useradd -m agentuser
+USER agentuser
+
+EXPOSE 3000
+
+CMD ["node", "dist/index.js"]
+EOF
+
+# Build and run
+docker build -t openclaw:latest ~/ai/openclaw/
+
+docker run -d \
+  --name openclaw \
+  --network lab-network \
+  -p 127.0.0.1:3000:3000 \
+  -v ~/ai/recon:/home/agentuser/recon \
+  -v ~/ai/reports:/home/agentuser/reports \
+  --env-file ~/ai/openclaw/.env \
+  --restart unless-stopped \
+  openclaw:latest
+```
+
+### 13.6 Isolated Test Network with Macvlan
+
+For a fully air-gapped lab that mirrors real network topology:
+
+```bash
+# Create macvlan network on a dedicated NIC (e.g., eth1)
+docker network create \
+  -d macvlan \
+  --subnet=10.99.0.0/24 \
+  --gateway=10.99.0.1 \
+  -o parent=eth1 \
+  isolated-lab
+
+# All lab containers on this network are fully isolated
+# from your main network and internet
+```
+
+---
+
+## Quick Reference Card
+
+```
+┌─────────────────────────────────────────────────────────┐
+│              OpenClaw Lab — Quick Commands               │
+├─────────────────────────────────────────────────────────┤
+│ Start service:   systemctl --user start openclaw         │
+│ Stop service:    systemctl --user stop openclaw          │
+│ View logs:       journalctl --user -u openclaw -f        │
+│ Start lab:       cd ~/ai/lab && docker compose up -d     │
+│ Stop lab:        cd ~/ai/lab && docker compose down      │
+│ Port scan:       ~/ai/openclaw/scripts/scan-ports.sh     │
+│ Web enum:        ~/ai/openclaw/scripts/web-enum.sh       │
+│ Vuln scan:       ~/ai/openclaw/scripts/vuln-scan.sh      │
+│ Full recon:      ~/ai/openclaw/scripts/recon-full.sh     │
+│ Gen report:      ~/ai/openclaw/scripts/generate-report.sh│
+├─────────────────────────────────────────────────────────┤
+│ Lab targets:                                             │
+│   DVWA:          http://127.0.0.1:8080                  │
+│   Juice Shop:    http://127.0.0.1:3001                  │
+│   WebGoat:       http://127.0.0.1:8888                  │
+│   OpenClaw UI:   http://127.0.0.1:3000                  │
+└─────────────────────────────────────────────────────────┘
+```
+
+---
+
+**Final Security Reminders:**
+- Keep `.env` at `chmod 600` — it contains API keys
+- Never expose OpenClaw's port beyond `127.0.0.1`
+- Keep `AUTHORIZED_TARGETS` scoped tightly in `.env`
+- Document your written authorization before every assessment
+- Review all AI-generated commands before executing them against any target
