@@ -1,0 +1,1860 @@
+---
+type: article
+title: OpenClaw on Arch Linux — SOC Defensive AI Assistant
+tags: [OpenClaw, Arch Linux, Blue Team AI Assistant, Ctf]
+date: 2026-03-07
+author: Eno
+featuredImage: https://raw.githubusercontent.com/z0rs/z0rs.github.io/refs/heads/master/content/Images/OpenClaw_BlueTeam.jpg
+---
+
+> **Scope Reminder:** This guide is strictly for defensive security operations — log analysis, threat detection, incident response, system hardening, and vulnerability management on systems you own and operate.
+
+---
+
+> **⚠️ Note on OpenClaw:** As noted in the companion red team guide, "OpenClaw" is not a widely documented public project as of my knowledge cutoff. Steps referencing its repo assume a Node.js/pnpm-based AI agent framework. **Verify the exact repo URL and build steps from the official source before proceeding.** All SOC tooling, systemd configuration, and monitoring integrations in this guide are fully accurate for Arch Linux.
+
+---
+
+## SECTION 1 — System Preparation
+
+### 1.1 Full System Update
+
+```bash
+sudo pacman -Syu --noconfirm
+```
+
+### 1.2 Install Core Build Dependencies
+
+```bash
+sudo pacman -S --noconfirm \
+  base-devel \
+  git \
+  curl \
+  wget \
+  unzip \
+  zip \
+  jq \
+  python \
+  python-pip \
+  python-virtualenv \
+  python-yaml \
+  go \
+  gcc \
+  make \
+  cmake \
+  openssl \
+  libffi \
+  zlib \
+  sqlite \
+  lsof \
+  strace \
+  htop \
+  iotop \
+  sysstat \
+  net-tools \
+  bind-tools \
+  whois \
+  tcpdump \
+  wireshark-qt \
+  audit \
+  acl \
+  inotify-tools \
+  rsync \
+  logrotate
+```
+
+### 1.3 Install Node.js LTS via nvm
+
+```bash
+# Install nvm for controlled Node.js version management
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+
+source ~/.bashrc
+
+# Install and pin LTS
+nvm install --lts
+nvm use --lts
+nvm alias default lts/*
+
+# Verify
+node --version    # v20.x.x or v22.x.x
+npm --version
+```
+
+### 1.4 Install pnpm
+
+```bash
+curl -fsSL https://get.pnpm.io/install.sh | sh -
+source ~/.bashrc
+pnpm --version
+```
+
+### 1.5 Install Blue Team Security Tools
+
+```bash
+# Core defensive tools from official repos
+sudo pacman -S --noconfirm \
+  nmap \
+  tcpdump \
+  wireshark-qt \
+  fail2ban \
+  clamav \
+  rkhunter \
+  lynis \
+  aide \
+  audit \
+  apparmor \
+  python-scapy \
+  netcat \
+  iptables \
+  ufw \
+  openssh \
+  gnupg \
+  openssl
+
+# Install yay for AUR packages
+git clone https://aur.archlinux.org/yay.git /tmp/yay
+cd /tmp/yay && makepkg -si --noconfirm
+cd ~ && rm -rf /tmp/yay
+
+# AUR: additional SOC tools
+yay -S --noconfirm \
+  osquery \
+  suricata \
+  zeek \
+  yara \
+  volatility3
+```
+
+### 1.6 Install Go-Based Defensive Tools
+
+```bash
+# Add Go bin to PATH
+echo 'export GOPATH=$HOME/go' >> ~/.bashrc
+echo 'export PATH=$PATH:$GOPATH/bin' >> ~/.bashrc
+source ~/.bashrc
+
+# nuclei — for vulnerability scanning your own infra
+go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest
+
+# httpx — HTTP probing for asset inventory
+go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest
+
+# naabu — port scanner for asset discovery
+go install -v github.com/projectdiscovery/naabu/v2/cmd/naabu@latest
+
+# dnsx — DNS resolution/validation
+go install -v github.com/projectdiscovery/dnsx/cmd/dnsx@latest
+
+# Verify
+nuclei -version && httpx -version
+```
+
+### 1.7 Install Docker (Optional)
+
+```bash
+sudo pacman -S --noconfirm docker docker-compose
+
+sudo systemctl enable --now docker
+sudo usermod -aG docker $USER
+
+# Re-login for group change to take effect
+docker --version
+docker compose version
+```
+
+### 1.8 Enable the Linux Audit Subsystem
+
+```bash
+# Enable auditd for kernel-level event logging
+sudo systemctl enable --now auditd
+
+# Verify audit is active
+sudo auditctl -s
+```
+
+---
+
+## SECTION 2 — Secure Deployment
+
+### 2.1 Create a Dedicated SOC Agent User
+
+```bash
+# Dedicated user — no sudo, minimal shell access
+sudo useradd -m -s /bin/bash -c "OpenClaw SOC Agent" soc-agent
+
+# Set a strong password
+sudo passwd soc-agent
+
+# Create the full directory layout
+sudo -u soc-agent mkdir -p /home/soc-agent/ai/{openclaw,logs,security-tools,reports,evidence,config,scripts,feeds}
+sudo -u soc-agent mkdir -p /home/soc-agent/ai/logs/{system,auth,network,alerts}
+sudo -u soc-agent mkdir -p /home/soc-agent/ai/security-tools/{signatures,rules,wordlists,scripts}
+sudo -u soc-agent mkdir -p /home/soc-agent/ai/reports/{daily,incidents,vuln-scans}
+sudo -u soc-agent mkdir -p /home/soc-agent/ai/evidence/{network,memory,filesystem}
+```
+
+### 2.2 Set Correct Permissions and Ownership
+
+```bash
+# Base directory locked to owner only
+sudo chmod 700 /home/soc-agent/ai
+
+# Reports and evidence readable only by owner
+sudo chmod -R 750 /home/soc-agent/ai/reports
+sudo chmod -R 700 /home/soc-agent/ai/evidence
+
+# Log directories writable by agent
+sudo chmod -R 750 /home/soc-agent/ai/logs
+
+# Prevent your main user from being readable by the agent
+sudo setfacl -m u:soc-agent:--- /home/$(whoami)
+
+# Confirm no sudo access
+sudo grep soc-agent /etc/sudoers   # Must return nothing
+```
+
+### 2.3 Grant Read-Only Access to System Logs
+
+The SOC agent needs to read system logs but must never write to them:
+
+```bash
+# Add soc-agent to the systemd-journal group for journald access
+sudo usermod -aG systemd-journal soc-agent
+
+# Grant read-only access to /var/log
+sudo setfacl -R -m u:soc-agent:r-x /var/log
+sudo setfacl -R -d -m u:soc-agent:r-x /var/log
+
+# Verify
+sudo -u soc-agent ls /var/log/
+```
+
+### 2.4 Final Directory Structure
+
+```
+/home/soc-agent/ai/
+├── openclaw/               ← Application source and runtime
+├── logs/
+│   ├── system/             ← Copied/processed system logs
+│   ├── auth/               ← Authentication event logs
+│   ├── network/            ← Network capture summaries
+│   └── alerts/             ← Generated alert files
+├── security-tools/
+│   ├── signatures/         ← YARA rules, ClamAV sigs
+│   ├── rules/              ← Suricata/Snort rules
+│   ├── wordlists/          ← For authorized asset testing
+│   └── scripts/            ← Automation scripts
+├── reports/
+│   ├── daily/              ← Automated daily reports
+│   ├── incidents/          ← Incident reports
+│   └── vuln-scans/         ← Vulnerability scan results
+├── evidence/
+│   ├── network/            ← PCAPs, flow data
+│   ├── memory/             ← Memory dumps
+│   └── filesystem/         ← File integrity snapshots
+├── config/                 ← Tool configuration files
+└── feeds/                  ← Threat intelligence feeds
+```
+
+---
+
+## SECTION 3 — Installing OpenClaw from Source
+
+### 3.1 Clone the Repository
+
+```bash
+# Switch to the soc-agent user
+sudo -i -u soc-agent
+# or
+su - soc-agent
+
+cd ~/ai
+
+# Replace with the actual verified repository URL
+git clone https://github.com/<openclaw-org>/openclaw.git openclaw
+cd openclaw
+
+# Inspect the project before installing
+ls -la
+cat package.json
+cat README.md
+```
+
+### 3.2 Install Node.js in the soc-agent User Context
+
+```bash
+# Install nvm for the soc-agent user
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+source ~/.bashrc
+
+nvm install --lts
+nvm use --lts
+
+# Install pnpm
+npm install -g pnpm
+source ~/.bashrc
+
+pnpm --version
+```
+
+### 3.3 Install Dependencies and Build
+
+```bash
+cd ~/ai/openclaw
+
+# Install all project dependencies
+pnpm install
+
+# Build the project
+pnpm run build
+# or: pnpm build / pnpm run compile
+
+# Confirm build output exists
+ls -la dist/ 2>/dev/null || ls -la .next/ 2>/dev/null || ls -la build/ 2>/dev/null
+```
+
+### 3.4 Arch Linux Specific Troubleshooting
+
+**Problem: `node-gyp` native compilation fails**
+```bash
+sudo pacman -S --noconfirm python2
+npm config set python /usr/bin/python3
+pnpm rebuild
+```
+
+**Problem: `EACCES` pnpm store permission error**
+```bash
+pnpm config set store-dir ~/.local/share/pnpm/store
+pnpm store prune
+rm -rf node_modules
+pnpm install
+```
+
+**Problem: Node version mismatch with `engines` field**
+```bash
+# Check required version
+cat package.json | python -m json.tool | grep '"node"'
+nvm install 20.11.0
+nvm use 20.11.0
+pnpm install
+```
+
+**Problem: `better-sqlite3` fails to compile**
+```bash
+sudo pacman -S --noconfirm sqlite
+pnpm rebuild better-sqlite3
+```
+
+**Problem: `canvas` or `sharp` fails**
+```bash
+sudo pacman -S --noconfirm cairo pango libpng libjpeg-turbo giflib librsvg pixman
+pnpm rebuild canvas sharp
+```
+
+**Problem: inotify watcher limit**
+```bash
+echo fs.inotify.max_user_watches=524288 | sudo tee /etc/sysctl.d/40-inotify.conf
+sudo sysctl --system
+```
+
+---
+
+## SECTION 4 — Environment Configuration
+
+### 4.1 Create and Secure the `.env` File
+
+```bash
+cd ~/ai/openclaw
+
+# Copy example if available
+cp .env.example .env 2>/dev/null || touch .env
+
+# CRITICAL: lock before writing any secrets
+chmod 600 .env
+
+nano .env
+```
+
+### 4.2 Complete SOC `.env` Example
+
+```dotenv
+# ============================================================
+# OpenClaw — SOC Defensive AI Assistant
+# CONFIDENTIAL — chmod 600, never commit to version control
+# ============================================================
+
+# --- Application ---
+NODE_ENV=production
+PORT=3000
+HOST=127.0.0.1         # Localhost only — never expose externally
+
+# --- AI Provider (choose one or configure fallback chain) ---
+
+# Option A: Anthropic Claude (recommended for analysis tasks)
+ANTHROPIC_API_KEY=sk-ant-...
+ANTHROPIC_MODEL=claude-opus-4-20250514
+
+# Option B: OpenAI
+OPENAI_API_KEY=sk-...
+OPENAI_MODEL=gpt-4o
+
+# Option C: Local Ollama (fully air-gapped, no data leaves host)
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=llama3.1:8b
+
+# Option D: OpenRouter
+OPENROUTER_API_KEY=sk-or-...
+OPENROUTER_MODEL=anthropic/claude-3.5-sonnet
+
+# --- Model Behavior ---
+USE_LOCAL_MODEL=false
+LOCAL_MODEL_FALLBACK=true     # Fall back to Ollama if API is unavailable
+TEMPERATURE=0.1               # Very low for deterministic security analysis
+MAX_TOKENS_PER_REQUEST=4096
+CONTEXT_WINDOW=8192
+
+# --- SOC Role Configuration ---
+AGENT_ROLE=soc-analyst
+AGENT_PERSONA="You are a senior SOC analyst. Analyze logs, detect anomalies, triage alerts, and recommend defensive actions. Never suggest offensive techniques."
+
+# --- System Log Paths (read-only access) ---
+JOURNALD_LOGS=true
+AUTH_LOG_PATH=/var/log/auth.log
+SYSLOG_PATH=/var/log/syslog
+KERN_LOG_PATH=/var/log/kern.log
+AUDIT_LOG_PATH=/var/log/audit/audit.log
+FAIL2BAN_LOG_PATH=/var/log/fail2ban.log
+SURICATA_LOG_PATH=/var/log/suricata/eve.json
+WAZUH_LOG_PATH=/var/ossec/logs/alerts/alerts.json
+
+# --- Agent Output Paths ---
+REPORTS_OUTPUT_PATH=/home/soc-agent/ai/reports
+ALERTS_OUTPUT_PATH=/home/soc-agent/ai/logs/alerts
+EVIDENCE_PATH=/home/soc-agent/ai/evidence
+AGENT_LOG_FILE=/home/soc-agent/ai/logs/openclaw.log
+
+# --- Monitoring Configuration ---
+LOG_ANALYSIS_INTERVAL=300       # Seconds between automated log checks
+ALERT_THRESHOLD_AUTH_FAILURES=5 # Auth failures before alert
+ALERT_THRESHOLD_SUDO_EVENTS=3   # Sudo events per hour before alert
+ANOMALY_DETECTION=true
+BASELINE_PERIOD_DAYS=7          # Days of history to establish baseline
+
+# --- Notification ---
+# (configure your preferred method)
+ALERT_WEBHOOK_URL=http://localhost:9093/alertmanager   # e.g., Alertmanager
+SMTP_HOST=localhost
+SMTP_PORT=25
+ALERT_EMAIL=soc@localhost
+
+# --- Threat Intelligence Feeds ---
+TI_FEEDS_ENABLED=true
+TI_FEEDS_PATH=/home/soc-agent/ai/feeds
+MISP_URL=http://localhost:8080
+# MISP_API_KEY=your_misp_key
+
+# --- Tool Paths ---
+NUCLEI_PATH=/home/soc-agent/go/bin/nuclei
+NMAP_PATH=/usr/bin/nmap
+YARA_PATH=/usr/bin/yara
+CLAMSCAN_PATH=/usr/bin/clamscan
+RKHUNTER_PATH=/usr/bin/rkhunter
+LYNIS_PATH=/usr/bin/lynis
+OSQUERY_PATH=/usr/bin/osqueryi
+AIDE_PATH=/usr/bin/aide
+FAIL2BAN_CLIENT_PATH=/usr/bin/fail2ban-client
+
+# --- Authorized Asset Inventory ---
+# Comma-separated list of CIDRs/IPs this SOC agent is authorized to scan
+AUTHORIZED_ASSETS=192.168.1.0/24,10.0.0.0/8,172.16.0.0/12
+ASSET_INVENTORY_PATH=/home/soc-agent/ai/config/assets.json
+
+# --- Performance ---
+LOG_LEVEL=info
+MAX_CONCURRENT_TASKS=4
+MEMORY_LIMIT_MB=2048
+CPU_MAX_PERCENT=60
+
+# --- Database ---
+DATABASE_PATH=/home/soc-agent/ai/openclaw/data/soc-agent.db
+```
+
+### 4.3 Protect API Keys with a Secret Store
+
+For production use, avoid plaintext keys in `.env`. Use `gpg` encryption:
+
+```bash
+# Encrypt the .env file at rest
+gpg --symmetric --cipher-algo AES256 .env
+# Creates .env.gpg
+
+# Decrypt at runtime (use in a wrapper startup script)
+gpg --quiet --batch --yes --passphrase-file ~/.openclaw-passphrase -d .env.gpg > .env.runtime
+chmod 600 .env.runtime
+```
+
+---
+
+## SECTION 5 — SOC-Focused Integrations
+
+### 5.1 Journald Integration Script
+
+```bash
+mkdir -p ~/ai/openclaw/scripts
+```
+
+**`~/ai/openclaw/scripts/analyze-journal.sh`**
+```bash
+#!/bin/bash
+# Exports recent journald events for AI analysis
+# Runs as soc-agent (read access via systemd-journal group)
+
+OUTPUT_DIR=~/ai/logs/system
+HOURS="${1:-1}"   # Default: last 1 hour
+
+mkdir -p "$OUTPUT_DIR"
+TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+
+echo "[*] Exporting journald events from last ${HOURS} hour(s)..."
+
+# All errors and above
+journalctl \
+  --since="${HOURS} hours ago" \
+  -p err..emerg \
+  --no-pager \
+  -o json \
+  > "$OUTPUT_DIR/errors-${TIMESTAMP}.json"
+
+# Authentication events
+journalctl \
+  --since="${HOURS} hours ago" \
+  -u sshd \
+  -u sudo \
+  -u pam \
+  --no-pager \
+  -o json \
+  > "$OUTPUT_DIR/auth-${TIMESTAMP}.json"
+
+# Kernel events
+journalctl \
+  --since="${HOURS} hours ago" \
+  -k \
+  --no-pager \
+  -o json \
+  > "$OUTPUT_DIR/kernel-${TIMESTAMP}.json"
+
+# Summarize counts
+echo "[+] Event summary:"
+echo "  Errors:     $(wc -l < $OUTPUT_DIR/errors-${TIMESTAMP}.json)"
+echo "  Auth events: $(wc -l < $OUTPUT_DIR/auth-${TIMESTAMP}.json)"
+echo "  Kernel:     $(wc -l < $OUTPUT_DIR/kernel-${TIMESTAMP}.json)"
+echo "[+] Output in $OUTPUT_DIR"
+```
+
+### 5.2 SSH Anomaly Detection Script
+
+```bash
+cat > ~/ai/openclaw/scripts/detect-ssh-anomalies.sh << 'EOF'
+#!/bin/bash
+# Detects SSH login anomalies and writes structured alerts
+
+OUTPUT=~/ai/logs/alerts/ssh-anomalies-$(date +%Y%m%d-%H%M%S).json
+THRESHOLD_FAILURES=5
+
+mkdir -p ~/ai/logs/alerts
+
+echo "[*] Analyzing SSH authentication events..."
+
+# Extract failed logins from journald
+FAILED=$(journalctl -u sshd --since="1 hour ago" --no-pager \
+  | grep "Failed password" \
+  | awk '{print $11}' \
+  | sort | uniq -c | sort -rn)
+
+# Extract successful logins
+SUCCESS=$(journalctl -u sshd --since="24 hours ago" --no-pager \
+  | grep "Accepted")
+
+# Extract new/unusual source IPs
+SOURCES=$(journalctl -u sshd --since="1 hour ago" --no-pager \
+  | grep -E "Failed|Invalid|Accepted" \
+  | grep -oE '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}' \
+  | sort | uniq -c | sort -rn)
+
+# Build JSON report
+jq -n \
+  --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+  --arg failed "$FAILED" \
+  --arg success "$SUCCESS" \
+  --arg sources "$SOURCES" \
+  '{
+    timestamp: $ts,
+    alert_type: "ssh_anomaly_detection",
+    failed_logins: $failed,
+    successful_logins: $success,
+    source_ips: $sources
+  }' > "$OUTPUT"
+
+echo "[+] SSH anomaly report saved: $OUTPUT"
+
+# Alert if threshold exceeded
+FAIL_COUNT=$(echo "$FAILED" | awk '{s+=$1} END {print s+0}')
+if [ "$FAIL_COUNT" -ge "$THRESHOLD_FAILURES" ]; then
+  echo "[!] ALERT: $FAIL_COUNT SSH failures in last hour — threshold is $THRESHOLD_FAILURES"
+fi
+EOF
+
+chmod +x ~/ai/openclaw/scripts/detect-ssh-anomalies.sh
+```
+
+### 5.3 File Integrity Monitoring with AIDE
+
+```bash
+# Initialize AIDE database baseline
+sudo aide --init
+sudo mv /var/lib/aide/aide.db.new /var/lib/aide/aide.db
+
+# Daily check script
+cat > ~/ai/openclaw/scripts/fim-check.sh << 'EOF'
+#!/bin/bash
+OUTPUT=~/ai/logs/alerts/fim-$(date +%Y%m%d-%H%M%S).txt
+
+echo "[*] Running AIDE file integrity check..."
+sudo aide --check > "$OUTPUT" 2>&1
+
+CHANGES=$(grep -c "changed\|added\|removed" "$OUTPUT" 2>/dev/null || echo 0)
+
+if [ "$CHANGES" -gt "0" ]; then
+  echo "[!] ALERT: $CHANGES file integrity changes detected"
+  echo "[!] See $OUTPUT for details"
+  grep -E "changed|added|removed" "$OUTPUT" | head -20
+else
+  echo "[+] No file integrity violations detected"
+fi
+EOF
+
+chmod +x ~/ai/openclaw/scripts/fim-check.sh
+```
+
+---
+
+## SECTION 6 — SOC Automation Examples
+
+### 6.1 Daily Security Digest Automation
+
+```bash
+cat > ~/ai/openclaw/scripts/daily-security-digest.sh << 'EOF'
+#!/bin/bash
+# Generates a daily security digest for AI analysis
+DATE=$(date +%Y%m%d)
+REPORT=~/ai/reports/daily/digest-${DATE}.txt
+
+mkdir -p ~/ai/reports/daily
+
+echo "======================================" > "$REPORT"
+echo " DAILY SECURITY DIGEST — $(date)"     >> "$REPORT"
+echo " Host: $(hostname)"                    >> "$REPORT"
+echo "======================================" >> "$REPORT"
+echo ""                                       >> "$REPORT"
+
+echo "=== AUTHENTICATION EVENTS (24h) ===" >> "$REPORT"
+journalctl -u sshd --since="24 hours ago" --no-pager \
+  | grep -E "Accepted|Failed|Invalid|Disconnected" \
+  | tail -100 >> "$REPORT"
+echo "" >> "$REPORT"
+
+echo "=== FAILED SUDO ATTEMPTS (24h) ===" >> "$REPORT"
+journalctl --since="24 hours ago" --no-pager \
+  | grep -i "sudo.*incorrect\|sudo.*not allowed\|authentication failure" \
+  >> "$REPORT"
+echo "" >> "$REPORT"
+
+echo "=== LISTENING SERVICES ===" >> "$REPORT"
+ss -tlnp >> "$REPORT"
+echo "" >> "$REPORT"
+
+echo "=== ACTIVE NETWORK CONNECTIONS ===" >> "$REPORT"
+ss -tnp state established >> "$REPORT"
+echo "" >> "$REPORT"
+
+echo "=== FAILED SYSTEMD SERVICES ===" >> "$REPORT"
+systemctl --failed --no-pager >> "$REPORT"
+echo "" >> "$REPORT"
+
+echo "=== LOGGED IN USERS ===" >> "$REPORT"
+who >> "$REPORT"
+last -20 >> "$REPORT"
+echo "" >> "$REPORT"
+
+echo "=== KERNEL ERRORS (24h) ===" >> "$REPORT"
+journalctl -k -p err..emerg --since="24 hours ago" --no-pager | tail -50 >> "$REPORT"
+echo "" >> "$REPORT"
+
+echo "=== DISK USAGE ===" >> "$REPORT"
+df -h >> "$REPORT"
+echo "" >> "$REPORT"
+
+echo "=== WORLD-WRITABLE FILES (system dirs) ===" >> "$REPORT"
+find /etc /usr/bin /usr/sbin -perm -o+w -type f 2>/dev/null >> "$REPORT" || echo "None found" >> "$REPORT"
+echo "" >> "$REPORT"
+
+echo "=== SUID/SGID BINARIES CHANGED (vs baseline) ===" >> "$REPORT"
+find / -perm /6000 -type f 2>/dev/null \
+  | grep -v -f ~/ai/config/suid-baseline.txt 2>/dev/null \
+  | head -20 >> "$REPORT"
+echo "" >> "$REPORT"
+
+echo "=== FAIL2BAN STATUS ===" >> "$REPORT"
+sudo fail2ban-client status 2>/dev/null >> "$REPORT" || echo "fail2ban not running" >> "$REPORT"
+
+echo "[+] Daily digest written to $REPORT"
+EOF
+
+chmod +x ~/ai/openclaw/scripts/daily-security-digest.sh
+```
+
+### 6.2 System Hardening Check Script
+
+```bash
+cat > ~/ai/openclaw/scripts/hardening-check.sh << 'EOF'
+#!/bin/bash
+# CIS-aligned hardening check — outputs structured findings
+OUTPUT=~/ai/reports/daily/hardening-$(date +%Y%m%d).json
+FINDINGS=()
+
+check_pass() { echo "[PASS] $1"; }
+check_fail() { echo "[FAIL] $1"; FINDINGS+=("$1"); }
+check_warn() { echo "[WARN] $1"; }
+
+echo "[*] Running system hardening checks..."
+
+# SSH hardening
+SSHD="/etc/ssh/sshd_config"
+grep -q "^PermitRootLogin no" "$SSHD"        && check_pass "SSH: PermitRootLogin disabled" \
+                                              || check_fail "SSH: PermitRootLogin should be 'no'"
+grep -q "^PasswordAuthentication no" "$SSHD" && check_pass "SSH: PasswordAuthentication disabled" \
+                                              || check_warn "SSH: Consider disabling PasswordAuthentication"
+grep -q "^Protocol 2" "$SSHD" || \
+  ! grep -q "^Protocol" "$SSHD"              && check_pass "SSH: Protocol 2 enforced" \
+                                              || check_fail "SSH: Protocol 1 must be disabled"
+grep -q "^MaxAuthTries [1-3]$" "$SSHD"       && check_pass "SSH: MaxAuthTries configured" \
+                                              || check_warn "SSH: Set MaxAuthTries to 3 or less"
+
+# Kernel hardening
+sysctl kernel.randomize_va_space | grep -q "= 2" && check_pass "Kernel: ASLR enabled" \
+                                                  || check_fail "Kernel: ASLR not fully enabled"
+sysctl net.ipv4.conf.all.accept_redirects | grep -q "= 0" && check_pass "Kernel: ICMP redirects disabled" \
+                                                            || check_fail "Kernel: ICMP redirects should be disabled"
+sysctl net.ipv4.tcp_syncookies | grep -q "= 1" && check_pass "Kernel: SYN cookies enabled" \
+                                                || check_fail "Kernel: Enable SYN cookies"
+sysctl net.ipv4.conf.all.rp_filter | grep -q "= 1" && check_pass "Kernel: Reverse path filtering enabled" \
+                                                     || check_warn "Kernel: Consider enabling rp_filter"
+
+# Firewall
+systemctl is-active --quiet iptables || \
+  systemctl is-active --quiet ufw    && check_pass "Firewall: Active" \
+                                     || check_fail "Firewall: No active firewall detected"
+
+# Auditd
+systemctl is-active --quiet auditd && check_pass "Auditd: Running" \
+                                    || check_fail "Auditd: Not running — enable for compliance"
+
+# Fail2ban
+systemctl is-active --quiet fail2ban && check_pass "Fail2ban: Running" \
+                                      || check_warn "Fail2ban: Not running"
+
+# USB guard (optional but recommended)
+command -v usbguard &>/dev/null && \
+  systemctl is-active --quiet usbguard && check_pass "USBGuard: Active" \
+                                       || check_warn "USBGuard: Not active"
+
+# Core dumps
+sysctl fs.suid_dumpable | grep -q "= 0" && check_pass "Core dumps: Disabled for SUID" \
+                                         || check_warn "Core dumps: Restrict with fs.suid_dumpable=0"
+
+# Build JSON output
+printf '%s\n' "${FINDINGS[@]}" | jq -R . | jq -s \
+  --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+  --arg host "$(hostname)" \
+  '{timestamp: $ts, host: $host, failed_checks: .}' > "$OUTPUT"
+
+echo "[+] Hardening check complete. Failures: ${#FINDINGS[@]}"
+echo "[+] Report: $OUTPUT"
+EOF
+
+chmod +x ~/ai/openclaw/scripts/hardening-check.sh
+```
+
+### 6.3 Daily Vulnerability Scan (Own Infrastructure)
+
+```bash
+cat > ~/ai/openclaw/scripts/vuln-scan-infra.sh << 'EOF'
+#!/bin/bash
+# Runs nuclei against authorized internal assets
+# Only scans IPs/CIDRs defined in AUTHORIZED_ASSETS
+
+ASSETS_FILE=~/ai/config/assets.txt
+OUTPUT_DIR=~/ai/reports/vuln-scans/$(date +%Y%m%d)
+mkdir -p "$OUTPUT_DIR"
+
+if [ ! -f "$ASSETS_FILE" ]; then
+  echo "[!] No assets file found at $ASSETS_FILE"
+  echo "[!] Create it with one IP/CIDR per line"
+  exit 1
+fi
+
+echo "[*] Starting infrastructure vulnerability scan..."
+echo "[*] Targets: $(cat $ASSETS_FILE)"
+
+nuclei \
+  -l "$ASSETS_FILE" \
+  -t ~/ai/security-tools/nuclei-templates/ \
+  -severity medium,high,critical \
+  -o "$OUTPUT_DIR/nuclei-results.txt" \
+  -json \
+  -stats \
+  -silent
+
+CRITICAL=$(grep '"severity":"critical"' "$OUTPUT_DIR/nuclei-results.txt" 2>/dev/null | wc -l)
+HIGH=$(grep '"severity":"high"' "$OUTPUT_DIR/nuclei-results.txt" 2>/dev/null | wc -l)
+
+echo "[+] Scan complete:"
+echo "  Critical: $CRITICAL"
+echo "  High:     $HIGH"
+echo "[+] Full results: $OUTPUT_DIR/nuclei-results.txt"
+EOF
+
+chmod +x ~/ai/openclaw/scripts/vuln-scan-infra.sh
+
+# Create your authorized assets file
+cat > ~/ai/config/assets.txt << 'EOF'
+# Add your authorized IPs/CIDRs here — one per line
+192.168.1.0/24
+10.0.0.1
+EOF
+```
+
+---
+
+## SECTION 7 — Security Monitoring Stack Integration
+
+### 7.1 Fail2Ban Configuration Enhancement
+
+```bash
+# Review active jails
+sudo fail2ban-client status
+
+# Check a specific jail
+sudo fail2ban-client status sshd
+
+# Enhanced sshd jail config
+sudo nano /etc/fail2ban/jail.d/sshd-enhanced.conf
+```
+
+```ini
+[sshd]
+enabled   = true
+port      = ssh
+filter    = sshd
+backend   = systemd
+maxretry  = 3
+findtime  = 300
+bantime   = 3600
+ignoreip  = 127.0.0.1/8 ::1
+action    = iptables-multiport[name=SSH, port="ssh", protocol=tcp]
+```
+
+```bash
+sudo systemctl restart fail2ban
+```
+
+### 7.2 Suricata IDS Setup
+
+```bash
+# Update Suricata rules
+sudo suricata-update
+
+# Minimal Suricata config for home interface
+sudo nano /etc/suricata/suricata.yaml
+# Key settings:
+#   af-packet: interface: enp0s3  (your interface)
+#   default-log-dir: /var/log/suricata
+#   eve-log: enabled: yes
+
+# Enable and start
+sudo systemctl enable --now suricata
+
+# Tail alerts
+sudo tail -f /var/log/suricata/eve.json | jq 'select(.event_type=="alert")'
+```
+
+**Suricata Alert Parser Script:**
+```bash
+cat > ~/ai/openclaw/scripts/parse-suricata-alerts.sh << 'EOF'
+#!/bin/bash
+# Parses Suricata EVE JSON for high-severity alerts
+EVE_LOG="/var/log/suricata/eve.json"
+OUTPUT=~/ai/logs/alerts/suricata-$(date +%Y%m%d-%H%M%S).json
+
+echo "[*] Parsing Suricata alerts..."
+
+cat "$EVE_LOG" \
+  | jq 'select(.event_type=="alert")
+       | select(.alert.severity <= 2)' \
+  > "$OUTPUT"
+
+COUNT=$(wc -l < "$OUTPUT")
+echo "[+] Found $COUNT high-severity Suricata alerts"
+echo "[+] Saved to $OUTPUT"
+EOF
+
+chmod +x ~/ai/openclaw/scripts/parse-suricata-alerts.sh
+```
+
+### 7.3 OSQuery for System Inventory and Anomaly Detection
+
+```bash
+# Enable osqueryd
+sudo systemctl enable --now osqueryd
+
+# Create useful SOC queries config
+cat > ~/ai/config/osquery-soc.conf << 'EOF'
+{
+  "schedule": {
+    "listening_ports": {
+      "query": "SELECT pid, port, protocol, address FROM listening_ports;",
+      "interval": 300
+    },
+    "processes_with_network": {
+      "query": "SELECT p.pid, p.name, p.cmdline, s.remote_address, s.remote_port FROM processes p JOIN process_open_sockets s ON p.pid = s.pid WHERE s.remote_address != '' AND s.remote_address != '0.0.0.0' AND s.remote_address != '::';",
+      "interval": 60
+    },
+    "crontab_entries": {
+      "query": "SELECT * FROM crontab;",
+      "interval": 3600
+    },
+    "startup_items": {
+      "query": "SELECT * FROM startup_items;",
+      "interval": 3600
+    },
+    "suid_binaries": {
+      "query": "SELECT * FROM suid_bin;",
+      "interval": 86400
+    },
+    "user_ssh_keys": {
+      "query": "SELECT * FROM user_ssh_keys;",
+      "interval": 3600
+    }
+  }
+}
+EOF
+
+# Run an ad-hoc query
+osqueryi "SELECT pid, name, cmdline FROM processes WHERE name LIKE '%sh' ORDER BY pid DESC LIMIT 20;"
+```
+
+### 7.4 Wazuh Agent Setup (Optional SIEM)
+
+```bash
+# Install Wazuh agent from AUR
+yay -S wazuh-agent --noconfirm
+
+# Configure agent to point to your Wazuh manager
+sudo nano /var/ossec/etc/ossec.conf
+# Set: <address>YOUR_WAZUH_MANAGER_IP</address>
+
+sudo systemctl enable --now wazuh-agent
+
+# Check agent status
+sudo /var/ossec/bin/agent_control -l
+```
+
+### 7.5 Auditd Rules for SOC Monitoring
+
+```bash
+# Create comprehensive audit rules
+sudo tee /etc/audit/rules.d/soc-monitoring.rules << 'EOF'
+# Delete all existing rules
+-D
+
+# Buffer size
+-b 8192
+
+# Failure mode (1=silent, 2=panic)
+-f 1
+
+# Monitor authentication files
+-w /etc/passwd -p wa -k identity
+-w /etc/shadow -p wa -k identity
+-w /etc/group  -p wa -k identity
+-w /etc/gshadow -p wa -k identity
+-w /etc/sudoers -p wa -k sudoers
+-w /etc/sudoers.d/ -p wa -k sudoers
+
+# SSH config changes
+-w /etc/ssh/sshd_config -p wa -k sshd_config
+
+# Privileged command usage
+-a always,exit -F path=/usr/bin/sudo -F perm=x -k sudo_usage
+-a always,exit -F path=/usr/bin/su -F perm=x -k su_usage
+-a always,exit -F path=/usr/bin/newgrp -F perm=x -k newgrp
+
+# System call monitoring (privilege escalation indicators)
+-a always,exit -F arch=b64 -S ptrace -k ptrace
+-a always,exit -F arch=b64 -S personality -k unusual_syscall
+
+# Network config changes
+-w /etc/hosts -p wa -k network_config
+-w /etc/resolv.conf -p wa -k network_config
+-w /etc/iptables/ -p wa -k firewall
+
+# Cron modifications
+-w /etc/cron.d/ -p wa -k cron
+-w /etc/crontab -p wa -k cron
+-w /var/spool/cron/ -p wa -k cron
+
+# Module loading/unloading
+-w /sbin/insmod -p x -k kernel_modules
+-w /sbin/rmmod  -p x -k kernel_modules
+-w /sbin/modprobe -p x -k kernel_modules
+
+# Login/logout tracking
+-w /var/log/lastlog -p wa -k logins
+-w /var/run/faillock/ -p wa -k logins
+EOF
+
+sudo augenrules --load
+sudo systemctl restart auditd
+```
+
+---
+
+## SECTION 8 — Running as Persistent systemd User Service
+
+### 8.1 Create the systemd User Service
+
+```bash
+mkdir -p ~/.config/systemd/user
+nano ~/.config/systemd/user/openclaw-soc.service
+```
+
+**`~/.config/systemd/user/openclaw-soc.service`**
+```ini
+[Unit]
+Description=OpenClaw SOC Defensive AI Assistant
+Documentation=https://github.com/<openclaw-org>/openclaw
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/soc-agent/ai/openclaw
+ExecStart=/home/soc-agent/.nvm/versions/node/v20.19.0/bin/node dist/index.js
+ExecReload=/bin/kill -HUP $MAINPID
+ExecStop=/bin/kill -SIGTERM $MAINPID
+
+# Restart policy
+Restart=on-failure
+RestartSec=15s
+StartLimitIntervalSec=180
+StartLimitBurst=5
+
+# Environment
+EnvironmentFile=/home/soc-agent/ai/openclaw/.env
+Environment=NODE_ENV=production
+Environment=NODE_OPTIONS=--max-old-space-size=2048
+
+# Logging
+StandardOutput=append:/home/soc-agent/ai/logs/openclaw.log
+StandardError=append:/home/soc-agent/ai/logs/openclaw-error.log
+
+# --- Systemd Security Hardening ---
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+
+# Explicitly allow read-write to agent directories
+ReadWritePaths=/home/soc-agent/ai/openclaw
+ReadWritePaths=/home/soc-agent/ai/logs
+ReadWritePaths=/home/soc-agent/ai/reports
+ReadWritePaths=/home/soc-agent/ai/evidence
+ReadWritePaths=/home/soc-agent/ai/feeds
+
+# Grant read-only access to logs
+ReadOnlyPaths=/var/log
+
+# Kernel protection
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictRealtime=true
+MemoryDenyWriteExecute=false
+RestrictNamespaces=true
+
+# Capability restrictions (no special privileges)
+CapabilityBoundingSet=
+AmbientCapabilities=
+
+# System call filter
+SystemCallFilter=@system-service
+SystemCallFilter=~@debug @mount @raw-io @reboot @swap @privileged
+
+[Install]
+WantedBy=default.target
+```
+
+> **Note:** Update the `ExecStart` Node.js path by running `which node` as the soc-agent user.
+
+### 8.2 Companion Timer Service for Scheduled Analysis
+
+```bash
+nano ~/.config/systemd/user/openclaw-daily-scan.service
+```
+
+```ini
+[Unit]
+Description=OpenClaw Daily Security Scan
+After=openclaw-soc.service
+
+[Service]
+Type=oneshot
+ExecStart=/home/soc-agent/ai/openclaw/scripts/daily-security-digest.sh
+ExecStartPost=/home/soc-agent/ai/openclaw/scripts/detect-ssh-anomalies.sh
+ExecStartPost=/home/soc-agent/ai/openclaw/scripts/hardening-check.sh
+StandardOutput=append:/home/soc-agent/ai/logs/daily-scan.log
+StandardError=append:/home/soc-agent/ai/logs/daily-scan-error.log
+```
+
+```bash
+nano ~/.config/systemd/user/openclaw-daily-scan.timer
+```
+
+```ini
+[Unit]
+Description=Run OpenClaw Daily Security Scan at 06:00
+Requires=openclaw-daily-scan.service
+
+[Timer]
+OnCalendar=*-*-* 06:00:00
+Persistent=true
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target
+```
+
+### 8.3 Enable and Start Everything
+
+```bash
+# Enable lingering for soc-agent user
+sudo loginctl enable-linger soc-agent
+
+# Reload and enable services
+systemctl --user daemon-reload
+systemctl --user enable openclaw-soc
+systemctl --user enable openclaw-daily-scan.timer
+
+# Start services
+systemctl --user start openclaw-soc
+systemctl --user start openclaw-daily-scan.timer
+
+# Verify status
+systemctl --user status openclaw-soc
+systemctl --user list-timers
+
+# Follow live logs
+journalctl --user -u openclaw-soc -f
+tail -f ~/ai/logs/openclaw.log
+```
+
+---
+
+## SECTION 9 — Log Analysis Workflows
+
+### 9.1 Authentication Log Analysis
+
+Feed this output directly to OpenClaw for AI analysis:
+
+```bash
+cat > ~/ai/openclaw/scripts/auth-analysis.sh << 'EOF'
+#!/bin/bash
+# Structured authentication analysis for AI triage
+OUTPUT=~/ai/logs/auth/auth-analysis-$(date +%Y%m%d-%H%M%S).json
+
+echo "[*] Building authentication analysis report..."
+
+# Failed logins by IP (top 20)
+FAILED_BY_IP=$(journalctl -u sshd --since="24 hours ago" --no-pager \
+  | grep "Failed password" \
+  | grep -oE '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}' \
+  | sort | uniq -c | sort -rn | head -20)
+
+# Successful logins
+SUCCESSFUL=$(journalctl -u sshd --since="24 hours ago" --no-pager \
+  | grep "Accepted" \
+  | awk '{print $1,$2,$3,$9,$11}')
+
+# Invalid usernames attempted
+INVALID_USERS=$(journalctl -u sshd --since="24 hours ago" --no-pager \
+  | grep "Invalid user" \
+  | awk '{print $8}' | sort | uniq -c | sort -rn | head -20)
+
+# Root login attempts
+ROOT_ATTEMPTS=$(journalctl -u sshd --since="24 hours ago" --no-pager \
+  | grep -c "Failed.*root\|Invalid user root" || echo 0)
+
+# Sudo events
+SUDO_EVENTS=$(journalctl --since="24 hours ago" --no-pager \
+  | grep "sudo:" | tail -50)
+
+# Construct JSON
+jq -n \
+  --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+  --arg failed_by_ip "$FAILED_BY_IP" \
+  --arg successful "$SUCCESSFUL" \
+  --arg invalid_users "$INVALID_USERS" \
+  --argjson root_attempts "$ROOT_ATTEMPTS" \
+  --arg sudo_events "$SUDO_EVENTS" \
+  '{
+    timestamp: $ts,
+    report_type: "authentication_analysis",
+    failed_logins_by_ip: $failed_by_ip,
+    successful_logins: $successful,
+    invalid_usernames: $invalid_users,
+    root_login_attempts: $root_attempts,
+    sudo_events: $sudo_events
+  }' > "$OUTPUT"
+
+echo "[+] Auth analysis written to $OUTPUT"
+echo "[*] Pass this to OpenClaw: 'Analyze this authentication log and identify threats'"
+EOF
+
+chmod +x ~/ai/openclaw/scripts/auth-analysis.sh
+```
+
+### 9.2 Network Anomaly Detection
+
+```bash
+cat > ~/ai/openclaw/scripts/network-analysis.sh << 'EOF'
+#!/bin/bash
+OUTPUT=~/ai/logs/network/netstat-$(date +%Y%m%d-%H%M%S).json
+
+echo "[*] Capturing network state..."
+
+# All established connections
+ESTABLISHED=$(ss -tnp state established \
+  | awk 'NR>1 {print $4, $5, $6}')
+
+# All listening services
+LISTENING=$(ss -tlnp \
+  | awk 'NR>1 {print $4, $6}')
+
+# Connections to unusual ports
+UNUSUAL=$(ss -tnp state established \
+  | awk 'NR>1 {
+    split($5, a, ":")
+    port = a[length(a)]
+    if (port != 80 && port != 443 && port != 22 && port != 53)
+      print $0
+  }')
+
+# DNS queries (if tcpdump access available)
+# sudo tcpdump -i any -nn -c 100 port 53 > /tmp/dns-sample.txt 2>/dev/null
+
+jq -n \
+  --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+  --arg established "$ESTABLISHED" \
+  --arg listening "$LISTENING" \
+  --arg unusual "$UNUSUAL" \
+  '{
+    timestamp: $ts,
+    report_type: "network_state",
+    established_connections: $established,
+    listening_services: $listening,
+    unusual_port_connections: $unusual
+  }' > "$OUTPUT"
+
+echo "[+] Network analysis saved to $OUTPUT"
+EOF
+
+chmod +x ~/ai/openclaw/scripts/network-analysis.sh
+```
+
+### 9.3 Sudo Abuse Detection
+
+```bash
+cat > ~/ai/openclaw/scripts/detect-sudo-abuse.sh << 'EOF'
+#!/bin/bash
+THRESHOLD=5   # Sudo events per hour to trigger alert
+OUTPUT=~/ai/logs/alerts/sudo-$(date +%Y%m%d-%H%M%S).json
+
+SUDO_COUNT=$(journalctl --since="1 hour ago" --no-pager \
+  | grep -c "sudo:" 2>/dev/null || echo 0)
+
+SUDO_FAILURES=$(journalctl --since="1 hour ago" --no-pager \
+  | grep "sudo:.*incorrect password\|sudo:.*not allowed" \
+  | wc -l)
+
+SUDO_COMMANDS=$(journalctl --since="1 hour ago" --no-pager \
+  | grep "sudo:" | grep "COMMAND=" | tail -30)
+
+jq -n \
+  --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+  --argjson count "$SUDO_COUNT" \
+  --argjson failures "$SUDO_FAILURES" \
+  --arg commands "$SUDO_COMMANDS" \
+  '{
+    timestamp: $ts,
+    alert_type: "sudo_monitoring",
+    total_sudo_events_1h: $count,
+    failed_sudo_attempts: $failures,
+    commands_run: $commands
+  }' > "$OUTPUT"
+
+if [ "$SUDO_COUNT" -ge "$THRESHOLD" ]; then
+  echo "[!] ALERT: $SUDO_COUNT sudo events in 1 hour (threshold: $THRESHOLD)"
+fi
+
+if [ "$SUDO_FAILURES" -gt 0 ]; then
+  echo "[!] ALERT: $SUDO_FAILURES failed sudo attempts detected"
+fi
+
+echo "[+] Sudo analysis: $OUTPUT"
+EOF
+
+chmod +x ~/ai/openclaw/scripts/detect-sudo-abuse.sh
+```
+
+---
+
+## SECTION 10 — Incident Response Support
+
+### 10.1 Automated Triage Script
+
+```bash
+cat > ~/ai/openclaw/scripts/incident-triage.sh << 'EOF'
+#!/bin/bash
+# Run immediately when an incident is suspected
+# Collects system state for AI-assisted triage
+
+INCIDENT_ID="IR-$(date +%Y%m%d-%H%M%S)"
+EVIDENCE_DIR=~/ai/evidence/filesystem/${INCIDENT_ID}
+mkdir -p "$EVIDENCE_DIR"
+
+echo "============================================"
+echo " INCIDENT TRIAGE — $INCIDENT_ID"
+echo " Started: $(date)"
+echo "============================================"
+
+# 1. Snapshot running processes
+echo "[*] Capturing process list..."
+ps auxf > "$EVIDENCE_DIR/processes.txt"
+ls -la /proc/*/exe 2>/dev/null | grep -v "Permission denied" \
+  > "$EVIDENCE_DIR/process-executables.txt"
+
+# 2. Network connections
+echo "[*] Capturing network state..."
+ss -tnup > "$EVIDENCE_DIR/network-connections.txt"
+ip route show > "$EVIDENCE_DIR/routes.txt"
+ip addr show > "$EVIDENCE_DIR/interfaces.txt"
+arp -n > "$EVIDENCE_DIR/arp-table.txt"
+
+# 3. Logged-in users
+echo "[*] Capturing user sessions..."
+who > "$EVIDENCE_DIR/who.txt"
+w > "$EVIDENCE_DIR/w.txt"
+last -50 > "$EVIDENCE_DIR/last.txt"
+lastlog > "$EVIDENCE_DIR/lastlog.txt"
+
+# 4. Scheduled tasks
+echo "[*] Capturing scheduled tasks..."
+crontab -l > "$EVIDENCE_DIR/crontab-current-user.txt" 2>/dev/null
+ls -la /etc/cron* > "$EVIDENCE_DIR/system-crons.txt"
+systemctl list-timers --all --no-pager > "$EVIDENCE_DIR/systemd-timers.txt"
+
+# 5. Recently modified files (last 24h)
+echo "[*] Finding recently modified files..."
+find /etc /bin /sbin /usr/bin /usr/sbin /tmp /var/tmp \
+  -newer /tmp -type f -ls 2>/dev/null \
+  | sort -k8 -k9 -k10 \
+  > "$EVIDENCE_DIR/recently-modified.txt"
+
+# 6. Suspicious temp files
+echo "[*] Checking temp directories..."
+ls -laR /tmp /var/tmp > "$EVIDENCE_DIR/temp-files.txt"
+
+# 7. SUID/SGID files
+echo "[*] Checking SUID/SGID files..."
+find / -perm /6000 -type f 2>/dev/null > "$EVIDENCE_DIR/suid-files.txt"
+
+# 8. Loaded kernel modules
+echo "[*] Checking kernel modules..."
+lsmod > "$EVIDENCE_DIR/kernel-modules.txt"
+
+# 9. Recent auth events
+echo "[*] Capturing recent auth logs..."
+journalctl -u sshd --since="24 hours ago" --no-pager \
+  > "$EVIDENCE_DIR/ssh-log-24h.txt"
+journalctl --since="1 hour ago" -p err..emerg --no-pager \
+  > "$EVIDENCE_DIR/errors-1h.txt"
+
+# 10. Fail2ban status
+echo "[*] Capturing Fail2ban status..."
+sudo fail2ban-client status > "$EVIDENCE_DIR/fail2ban-status.txt" 2>/dev/null
+
+# 11. Hash critical binaries (integrity snapshot)
+echo "[*] Hashing critical binaries..."
+sha256sum /bin/bash /bin/sh /usr/bin/sudo /usr/bin/passwd \
+  /sbin/sshd /usr/bin/python3 /usr/bin/python \
+  > "$EVIDENCE_DIR/critical-binary-hashes.txt" 2>/dev/null
+
+# Compress evidence
+echo "[*] Compressing evidence package..."
+tar -czf ~/ai/evidence/${INCIDENT_ID}.tar.gz -C ~/ai/evidence/filesystem "${INCIDENT_ID}/"
+chmod 600 ~/ai/evidence/${INCIDENT_ID}.tar.gz
+
+echo ""
+echo "============================================"
+echo "[+] Triage complete: $INCIDENT_ID"
+echo "[+] Evidence: ~/ai/evidence/${INCIDENT_ID}.tar.gz"
+echo "[+] Pass the evidence directory contents to OpenClaw:"
+echo "    'Analyze this incident triage data and provide a threat assessment'"
+echo "============================================"
+EOF
+
+chmod +x ~/ai/openclaw/scripts/incident-triage.sh
+```
+
+### 10.2 System Isolation Steps
+
+```bash
+cat > ~/ai/openclaw/scripts/isolate-system.sh << 'EOF'
+#!/bin/bash
+# EMERGENCY: Isolate a compromised system
+# USE ONLY when compromise is confirmed
+# This will sever network connectivity
+
+echo "============================================"
+echo " SYSTEM ISOLATION INITIATED"
+echo " Time: $(date)"
+echo " WARNING: This will block network access"
+echo "============================================"
+echo ""
+read -p "Type 'ISOLATE' to confirm: " CONFIRM
+[ "$CONFIRM" != "ISOLATE" ] && echo "Aborted." && exit 1
+
+# Log the isolation event
+echo "ISOLATION STARTED: $(date)" >> ~/ai/logs/alerts/isolation.log
+
+# 1. Block all inbound traffic except local management
+sudo iptables -I INPUT 1 -i lo -j ACCEPT
+sudo iptables -I INPUT 2 -s 192.168.1.100 -j ACCEPT  # Replace with your management IP
+sudo iptables -P INPUT DROP
+sudo iptables -P FORWARD DROP
+
+# 2. Block all outbound traffic except established sessions
+sudo iptables -P OUTPUT DROP
+sudo iptables -I OUTPUT 1 -o lo -j ACCEPT
+sudo iptables -I OUTPUT 2 -m state --state ESTABLISHED,RELATED -j ACCEPT
+
+# 3. Kill all established external connections
+sudo ss -K dst \! 192.168.1.0/24  # Kill connections outside local subnet
+
+# 4. Disable WiFi/Bluetooth
+sudo rfkill block all
+
+echo "[+] System isolated at $(date)" | tee -a ~/ai/logs/alerts/isolation.log
+echo "[!] Run incident-triage.sh to collect evidence"
+echo "[!] Document everything before remediation"
+EOF
+
+chmod +x ~/ai/openclaw/scripts/isolate-system.sh
+```
+
+### 10.3 Evidence Collection for Forensics
+
+```bash
+cat > ~/ai/openclaw/scripts/collect-evidence.sh << 'EOF'
+#!/bin/bash
+# Forensic evidence collection
+CASE_ID="${1:-CASE-$(date +%Y%m%d)}"
+EVIDENCE_DIR=~/ai/evidence/filesystem/${CASE_ID}
+mkdir -p "$EVIDENCE_DIR"
+
+echo "[*] Collecting forensic evidence for: $CASE_ID"
+
+# Memory-resident information (volatile — collect first)
+echo "[*] Volatile data collection..."
+date > "$EVIDENCE_DIR/00-timestamp.txt"
+uptime >> "$EVIDENCE_DIR/00-timestamp.txt"
+ps auxww > "$EVIDENCE_DIR/01-processes.txt"
+ss -tnuplr > "$EVIDENCE_DIR/02-network-all.txt"
+lsof -n > "$EVIDENCE_DIR/03-open-files.txt" 2>/dev/null
+
+# System information
+uname -a > "$EVIDENCE_DIR/10-system-info.txt"
+cat /etc/os-release >> "$EVIDENCE_DIR/10-system-info.txt"
+cat /proc/version >> "$EVIDENCE_DIR/10-system-info.txt"
+
+# User activity
+cat /etc/passwd > "$EVIDENCE_DIR/20-passwd.txt"
+cat /etc/shadow > "$EVIDENCE_DIR/21-shadow.txt" 2>/dev/null
+cat /etc/group > "$EVIDENCE_DIR/22-group.txt"
+find /home -name ".bash_history" -exec cat {} \; > "$EVIDENCE_DIR/23-bash-histories.txt" 2>/dev/null
+find /home -name ".ssh" -type d -exec ls -la {} \; > "$EVIDENCE_DIR/24-ssh-dirs.txt" 2>/dev/null
+
+# Persistence mechanisms
+crontab -l > "$EVIDENCE_DIR/30-crontab.txt" 2>/dev/null
+ls -laR /etc/cron* > "$EVIDENCE_DIR/31-system-crontabs.txt"
+ls -la /etc/systemd/system/ > "$EVIDENCE_DIR/32-systemd-units.txt"
+ls -la /etc/init.d/ > "$EVIDENCE_DIR/33-init-scripts.txt" 2>/dev/null
+cat /etc/rc.local > "$EVIDENCE_DIR/34-rc-local.txt" 2>/dev/null
+
+# Log collection
+journalctl --since="48 hours ago" --no-pager > "$EVIDENCE_DIR/40-journal-48h.txt"
+cp /var/log/auth.log "$EVIDENCE_DIR/41-auth-log.txt" 2>/dev/null
+cp /var/log/audit/audit.log "$EVIDENCE_DIR/42-audit-log.txt" 2>/dev/null
+
+# Hash the evidence directory
+echo "[*] Creating evidence integrity hashes..."
+find "$EVIDENCE_DIR" -type f -exec sha256sum {} \; > ~/ai/evidence/${CASE_ID}-hashes.txt
+
+# Seal evidence
+tar -czf ~/ai/evidence/${CASE_ID}.tar.gz -C ~/ai/evidence/filesystem "${CASE_ID}/"
+sha256sum ~/ai/evidence/${CASE_ID}.tar.gz >> ~/ai/evidence/${CASE_ID}-hashes.txt
+chmod 400 ~/ai/evidence/${CASE_ID}.tar.gz
+
+echo "[+] Evidence collection complete"
+echo "[+] Archive: ~/ai/evidence/${CASE_ID}.tar.gz"
+echo "[+] Hashes: ~/ai/evidence/${CASE_ID}-hashes.txt"
+EOF
+
+chmod +x ~/ai/openclaw/scripts/collect-evidence.sh
+```
+
+---
+
+## SECTION 11 — Performance Optimization
+
+### 11.1 Node.js Memory Tuning for i7-8650U
+
+In the `.env` or systemd service:
+```dotenv
+NODE_OPTIONS=--max-old-space-size=2048
+```
+
+For longer log analysis sessions:
+```dotenv
+NODE_OPTIONS=--max-old-space-size=3072 --expose-gc
+```
+
+### 11.2 CPU Usage Control via systemd
+
+Add to the `[Service]` block of `openclaw-soc.service`:
+
+```ini
+# Limit to 60% of 4 cores (240% of one core)
+CPUQuota=240%
+
+# Assign to specific CPU cores (optional)
+CPUAffinity=0 1
+
+# Memory hard limit
+MemoryMax=3G
+MemorySwapMax=512M
+```
+
+### 11.3 CPU Governor for Sustained Background Work
+
+```bash
+sudo pacman -S --noconfirm cpupower
+
+# For active analysis sessions
+sudo cpupower frequency-set -g performance
+
+# For idle background SOC agent
+sudo cpupower frequency-set -g powersave
+
+# Check current state
+cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor
+```
+
+### 11.4 Token Budget Control for Log Analysis
+
+Use structured prompts to minimize token waste:
+
+```
+System: You are a SOC analyst. Be concise and technical.
+Task: Analyze the following auth log extract.
+Format: JSON with fields: severity, indicators, recommended_action.
+Max response: 800 tokens.
+Log data: [PASTE LOG HERE]
+```
+
+### 11.5 Intelligent Log Chunking
+
+```bash
+cat > ~/ai/openclaw/scripts/chunk-logs.sh << 'EOF'
+#!/bin/bash
+# Splits large log files into AI-digestible chunks
+LOG_FILE="$1"
+CHUNK_SIZE="${2:-200}"   # lines per chunk
+OUTPUT_DIR="${3:-~/ai/logs/chunks}"
+
+mkdir -p "$OUTPUT_DIR"
+
+split -l "$CHUNK_SIZE" \
+      --additional-suffix=".log" \
+      "$LOG_FILE" \
+      "$OUTPUT_DIR/chunk-"
+
+echo "[+] Split $LOG_FILE into $(ls $OUTPUT_DIR/chunk-*.log | wc -l) chunks"
+echo "[+] Process each chunk through OpenClaw separately"
+EOF
+
+chmod +x ~/ai/openclaw/scripts/chunk-logs.sh
+```
+
+---
+
+## SECTION 12 — Troubleshooting (Arch Linux Specific)
+
+### 12.1 pnpm Build Cache Corruption
+
+```bash
+pnpm store prune
+rm -rf ~/.local/share/pnpm/store
+rm -rf ~/ai/openclaw/node_modules
+rm -f ~/ai/openclaw/pnpm-lock.yaml
+pnpm install --force
+```
+
+### 12.2 Node Version Conflicts
+
+```bash
+# Check what the project requires
+cat ~/ai/openclaw/package.json | python -m json.tool | grep '"node"'
+
+nvm ls
+nvm install 20.11.0
+nvm alias default 20.11.0
+nvm use 20.11.0
+
+# Confirm pnpm resolves to the right node
+which node && node --version
+```
+
+### 12.3 Permission Errors After Re-Install
+
+```bash
+# Full ownership reset
+sudo chown -R soc-agent:soc-agent /home/soc-agent
+find /home/soc-agent/ai -type d -exec chmod 750 {} \;
+find /home/soc-agent/ai -type f -exec chmod 640 {} \;
+chmod +x /home/soc-agent/ai/openclaw/scripts/*.sh
+chmod 600 /home/soc-agent/ai/openclaw/.env
+```
+
+### 12.4 soc-agent Cannot Read journald Logs
+
+```bash
+# Verify group membership
+sudo usermod -aG systemd-journal soc-agent
+# Must re-login after group change
+
+# Test
+sudo -u soc-agent journalctl -n 10
+```
+
+### 12.5 auditd Service Conflicts
+
+```bash
+sudo systemctl status auditd
+sudo journalctl -u auditd -n 50 --no-pager
+
+# Reload rules
+sudo augenrules --load
+sudo systemctl restart auditd
+```
+
+### 12.6 Systemd Service Fails with Environment File Error
+
+```bash
+# Verify the .env file exists and is readable by soc-agent
+ls -la /home/soc-agent/ai/openclaw/.env
+
+# Check service errors in detail
+systemctl --user status openclaw-soc -l
+journalctl --user -u openclaw-soc -n 30 --no-pager
+
+# Confirm node binary path
+sudo -u soc-agent which node
+# Update ExecStart in the service file to match
+systemctl --user daemon-reload && systemctl --user restart openclaw-soc
+```
+
+---
+
+## SECTION 13 — Advanced: Local LLMs, Containers, and Sandboxing
+
+### 13.1 Ollama for Air-Gapped SOC Operations
+
+```bash
+# Install Ollama
+curl -fsSL https://ollama.ai/install.sh | sh
+# or via AUR:
+yay -S ollama --noconfirm
+
+sudo systemctl enable --now ollama
+
+# Pull security-relevant models
+ollama pull llama3.1:8b           # Fast, good for log triage
+ollama pull mistral:7b            # Lightweight, quick analysis
+ollama pull deepseek-coder-v2:16b # Code/script analysis
+
+# Test with a SOC prompt
+curl http://localhost:11434/api/generate -d '{
+  "model": "llama3.1:8b",
+  "prompt": "You are a SOC analyst. Analyze this SSH log: Failed password for root from 185.220.101.5 port 51234 ssh2. What is the threat level and recommended action?",
+  "stream": false
+}'
+```
+
+Update `.env` for local model:
+```dotenv
+USE_LOCAL_MODEL=true
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=llama3.1:8b
+```
+
+### 13.2 OpenClaw in a Docker Container with Log Access
+
+```bash
+cat > ~/ai/openclaw/Dockerfile.soc << 'EOF'
+FROM node:20-slim
+
+WORKDIR /app
+
+RUN npm install -g pnpm
+
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
+
+COPY . .
+RUN pnpm build
+
+# Non-root user inside container
+RUN useradd -m soc-runtime
+USER soc-runtime
+
+EXPOSE 3000
+CMD ["node", "dist/index.js"]
+EOF
+
+docker build -f ~/ai/openclaw/Dockerfile.soc -t openclaw-soc:latest ~/ai/openclaw/
+
+# Run with read-only log mount
+docker run -d \
+  --name openclaw-soc \
+  -p 127.0.0.1:3000:3000 \
+  --read-only \
+  --tmpfs /tmp \
+  -v /var/log:/var/log:ro \
+  -v ~/ai/reports:/reports:rw \
+  -v ~/ai/logs/alerts:/alerts:rw \
+  --env-file ~/ai/openclaw/.env \
+  --restart unless-stopped \
+  --cap-drop=ALL \
+  --security-opt no-new-privileges \
+  --memory=2g \
+  --cpus=2.0 \
+  openclaw-soc:latest
+```
+
+### 13.3 AppArmor Profile for OpenClaw
+
+```bash
+sudo nano /etc/apparmor.d/openclaw-soc
+```
+
+```
+#include <tunables/global>
+
+/home/soc-agent/.nvm/versions/node/*/bin/node {
+  #include <abstractions/base>
+  #include <abstractions/nameservice>
+  #include <abstractions/ssl_certs>
+
+  # Node.js execution
+  /home/soc-agent/.nvm/versions/node/*/bin/node mr,
+  /home/soc-agent/.nvm/             r,
+  /home/soc-agent/.nvm/**           r,
+
+  # Application code
+  /home/soc-agent/ai/openclaw/**    rw,
+
+  # Output directories
+  /home/soc-agent/ai/logs/**        rw,
+  /home/soc-agent/ai/reports/**     rw,
+  /home/soc-agent/ai/evidence/**    rw,
+
+  # Read-only system logs
+  /var/log/**                       r,
+
+  # Deny everything else
+  deny /etc/shadow                  r,
+  deny /root/**                     rw,
+  deny /proc/sysrq-trigger          w,
+  deny /sys/**                      w,
+}
+```
+
+```bash
+sudo apparmor_parser -r /etc/apparmor.d/openclaw-soc
+sudo aa-enforce /etc/apparmor.d/openclaw-soc
+```
+
+---
+
+## Quick Reference Card
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│           OpenClaw SOC Assistant — Quick Reference            │
+├──────────────────────────────────────────────────────────────┤
+│ Start agent:     systemctl --user start openclaw-soc         │
+│ Stop agent:      systemctl --user stop openclaw-soc          │
+│ View live logs:  journalctl --user -u openclaw-soc -f        │
+│ Daily digest:    ~/ai/openclaw/scripts/daily-security-digest.sh│
+│ SSH anomalies:   ~/ai/openclaw/scripts/detect-ssh-anomalies.sh│
+│ Hardening check: ~/ai/openclaw/scripts/hardening-check.sh    │
+│ Vuln scan:       ~/ai/openclaw/scripts/vuln-scan-infra.sh    │
+│ Incident triage: ~/ai/openclaw/scripts/incident-triage.sh    │
+│ Collect evidence:~/ai/openclaw/scripts/collect-evidence.sh   │
+│ FIM check:       ~/ai/openclaw/scripts/fim-check.sh          │
+│ Auth analysis:   ~/ai/openclaw/scripts/auth-analysis.sh      │
+│ Sudo detection:  ~/ai/openclaw/scripts/detect-sudo-abuse.sh  │
+├──────────────────────────────────────────────────────────────┤
+│ Report locations:                                            │
+│   Daily:    ~/ai/reports/daily/                              │
+│   Incidents:~/ai/reports/incidents/                          │
+│   Vulns:    ~/ai/reports/vuln-scans/                         │
+│   Alerts:   ~/ai/logs/alerts/                                │
+│   Evidence: ~/ai/evidence/                                   │
+└──────────────────────────────────────────────────────────────┘
+```
+
+---
+
+**Final Security Reminders:**
+- The `.env` file must always remain at `chmod 600`
+- The soc-agent user must never have `sudo` privileges
+- Bind OpenClaw to `127.0.0.1` only — never expose the port externally
+- All log access is read-only; the agent writes only to its own output directories
+- Regularly review the agent's API usage — logs are in `~/ai/logs/openclaw.log`
+- Keep AIDE, ClamAV, and nuclei-templates updated weekly
