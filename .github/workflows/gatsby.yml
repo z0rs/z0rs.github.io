@@ -25,6 +25,7 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
       - name: Detect package manager
         id: detect-package-manager
         run: |
@@ -40,40 +41,44 @@ jobs:
             echo "Unable to determine package manager"
             exit 1
           fi
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: "18"
           cache: ${{ steps.detect-package-manager.outputs.manager }}
+
       - name: Setup Pages
         id: pages
         uses: actions/configure-pages@v4
         with:
           static_site_generator: gatsby
+
       - name: Restore cache
         uses: actions/cache@v4
         with:
           path: |
             public
             .cache
-          key: ${{ runner.os }}-gatsby-build-${{ hashFiles('public') }}
+          # Hash the lock file so cache invalidates when dependencies change
+          key: ${{ runner.os }}-gatsby-build-${{ hashFiles('**/package-lock.json') }}
           restore-keys: |
             ${{ runner.os }}-gatsby-build-
+
       - name: Install dependencies
         run: ${{ steps.detect-package-manager.outputs.manager }} ${{ steps.detect-package-manager.outputs.command }}
+
       - name: Build with Gatsby
         env:
           PREFIX_PATHS: 'true'
-          NODE_TLS_REJECT_UNAUTHORIZED: 0
+          # Increase heap size for large Gatsby builds; TLS verification must remain enabled
+          NODE_OPTIONS: '--max-old-space-size=4096'
         run: ${{ steps.detect-package-manager.outputs.runner }} gatsby build
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: ./public
-      - name: Increase memory limit and run build
-        run: |
-          export NODE_OPTIONS="--max-old-space-size=4096"
-          yarn run build
 
   deploy:
     environment:
