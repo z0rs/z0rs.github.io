@@ -1,7 +1,6 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import { MDXProvider } from '@mdx-js/react';
-import { MDXRenderer } from 'gatsby-plugin-mdx';
 
 import { Link } from 'gatsby';
 import { GatsbyImage, getImage } from 'gatsby-plugin-image';
@@ -9,7 +8,6 @@ import { GatsbyImage, getImage } from 'gatsby-plugin-image';
 import MarkdownCtaLink from './markdown-cta-link';
 import PrismSyntaxHighlight from './prism-syntax-highlight.js';
 
-import { transformImages } from '../utils/transform-images';
 import { stripLeadingSlash } from '../utils/strip-leading-slash';
 import Tweet from '../components/tweet';
 import YouTube from '../components/youtube';
@@ -46,17 +44,15 @@ const components = {
   Vimeo
 };
 
-const MdxParser = ({ children, embedded }) => {
-  return (
-    <MDXProvider components={components}>
-      <MDXRenderer embedded={transformImages(embedded)}>{children}</MDXRenderer>
-    </MDXProvider>
-  );
+// gatsby-plugin-mdx v5 renders MDX as React components passed directly as `children`.
+// MDXRenderer (from gatsby-plugin-mdx v3) and the `body` GraphQL field no longer exist in v5.
+const MdxParser = ({ children }) => {
+  return <MDXProvider components={components}>{children}</MDXProvider>;
 };
 
 MdxParser.propTypes = {
-  /** Embedded image dtails */
-  embedded: PropTypes.any
+  /** MDX content rendered as React children (gatsby-plugin-mdx v5) */
+  children: PropTypes.node
 };
 
 export default MdxParser;

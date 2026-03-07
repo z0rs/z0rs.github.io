@@ -51,7 +51,9 @@ module.exports = {
     {
       resolve: 'gatsby-plugin-mdx',
       options: {
-        rehypePlugins: [wrapESMPlugin('rehype-slug'), [wrapESMPlugin('rehype-autolink-headings'), { behavior: 'wrap' }]]
+        mdxOptions: {
+          rehypePlugins: [wrapESMPlugin('rehype-slug'), [wrapESMPlugin('rehype-autolink-headings'), { behavior: 'wrap' }]]
+        }
       }
     },
     {
