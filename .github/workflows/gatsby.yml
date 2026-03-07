@@ -61,7 +61,7 @@ jobs:
             public
             .cache
           # Hash the lock file so cache invalidates when dependencies change
-          key: ${{ runner.os }}-gatsby-build-${{ hashFiles('**/package-lock.json') }}
+          key: ${{ runner.os }}-gatsby-build-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
             ${{ runner.os }}-gatsby-build-
 
