@@ -82,54 +82,69 @@ exports.onCreateNode = async ({
 
   if (node.internal.type === 'Mdx') {
     if (node.frontmatter.featuredImage) {
-      let featuredImage = await createRemoteFileNode({
-        url: node.frontmatter.featuredImage,
-        parentNodeId: node.id,
-        createNode,
-        createNodeId,
-        cache,
-        store
-      });
-      if (featuredImage) {
-        createNodeField({ node, name: 'featuredImage', value: featuredImage.id });
+      try {
+        let featuredImage = await createRemoteFileNode({
+          url: node.frontmatter.featuredImage,
+          parentNodeId: node.id,
+          createNode,
+          createNodeId,
+          cache,
+          store
+        });
+        if (featuredImage) {
+          createNodeField({ node, name: 'featuredImage', value: featuredImage.id });
+        }
+      } catch (err) {
+        console.warn(`[gatsby-node] Could not fetch featuredImage for "${node.frontmatter.title}": ${err.message}`);
+        console.warn(`  URL: ${node.frontmatter.featuredImage}`);
       }
     }
 
     if (node.frontmatter.embeddedImages) {
-      let embeddedImages = await Promise.all(
-        node.frontmatter.embeddedImages.map((url) => {
-          return createRemoteFileNode({
-            url,
-            parentNodeId: node.id,
-            createNode,
-            createNodeId,
-            cache,
-            store
-          });
+      const embeddedImages = await Promise.all(
+        node.frontmatter.embeddedImages.map(async (url) => {
+          try {
+            return await createRemoteFileNode({
+              url,
+              parentNodeId: node.id,
+              createNode,
+              createNodeId,
+              cache,
+              store
+            });
+          } catch (err) {
+            console.warn(`[gatsby-node] Could not fetch embeddedImage for "${node.frontmatter.title}": ${err.message}`);
+            console.warn(`  URL: ${url}`);
+            return null;
+          }
         })
       );
-      if (embeddedImages) {
+      const validImages = embeddedImages.filter(Boolean);
+      if (validImages.length > 0) {
         createNodeField({
           node,
           name: 'embeddedImages',
-          value: embeddedImages.map((embeddedImage) => {
-            return embeddedImage.id;
-          })
+          value: validImages.map((embeddedImage) => embeddedImage.id)
         });
       }
     }
 
     if (node.frontmatter.logo) {
-      let logo = await createRemoteFileNode({
-        url: node.frontmatter.logo,
-        parentNodeId: node.id,
-        createNode,
-        createNodeId,
-        cache,
-        store
-      });
-      if (logo) {
-        createNodeField({ node, name: 'logo', value: logo.id });
+      try {
+        let logo = await createRemoteFileNode({
+          url: node.frontmatter.logo,
+          parentNodeId: node.id,
+          createNode,
+          createNodeId,
+          cache,
+          store
+        });
+        if (logo) {
+          createNodeField({ node, name: 'logo', value: logo.id });
+        }
+      } catch (err) {
+        console.warn(`[gatsby-node] Could not fetch logo for "${node.frontmatter.title}": ${err.message}`);
+        console.warn(`  URL: ${node.frontmatter.logo}`);
       }
     }
   }

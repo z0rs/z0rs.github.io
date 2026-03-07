@@ -18,9 +18,7 @@ const Page = ({
       fields: { slug },
       excerpt,
       frontmatter: { type, title, date, dateModified, author, tags },
-      featuredImage: {
-        childImageSharp: { thumbnail }
-      },
+      featuredImage,
       embeddedImages,
       tableOfContents: { items: toc }
     },
@@ -30,6 +28,7 @@ const Page = ({
   },
   children
 }) => {
+  const thumbnail = featuredImage?.childImageSharp?.thumbnail ?? null;
   return (
     <Fragment>
       <div className="grid lg:grid-cols-1fr-auto">
@@ -109,13 +108,12 @@ export const Head = ({
       fields: { slug },
       excerpt,
       frontmatter: { type, title, tags },
-      featuredImage: {
-        childImageSharp: { og }
-      }
+      featuredImage
     }
   }
 }) => {
+  const ogImage = featuredImage?.childImageSharp?.og?.images?.fallback?.src ?? null;
   return (
-    <Seo type="ctf" title={title} description={excerpt} slug={slug} image={og.images.fallback.src} tags={tags} />
+    <Seo type="ctf" title={title} description={excerpt} slug={slug} image={ogImage} tags={tags} />
   );
 };
