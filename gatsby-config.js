@@ -42,7 +42,6 @@ module.exports = {
     defaultImage: '/images/76135196.jpeg'
   },
   plugins: [
-    'gatsby-plugin-gatsby-cloud',
     'gatsby-plugin-image',
     'gatsby-transformer-sharp',
     'gatsby-plugin-postcss',
