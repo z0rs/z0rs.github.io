@@ -54,10 +54,6 @@ module.exports = {
       resolve: 'gatsby-plugin-mdx',
       options: {
         mdxOptions: {
-          // remark-gfm enables GitHub Flavored Markdown: tables, strikethrough,
-          // task lists, etc. MDX v2 does NOT include GFM by default (unlike MDX v1),
-          // so pipe tables in .mdx files require this plugin to render correctly.
-          remarkPlugins: [wrapESMPlugin('remark-gfm')],
           rehypePlugins: [wrapESMPlugin('rehype-slug'), [wrapESMPlugin('rehype-autolink-headings'), { behavior: 'wrap' }]]
         }
       }

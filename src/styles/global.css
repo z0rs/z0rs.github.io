@@ -26,11 +26,7 @@
   @apply text-salmon font-bold text-xl;
 }
 
-.prose :where(table):not(:where([class~='not-prose'] *)) {
-  @apply block overflow-x-auto;
-}
-
-
+.youtube-mdx-embed {
   @apply overflow-hidden rounded border border-outline;
 }
 
