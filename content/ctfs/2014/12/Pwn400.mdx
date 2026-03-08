@@ -8,8 +8,6 @@ featuredImage: https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQiSbw35M3yI
 ---
 
 Similar with Pwn200, Pwn400 gave us a binary file, but no libc.so. Open it with IDA Pro and analyze it, we found some information:
-<!-- more -->
-
 First, there's a data structure ( let's call it **node** ) which look like this:
 
 ```c
