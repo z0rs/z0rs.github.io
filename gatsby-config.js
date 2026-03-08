@@ -12,7 +12,9 @@ const wrapESMPlugin = (name) =>
   };
 
 module.exports = {
-  pathPrefix: "/z0rs.github.io",
+  // pathPrefix is only applied when PREFIX_PATHS=true (GitHub Actions / GitHub Pages).
+  // Netlify deploys serve from root so no prefix is needed there.
+  ...(process.env.PREFIX_PATHS === 'true' ? { pathPrefix: '/z0rs.github.io' } : {}),
   // flags: {
   //   FAST_DEV: true
   // },
