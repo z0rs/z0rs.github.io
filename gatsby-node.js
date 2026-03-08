@@ -158,6 +158,9 @@ exports.createPages = async ({ graphql, actions: { createPage, createRedirect } 
       allMdx(filter: { frontmatter: { status: { ne: "draft" } } }) {
         nodes {
           id
+          internal {
+            contentFilePath
+          }
           fields {
             slug
           }
@@ -172,19 +175,24 @@ exports.createPages = async ({ graphql, actions: { createPage, createRedirect } 
   allMdx.nodes.forEach((node) => {
     const {
       id,
+      internal: { contentFilePath },
       fields: { slug },
       frontmatter: { type }
     } = node;
 
+    // gatsby-plugin-mdx v5 requires ?__contentFilePath=<absolute_path_to_mdx_file>
+    // appended to the component path so Gatsby knows which MDX file to compile and
+    // inject as the `children` prop into the template component.
+    // Without this, `children` is undefined and the page renders blank.
+    const template = path.join(__dirname, `./src/templates/${type}.js`);
+
     createPage({
       path: slug,
-      component: path.join(__dirname, `./src/templates/${type}.js`),
+      component: `${template}?__contentFilePath=${contentFilePath}`,
       context: {
         id: id
       },
       defer: false
-      // defer: type !== 'post' || type !== 'demo' ? false : true
-      // defer: index + 1 > 50
     });
   });
 
