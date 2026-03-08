@@ -94,7 +94,10 @@ export const query = graphql`
     }
     site {
       siteMetadata {
+        name
         siteUrl
+        defaultImage
+        keywords
       }
     }
   }
@@ -109,11 +112,12 @@ export const Head = ({
       excerpt,
       frontmatter: { type, title, tags },
       featuredImage
-    }
+    },
+    site: { siteMetadata }
   }
 }) => {
   const ogImage = featuredImage?.childImageSharp?.og?.images?.fallback?.src ?? null;
   return (
-    <Seo type="ctf" title={title} description={excerpt} slug={slug} image={ogImage} tags={tags} />
+    <Seo type="ctf" title={title} description={excerpt} slug={slug} image={ogImage} tags={tags} siteMetadata={siteMetadata} />
   );
 };

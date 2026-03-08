@@ -40,6 +40,14 @@ export const query = graphql`
         title
       }
     }
+    site {
+      siteMetadata {
+        name
+        siteUrl
+        defaultImage
+        keywords
+      }
+    }
   }
 `;
 
@@ -51,8 +59,9 @@ export const Head = ({
       fields: { slug },
       excerpt,
       frontmatter: { title }
-    }
+    },
+    site: { siteMetadata }
   }
 }) => {
-  return <Seo title={title} description={excerpt} slug={slug} />;
+  return <Seo title={title} description={excerpt} slug={slug} siteMetadata={siteMetadata} />;
 };
