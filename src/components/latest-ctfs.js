@@ -43,10 +43,9 @@ const LatestCtfs = () => {
             fields: { slug },
             excerpt,
             frontmatter: { title, date, dateModified },
-            featuredImage: {
-              childImageSharp: { thumbnail }
-            }
+            featuredImage
           } = node;
+          const thumbnail = featuredImage?.childImageSharp?.thumbnail ?? null;
 
           return (
             <CtfCard

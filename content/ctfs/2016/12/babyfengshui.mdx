@@ -63,7 +63,7 @@ if ( &users[id]->desc[text_len] >= &users[id] - 4 )
 printf("text: ");
 read_n(users[id]->desc, text_len + 1);
 ```
-So `user->desc + text_len` must < `user` (both `user->desc` and `user` are pointers). Guess it use this protection to avoid heap overflow.
+So `user->desc + text_len` must {' < '} `user` (both `user->desc` and `user` are pointers). Guess it use this protection to avoid heap overflow.
 
 But what if we have the following heap memory layout?
 ```

@@ -10,15 +10,15 @@ const Page = ({
   data: {
     mdx: {
       excerpt,
-      frontmatter: { type, title },
-      body
+      frontmatter: { type, title }
     }
-  }
+  },
+  children
 }) => {
   return (
     <Fragment>
       <small className="mb-4 leading-6 font-semibold capitalize text-primary">{title}</small>
-      <MdxParser>{body}</MdxParser>
+      <MdxParser>{children}</MdxParser>
       <AsideElement>
         <div className="flex flex-col gap-4">
           <GenericAside />
@@ -39,7 +39,6 @@ export const query = graphql`
         type
         title
       }
-      body
     }
   }
 `;
