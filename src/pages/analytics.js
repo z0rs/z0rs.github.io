@@ -297,6 +297,14 @@ export const query = graphql`
       }
       body
     }
+    site {
+      siteMetadata {
+        name
+        siteUrl
+        defaultImage
+        keywords
+      }
+    }
   }
 `;
 
@@ -308,8 +316,9 @@ export const Head = ({
       fields: { slug },
       frontmatter: { title },
       body
-    }
+    },
+    site: { siteMetadata }
   }
 }) => {
-  return <Seo title={title} description={body} slug={slug} />;
+  return <Seo title={title} description={body} slug={slug} siteMetadata={siteMetadata} />;
 };

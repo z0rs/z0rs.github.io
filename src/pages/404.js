@@ -1,5 +1,5 @@
 import React, { Fragment } from 'react';
-import { Link } from 'gatsby';
+import { Link, graphql } from 'gatsby';
 
 import Seo from '../components/seo';
 
@@ -18,6 +18,19 @@ const Page = () => {
 
 export default Page;
 
-export const Head = () => {
-  return <Seo title="Page Not Found" description="Blast!" slug="/404" />;
+export const query = graphql`
+  query {
+    site {
+      siteMetadata {
+        name
+        siteUrl
+        defaultImage
+        keywords
+      }
+    }
+  }
+`;
+
+export const Head = ({ data: { site: { siteMetadata } } }) => {
+  return <Seo title="Page Not Found" description="Blast!" slug="/404" siteMetadata={siteMetadata} />;
 };

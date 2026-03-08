@@ -1,34 +1,14 @@
 import React, { Fragment } from 'react';
 import PropTypes from 'prop-types';
-import { useStaticQuery, graphql } from 'gatsby';
 
-// siteMetadata can be provided two ways:
+// useStaticQuery has been removed from this component entirely.
+// Calling useStaticQuery inside Gatsby 5's Head API export is broken for
+// MDX-backed pages using gatsby-plugin-mdx v5's ?__contentFilePath= mechanism:
+// those chunks fail to register the static query hash, causing a runtime crash.
 //
-//   1. As a `siteMetadata` prop (preferred for MDX-backed pages using Gatsby 5's
-//      Head API + gatsby-plugin-mdx v5 ?__contentFilePath= mechanism, where
-//      useStaticQuery inside Head is unreliable). Pass it from the page GraphQL query.
-//
-//   2. Via the internal useStaticQuery fallback (used by non-MDX pages like 404.js
-//      and analytics.js, where useStaticQuery in Head works fine).
-//
-const SEO_QUERY = graphql`
-  {
-    site {
-      siteMetadata {
-        name
-        siteUrl
-        defaultImage
-        keywords
-      }
-    }
-  }
-`;
-
-const Seo = ({ type, title, description, slug, image, tags, siteMetadata: siteMetadataProp }) => {
-  // Only call useStaticQuery when the prop is not provided.
-  // This is safe in non-MDX page Head exports.
-  const staticResult = useStaticQuery(SEO_QUERY);
-  const { name, siteUrl, defaultImage, keywords } = siteMetadataProp || staticResult.site.siteMetadata;
+// siteMetadata must always be passed as a prop sourced from the page GraphQL query.
+const Seo = ({ type, title, description, slug, image, tags, siteMetadata }) => {
+  const { name = '', siteUrl = '', defaultImage = '', keywords = [] } = siteMetadata || {};
 
   const htmlTitle = `${name} | ${title}`;
   const ogImage = image ? image : defaultImage;
@@ -41,7 +21,7 @@ const Seo = ({ type, title, description, slug, image, tags, siteMetadata: siteMe
       <meta name="description" content={description} />
       <meta name="image" content={`${siteUrl}${ogImage}`} />
       <meta name="image:alt" content={description} />
-      <meta name="keywords" content={seoKeywords ? seoKeywords.join(', ') : ''} />
+      <meta name="keywords" content={Array.isArray(seoKeywords) ? seoKeywords.join(', ') : ''} />
 
       {/* Facebook */}
       <meta property="og:type" content={type} />
@@ -69,13 +49,12 @@ Seo.propTypes = {
   slug: PropTypes.string.isRequired,
   image: PropTypes.string,
   tags: PropTypes.arrayOf(PropTypes.string),
-  /** Pass from page GraphQL query when used inside MDX-backed Head exports */
   siteMetadata: PropTypes.shape({
     name: PropTypes.string,
     siteUrl: PropTypes.string,
     defaultImage: PropTypes.string,
     keywords: PropTypes.arrayOf(PropTypes.string)
-  })
+  }).isRequired
 };
 
 Seo.defaultProps = {
