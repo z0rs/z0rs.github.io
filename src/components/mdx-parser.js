@@ -12,6 +12,10 @@ import { stripLeadingSlash } from '../utils/strip-leading-slash';
 import Tweet from '../components/tweet';
 import YouTube from '../components/youtube';
 import Vimeo from '../components/vimeo';
+import LatestArticles from '../components/latest-articles';
+import LatestCtfs from '../components/latest-ctfs';
+import AllArticles from '../components/all-articles';
+import AllCtfs from '../components/all-ctfs';
 
 const components = {
   a: ({ href, children }) => {
@@ -41,7 +45,14 @@ const components = {
   MarkdownCtaLink,
   Tweet,
   YouTube,
-  Vimeo
+  Vimeo,
+  // Page-level components used directly in MDX files.
+  // Providing them here via MDXProvider avoids direct imports inside MDX content files,
+  // which are unreliable in gatsby-plugin-mdx v5 / MDX v2.
+  LatestArticles,
+  LatestCtfs,
+  AllArticles,
+  AllCtfs
 };
 
 // gatsby-plugin-mdx v5 renders MDX as React components passed directly as `children`.
