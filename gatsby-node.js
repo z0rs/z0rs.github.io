@@ -67,7 +67,11 @@ exports.onCreateNode = async ({
   createNodeId
 }) => {
   if (node.internal.type === 'Mdx' || node.internal.type === 'PagesJson') {
-    const path = createFilePath({ node, getNode });
+    const rawPath = createFilePath({ node, getNode });
+    // Sanitize the slug: replace characters that are invalid or problematic in URL paths.
+    // & in a page path breaks Gatsby's static-query result lookup during SSR, causing
+    // "The result of this StaticQuery could not be fetched" for those pages.
+    const path = rawPath.replace(/&/g, '-and-').replace(/[%#?]/g, '-').replace(/-{2,}/g, '-');
 
     const {
       frontmatter: { type }
