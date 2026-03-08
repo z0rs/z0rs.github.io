@@ -10,6 +10,11 @@ Personal security research blog and portfolio — built with Gatsby 5, MDX v2, T
 - [Tech Stack](#tech-stack)
 - [Project Structure](#project-structure)
 - [Build Instructions](#build-instructions)
+- [Creating Content](#creating-content)
+  - [Writing an Article](#writing-an-article)
+  - [Writing a CTF Write-up](#writing-a-ctf-write-up)
+  - [MDX Features](#mdx-features)
+  - [Content Rules (MDX v2)](#content-rules-mdx-v2)
 - [Deployment](#deployment)
 - [Environment Variables](#environment-variables)
 - [Migration Notes: Gatsby 5 + gatsby-plugin-mdx v5](#migration-notes-gatsby-5--gatsby-plugin-mdx-v5)
@@ -47,15 +52,13 @@ content/
 
 ### Content System
 
-MDX files live in `content/` and are sourced via `gatsby-source-filesystem`. Each file's frontmatter defines its `type` (`article`, `ctf`, `page`), which determines which template renders it.
+MDX files live in `content/` and are sourced via `gatsby-source-filesystem`. Each file's frontmatter `type` field (`article`, `ctf`, `page`) determines which template renders it.
 
 **gatsby-plugin-mdx v5** compiles MDX to React components. Templates receive the compiled MDX as `children` via the `?__contentFilePath=` mechanism — there is no `MDXRenderer` or `body` field (both were removed in v5).
 
-Custom MDX components (links, code blocks, embeds, `LatestArticles`, `AllCtfs`, etc.) are injected globally via `MDXProvider` in `src/components/mdx-parser.js`. MDX content files must **not** contain direct `import` statements — components must be registered in the provider instead.
+Custom components (`LatestArticles`, `AllCtfs`, code blocks, etc.) are injected globally via `MDXProvider` in `src/components/mdx-parser.js`. MDX content files must **not** contain direct `import` statements.
 
 ### Serverless API
-
-Gatsby Functions in `src/api/` are deployed as serverless endpoints:
 
 | Endpoint | Purpose |
 |---|---|
@@ -64,10 +67,6 @@ Gatsby Functions in `src/api/` are deployed as serverless endpoints:
 | `/api/fauna-reaction-by-slug` | Fetch reactions for a page |
 | `/api/newsletter` | Newsletter signup (ConvertKit) |
 | `/api/ua-analytics` | Proxy to Google Analytics Data API |
-
-### Styling
-
-TailwindCSS v3 with `@tailwindcss/typography` provides all styling. PostCSS + Autoprefixer handle transforms. Custom colours are defined in `tailwind.config.js`.
 
 ---
 
@@ -93,23 +92,21 @@ TailwindCSS v3 with `@tailwindcss/typography` provides all styling. PostCSS + Au
 +-- content/
 |   +-- articles/       # Security article MDX files
 |   +-- ctfs/           # CTF write-up MDX files (organised by year/month)
+|   |   +-- 2024/
+|   |       +-- 04/
+|   |           +-- MyChallenge.mdx
 |   +-- pages/          # Top-level page MDX files (index, about, etc.)
 +-- src/
 |   +-- api/            # Gatsby serverless functions
 |   +-- components/     # React components
-|   +-- context/        # React context (app state)
 |   +-- hooks/          # Custom React hooks
 |   +-- pages/          # Static Gatsby pages (404, analytics, test)
-|   +-- styles/         # Global CSS
 |   +-- templates/      # Page templates (article, ctf, page)
 |   +-- utils/          # Utility functions
 +-- static/             # Static assets (fonts, images, favicon)
-+-- gatsby-browser.js   # Browser-side Gatsby APIs
 +-- gatsby-config.js    # Gatsby configuration + plugins
-+-- gatsby-node.js      # Node.js build-time APIs (createPages, schema)
-+-- gatsby-ssr.js       # SSR-side Gatsby APIs
++-- gatsby-node.js      # createPages, slug sanitisation, remote images
 +-- tailwind.config.js  # TailwindCSS configuration
-+-- postcss.config.js   # PostCSS configuration
 ```
 
 ---
@@ -121,40 +118,212 @@ TailwindCSS v3 with `@tailwindcss/typography` provides all styling. PostCSS + Au
 - Node.js >= 18 (see `.nvmrc`)
 - Yarn
 
-### Install dependencies
-
 ```bash
-yarn install
+yarn install      # Install dependencies
+yarn develop      # Dev server at http://localhost:8000
+yarn build        # Production build -> public/
+yarn serve        # Serve production build locally
+yarn clean        # Clear Gatsby cache
 ```
 
-### Development server
+GraphiQL (interactive query explorer) is available at `http://localhost:8000/___graphql` during development.
 
-```bash
-yarn develop
-# Site available at http://localhost:8000
-# GraphiQL at http://localhost:8000/___graphql
+---
+
+## Creating Content
+
+### Writing an Article
+
+1. Create a new `.mdx` file in `content/articles/`:
+
+```
+content/articles/My-New-Article.mdx
 ```
 
-### Production build
+2. Add the required frontmatter at the top:
 
-```bash
-yarn build
+```yaml
+---
+type: article
+title: My New Article Title
+tags: [Web Security, OWASP, XSS]
+date: 2024-06-15
+author: Eno
+featuredImage: https://example.com/path/to/cover-image.jpg
+---
 ```
 
-Output is written to `public/`.
+3. Write your content in MDX below the frontmatter block.
 
-### Serve production build locally
-
-```bash
-yarn serve
+The article will be published at:
+```
+/articles/My-New-Article/
 ```
 
-### Clean Gatsby cache
+#### Article frontmatter fields
 
-```bash
-yarn clean
-# or: gatsby clean
+| Field | Required | Description |
+|---|---|---|
+| `type` | Yes | Must be `article` |
+| `title` | Yes | Display title — shown in the page heading and SEO tags |
+| `tags` | Yes | Array of topic tags, e.g. `[Web Security, SQLi]` |
+| `date` | Yes | Publication date in `YYYY-MM-DD` format |
+| `author` | Yes | Author name |
+| `featuredImage` | No | URL to a cover image (HTTPS). Fetched at build time. If the URL is unreachable the article renders without an image |
+| `dateModified` | No | Last-modified date in `YYYY-MM-DD` format — shown instead of `date` when set |
+| `embeddedImages` | No | Array of image URLs to pre-process with `gatsby-plugin-image` for use inline in the MDX body |
+| `status` | No | Set to `draft` to exclude from build output |
+
+---
+
+### Writing a CTF Write-up
+
+1. Create a `.mdx` file inside a `year/month` subdirectory under `content/ctfs/`:
+
 ```
+content/ctfs/2024/04/CTFName-ChallengeName.mdx
+```
+
+2. Add the required frontmatter:
+
+```yaml
+---
+type: ctf
+title: CTFName 2024 - Challenge Name (category)
+tags: [pwn, buffer overflow, CTFName]
+date: 2024-04-20
+author: Eno
+featuredImage: https://example.com/ctf-logo.png
+---
+```
+
+3. Write your write-up in MDX below the frontmatter.
+
+The write-up will be published at:
+```
+/ctfs/CTFName-ChallengeName/
+```
+
+#### CTF frontmatter fields
+
+| Field | Required | Description |
+|---|---|---|
+| `type` | Yes | Must be `ctf` |
+| `title` | Yes | Display title — convention: `CTFName Year - Challenge (category)` |
+| `tags` | Yes | Array of tags, e.g. `[pwn, rop, CTFName 2024]` |
+| `date` | Yes | Date of the CTF or write-up in `YYYY-MM-DD` |
+| `author` | Yes | Author name |
+| `featuredImage` | No | Cover image URL (HTTPS) |
+| `status` | No | Set to `draft` to exclude from build |
+
+---
+
+### MDX Features
+
+Your content files are MDX — a superset of Markdown that supports JSX. The following features are available.
+
+#### Standard Markdown
+
+All standard Markdown syntax works: headings, bold, italic, blockquotes, ordered and unordered lists, horizontal rules, and fenced code blocks with syntax highlighting.
+
+````md
+## Section Heading
+
+This is a paragraph with **bold** and _italic_ text.
+
+> This is a blockquote.
+
+```python
+def exploit():
+    payload = b"A" * 264 + p64(0xdeadbeef)
+    return payload
+```
+````
+
+#### Tables
+
+Markdown tables are fully supported and styled automatically:
+
+```md
+| Finding | Severity |
+|---|---|
+| SQL Injection | High |
+| XSS | Medium |
+```
+
+#### Inline components
+
+The following components are available in all MDX files without any import:
+
+| Component | Usage | Description |
+|---|---|---|
+| `<LatestArticles />` | `<LatestArticles />` | Renders a grid of the most recent articles |
+| `<LatestCtfs />` | `<LatestCtfs />` | Renders a grid of the most recent CTF write-ups |
+| `<AllArticles />` | `<AllArticles />` | Renders the full article archive |
+| `<AllCtfs />` | `<AllCtfs />` | Renders the full CTF archive |
+
+These are provided globally via `MDXProvider` — do not `import` them.
+
+#### Links
+
+Standard Markdown links work for external URLs. Internal links use the same syntax:
+
+```md
+[Read more about XSS](/articles/Cross-Site-Scripting/)
+[Download the binary](/Files/challenge.zip)
+```
+
+---
+
+### Content Rules (MDX v2)
+
+MDX v2 parses your content as JSX. A few constructs that work in plain Markdown will break the build:
+
+**Do not use HTML comments**
+```md
+<!-- This will break the build -->
+```
+Remove them entirely or convert to a regular paragraph note.
+
+**Wrap bare angle brackets in backticks**
+
+If you write an IP address, port, or any `<word>` that looks like an HTML tag, wrap it in backticks:
+```md
+<!-- WRONG -->
+Connect to <192.168.1.1:4444>
+
+<!-- CORRECT -->
+Connect to `<192.168.1.1:4444>`
+```
+
+**Wrap CTF flags in backticks**
+
+Curly braces `{}` outside of code fences are interpreted as JSX expressions:
+```md
+<!-- WRONG -->
+The flag is CTF{s0m3_s3cr3t_flag}
+
+<!-- CORRECT -->
+The flag is `CTF{s0m3_s3cr3t_flag}`
+```
+
+**No special characters in filenames**
+
+The following characters in an `.mdx` filename will cause URL/build issues and must be avoided:
+
+| Character | Replace with |
+|---|---|
+| `&` | `-and-` or `-` |
+| `%` | `-` |
+| `#` | `-` |
+| `?` | `-` |
+
+Good: `SQL-Injection-and-XSS.mdx`
+Bad: `SQL-Injection-&-XSS.mdx`
+
+**No import statements in MDX files**
+
+Do not add `import` statements inside your `.mdx` content files. They are silently dropped at build time. Use the globally-available components listed above instead.
 
 ---
 
@@ -165,18 +334,16 @@ The site deploys automatically to **GitHub Pages** on every push to `master`.
 ### CI/CD Pipeline (`.github/workflows/gatsby.yml`)
 
 1. Checkout source
-2. Detect package manager (yarn)
-3. Setup Node 18
-4. Configure GitHub Pages
-5. Restore Gatsby build cache (keyed on `yarn.lock`)
-6. `yarn install`
-7. `gatsby build` with `PREFIX_PATHS=true` and `--max-old-space-size=4096`
-8. Upload `public/` as a Pages artifact
-9. Deploy to GitHub Pages
+2. Setup Node 18
+3. Restore Gatsby build cache (keyed on `yarn.lock`)
+4. `yarn install`
+5. `gatsby build` with `PREFIX_PATHS=true` and `--max-old-space-size=4096`
+6. Upload `public/` as a Pages artifact
+7. Deploy to GitHub Pages
 
 ### Path prefix
 
-The site is served from `/z0rs.github.io`. This is configured via `pathPrefix` in `gatsby-config.js` and is only applied when `PREFIX_PATHS=true` is set, so local dev and Netlify deploy-previews work without it.
+The site is served from `/z0rs.github.io`. The `pathPrefix` in `gatsby-config.js` is only applied when `PREFIX_PATHS=true` is set, so local dev and Netlify deploy-previews work without it.
 
 ---
 
@@ -200,7 +367,7 @@ GitHub Actions secrets required for CI: `GATSBY_GA_MEASUREMENT_ID`, `FAUNA_KEY`,
 
 ## Migration Notes: Gatsby 5 + gatsby-plugin-mdx v5
 
-This section documents every breaking change resolved during the Gatsby 4 -> Gatsby 5 / gatsby-plugin-mdx v3 -> v5 migration.
+Documents every breaking change resolved during the Gatsby 4 -> Gatsby 5 / gatsby-plugin-mdx v3 -> v5 migration.
 
 ### 1. Dependency upgrades
 
@@ -210,11 +377,11 @@ This section documents every breaking change resolved during the Gatsby 4 -> Gat
 "@mdx-js/react": "^2.3.0"
 ```
 
-`gatsby-config.js` change: rehype plugins must be nested under `mdxOptions` (was `options`).
+`gatsby-config.js`: rehype plugins must be nested under `mdxOptions` (was `options`).
 
 ### 2. MDXRenderer removed — use children
 
-`gatsby-plugin-mdx` v5 removed `MDXRenderer` and the `body` GraphQL field. Templates now receive compiled MDX as React `children` via the `?__contentFilePath=` mechanism.
+`gatsby-plugin-mdx` v5 removed `MDXRenderer` and the `body` GraphQL field. Templates now receive compiled MDX as React `children` via `?__contentFilePath=`.
 
 `gatsby-node.js` `createPage` call:
 ```js
@@ -222,30 +389,21 @@ const template = path.join(__dirname, `./src/templates/${type}.js`);
 component: `${template}?__contentFilePath=${contentFilePath}`,
 ```
 
-Templates accept `children`:
+Templates:
 ```js
-// Before (v3):
-const Page = ({ data: { mdx: { body } } }) => <MdxParser>{body}</MdxParser>
-// After (v5):
-const Page = ({ data, children }) => <MdxParser>{children}</MdxParser>
+// Before (v3): const Page = ({ data: { mdx: { body } } }) => <MdxParser>{body}</MdxParser>
+// After  (v5): const Page = ({ data, children }) => <MdxParser>{children}</MdxParser>
 ```
 
 ### 3. No direct imports inside MDX content files
 
-MDX v2 imports inside `.mdx` files are silently dropped by webpack when using `?__contentFilePath=`. Any component used in MDX must be registered in `MDXProvider` in `src/components/mdx-parser.js`. Remove all `import` statements from `.mdx` files.
+MDX v2 imports inside `.mdx` files are silently dropped by webpack when using `?__contentFilePath=`. Register all components in `MDXProvider` in `src/components/mdx-parser.js` instead.
 
 ### 4. MDX v2 is a strict JSX parser
 
-MDX v2 treats `.mdx` files as JSX. Constructs valid in MDX v1 that now cause build errors:
+See [Content Rules](#content-rules-mdx-v2) above for the full list of forbidden constructs.
 
-| Construct | Fix |
-|---|---|
-| HTML comments `<!-- ... -->` | Remove entirely |
-| Bare `<` in prose (e.g. `<192.168.1.1:80>`) | Wrap in backticks |
-| CTF flags `{flag_value}` outside code fences | Wrap in backticks |
-| Special chars in filename (`&`, `%`, `#`, `?`) | Rename file; sanitise slug in `gatsby-node.js` |
-
-Slug sanitisation in `gatsby-node.js`:
+Slug sanitisation applied in `gatsby-node.js`:
 ```js
 const rawPath = createFilePath({ node, getNode });
 const sanitised = rawPath
@@ -256,15 +414,13 @@ const sanitised = rawPath
 
 ### 5. useStaticQuery must not appear in Gatsby Head API exports
 
-Calling `useStaticQuery` inside a `Head` export from an MDX-backed template causes a crash on large articles. Gatsby's worker-based static query registration fails for large `?__contentFilePath=` webpack chunks, leaving the query hash unregistered. At SSR time, `useStaticQuery` throws `The result of this StaticQuery could not be fetched`.
+Calling `useStaticQuery` inside a `Head` export from an MDX-backed template crashes on large articles. Gatsby's worker-based static query registration fails for large `?__contentFilePath=` webpack chunks, leaving the hash unregistered. At SSR time, `useStaticQuery` throws `The result of this StaticQuery could not be fetched`.
 
-**Fix:** `seo.js` no longer calls `useStaticQuery`. All callers pass `siteMetadata` as a prop sourced from the page-level GraphQL query:
+**Fix:** `seo.js` no longer calls `useStaticQuery`. All callers pass `siteMetadata` from the page-level GraphQL query:
 
 ```js
 // In each template's GraphQL query:
-site {
-  siteMetadata { name siteUrl defaultImage keywords }
-}
+site { siteMetadata { name siteUrl defaultImage keywords } }
 
 // In the Head export:
 export const Head = ({ data: { site: { siteMetadata }, mdx: { ... } } }) => (
@@ -274,11 +430,10 @@ export const Head = ({ data: { site: { siteMetadata }, mdx: { ... } } }) => (
 
 ### 6. TLS errors from remote featuredImages
 
-Some articles reference images at `inseclab.uit.edu.vn`, which has an incomplete TLS chain. Each `createRemoteFileNode` call is wrapped in try/catch so the build continues gracefully. Affected articles render without a featured image. All image-consuming components guard against `null` thumbnails with optional chaining.
+Some articles reference images at hosts with incomplete TLS chains. Each `createRemoteFileNode` call is wrapped in try/catch so the build continues gracefully. All image-consuming components guard against `null` thumbnails with optional chaining.
 
 ### 7. null featuredImage crashes
 
-Components that destructure `featuredImage.childImageSharp.thumbnail` directly throw if the image was not fetched. All list and card components use safe destructuring:
 ```js
 const thumbnail = featuredImage?.childImageSharp?.thumbnail ?? null;
 {thumbnail && <GatsbyImage image={thumbnail} alt={...} />}
@@ -288,68 +443,29 @@ const thumbnail = featuredImage?.childImageSharp?.thumbnail ?? null;
 
 ## Troubleshooting
 
-### `gatsby-plugin-mdx` version mismatch
+### Build fails: `The result of this StaticQuery could not be fetched`
 
-**Symptom:** `warning Plugin gatsby-plugin-mdx is not compatible with your gatsby version 5.0.0`
-
-**Fix:**
-```bash
-yarn add gatsby-plugin-mdx@^5 @mdx-js/react@^2 @mdx-js/mdx@^2
-```
+`useStaticQuery` was called inside a `Head` export on a large MDX page. See [Migration Notes §5](#5-usestaticquery-must-not-appear-in-gatsby-head-api-exports).
 
 ---
 
-### `unstable_shouldOnCreateNode` error
+### Build fails: `ReferenceError: identifier is not defined`
 
-**Symptom:**
-```
-error Your plugins must export known APIs from their gatsby-node.js.
-- The plugin gatsby-plugin-mdx@3.x.x is using the API "unstable_shouldOnCreateNode"
-```
-
-**Cause:** `gatsby-plugin-mdx@3` used an API renamed in Gatsby 5. **Fix:** Upgrade to `gatsby-plugin-mdx@5`.
+A CTF flag or `{expression}` appears in MDX prose outside a code fence. See [Content Rules](#content-rules-mdx-v2) — wrap it in backticks.
 
 ---
 
-### `MDXRenderer` not found / `body` field missing
-
-**Cause:** Both were removed in `gatsby-plugin-mdx@5`. See [Migration Notes §2](#2-mdxrenderer-removed--use-children).
-
----
-
-### `The result of this StaticQuery could not be fetched`
-
-**Symptom:**
-```
-WebpackError: The result of this StaticQuery could not be fetched.
-  - seo.js:NN
-```
-
-**Cause:** `useStaticQuery` inside a `Head` export on a large MDX-backed page. See [Migration Notes §5](#5-usestaticquery-must-not-appear-in-gatsby-head-api-exports).
-
----
-
-### MDX parse error: identifier `is not defined` on CTF flags
-
-**Symptom:** `ReferenceError: flag_value is not defined`
-
-**Cause:** MDX v2 treats `{...}` in prose as JSX expressions. **Fix:** Wrap in backticks: `` `CTF{flag_value}` ``
-
----
-
-### Blank page / MDX content not rendering
-
-**Possible causes:**
+### Page renders but content area is blank
 
 1. Missing `?__contentFilePath=` in `createPage()` — see [Migration Notes §2](#2-mdxrenderer-removed--use-children)
-2. Direct `import` statements in `.mdx` files — see [Migration Notes §3](#3-no-direct-imports-inside-mdx-content-files)
-3. Null `featuredImage` crashing the React tree — see [Migration Notes §7](#7-null-featuredimage-crashes)
+2. Direct `import` in `.mdx` file — see [Migration Notes §3](#3-no-direct-imports-inside-mdx-content-files)
+3. Null `featuredImage` crashing React tree — see [Migration Notes §7](#7-null-featuredimage-crashes)
 
 ---
 
-### `NODE_TLS_REJECT_UNAUTHORIZED=0` in CI
+### Build fails: MDX parse error on `<something>`
 
-**Risk:** Disables TLS verification for all outbound HTTPS during the build — a security vulnerability. **Fix:** Remove the variable from the workflow and wrap individual `createRemoteFileNode` calls in try/catch instead.
+A bare `<tag>` appears in prose. MDX v2 treats it as JSX. Wrap in backticks. See [Content Rules](#content-rules-mdx-v2).
 
 ---
 
