@@ -40,7 +40,7 @@ module.exports = {
       'Component Library',
       'Serverless Functions'
     ],
-    siteUrl: process.env.URL,
+    siteUrl: process.env.URL || 'https://z0rs.github.io',
     defaultImage: '/images/76135196.jpeg'
   },
   plugins: [

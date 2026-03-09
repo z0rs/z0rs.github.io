@@ -47,7 +47,9 @@ const ThreeLatLong = () => {
 
   useFrame(() => {
     if (!isLoading) return;
-    return (mesh.current.rotation.x += 0.15), (mesh.current.rotation.z += 0.15);
+    
+      (mesh.current.rotation.x += 0.15);
+      (mesh.current.rotation.z += 0.15);
   });
 
   useEffect(() => {

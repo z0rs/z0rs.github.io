@@ -20,7 +20,11 @@ module.exports = async function () {
 
     const format = (result) => {
       return result
-        .filter((item) => item.slug !== null)
+        .filter((item) => {
+          if (item.slug !== null) {
+            return item;
+          }
+        })
         .map((item) => {
           const { reaction, date, slug } = item;
           return {
