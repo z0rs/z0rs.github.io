@@ -1,18 +1,21 @@
-require('dotenv').config({
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+
+import dotenv from 'dotenv';
+dotenv.config({
   path: `.env.${process.env.NODE_ENV || 'production'}`
 });
 
-const remarkGfm = require('remark-gfm');
-const remarkGfmPlugin = typeof remarkGfm === 'function' ? remarkGfm : remarkGfm.default;
+import remarkGfm from 'remark-gfm';
+import rehypeSlug from 'rehype-slug';
+import rehypeAutolinkHeadings from 'rehype-autolink-headings';
+
 const canonicalSiteUrl =
   process.env.URL ||
   process.env.SITE_URL ||
   (process.env.NODE_ENV === 'production' ? 'https://z0rs.github.io' : 'http://localhost:8000');
 
-module.exports = {
-  // flags: {
-  //   FAST_DEV: true
-  // },
+export default {
   trailingSlash: 'always',
   siteMetadata: {
     name: 'Eno Leriand',
@@ -54,10 +57,10 @@ module.exports = {
       options: {
         extensions: ['.mdx', '.md'],
         mdxOptions: {
-          remarkPlugins: [remarkGfmPlugin],
+          remarkPlugins: [remarkGfm],
           rehypePlugins: [
-            require('rehype-slug'),
-            [require('rehype-autolink-headings'), { behavior: 'wrap' }]
+            rehypeSlug,
+            [rehypeAutolinkHeadings, { behavior: 'wrap' }]
           ]
         }
       }
@@ -75,19 +78,19 @@ module.exports = {
     {
       resolve: 'gatsby-source-filesystem',
       options: {
-        path: `${__dirname}/content/pages/`
+        path: `${import.meta.dirname}/content/pages/`
       }
     },
     {
       resolve: 'gatsby-source-filesystem',
       options: {
-        path: `${__dirname}/content/articles/`
+        path: `${import.meta.dirname}/content/articles/`
       }
     },
     {
       resolve: 'gatsby-source-filesystem',
       options: {
-        path: `${__dirname}/content/ctfs/`
+        path: `${import.meta.dirname}/content/ctfs/`
       }
     }
   ],
