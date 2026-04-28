@@ -1,124 +1,146 @@
 ---
 type: article
-title: "Postmortem: Build Gatsby Gagal di GitHub Actions dan Proses Perbaikannya"
+title: 'Build Was Tweaking: Full Fix Timeline for This Gatsby + GitHub Actions Meltdown'
 tags: [Gatsby, GitHub Actions, CI/CD, Debugging, Postmortem]
 date: 2026-04-29
+dateModified: 2026-04-29
 author: Eno
 featuredImage:
 ---
 
-Beberapa hari terakhir project ini mengalami incident di pipeline deploy GitHub Pages. Di lokal (`yarn develop`) terlihat aman, tapi di GitHub Actions `yarn gatsby build` gagal berulang dengan error yang berbeda-beda.
+Alright, quick story time.
 
-Artikel ini merangkum apa yang rusak, kenapa bisa terjadi, dan langkah perbaikan sampai build kembali stabil.
+This repo hit a full-on CI spiral. Local was chill, but GitHub Actions kept faceplanting on `gatsby build` with a new
+error every round. One fix in, two new bugs out. Classic.
 
-## Ringkasan Incident
+This post is the full timeline of what broke, why it broke, and every patch we shipped to get this thing stable again.
 
-Tanggal: **29 April 2026**  
-Lingkungan terdampak: **GitHub Actions (CI)**  
-Dampak: deploy ke GitHub Pages gagal, website tidak ter-publish versi terbaru.
+## What Went Sideways
 
-## Gejala Error yang Muncul
+### Symptom #1
 
-### 1) `Cannot query field "allMdx" on type "Query"`
+```bash
+Cannot query field "allMdx" on type "Query"
+```
 
-Error ini muncul di fase `createPages`. Query GraphQL di `gatsby-node.js` memanggil `allMdx`, tapi schema CI pada saat itu tidak membentuk field tersebut secara konsisten.
+`createPages` was querying `allMdx`, but CI schema state wasn’t always lining up.
 
-### 2) `ERR_REQUIRE_ESM` untuk `remark-gfm`
-
-Setelah perbaikan pertama, muncul error baru:
+### Symptom #2
 
 ```bash
 Error [ERR_REQUIRE_ESM]: require() of ES Module .../remark-gfm/index.js not supported
 ```
 
-Artinya config Gatsby saat itu dieksekusi sebagai **CommonJS** (`gatsby-config.js`), sementara plugin terkait MDX sudah **ESM-only**.
+We had config/runtime mismatch. `remark-gfm` is ESM-only now, but part of the setup was still effectively going CJS
+route.
 
-### 3) Warning config ganda + schema jadi minim
-
-CI menampilkan warning:
+### Symptom #3
 
 ```bash
-The file 'gatsby-config' has both .js and .mjs variants, please use one or the other. Using .js by default.
+The file 'gatsby-config' has both .js and .mjs variants... Using .js by default.
 ```
 
-Begitu Gatsby memilih `.js`, efek lanjutannya schema menjadi minimal:
+That one was nasty. Once Gatsby picked `.js`, schema got super thin in CI:
 
 - `Cannot query field "childImageSharp" on type "File"`
-- `Cannot query field "name/defaultImage/keywords" on type "SiteSiteMetadata"`
+- `Cannot query field "name" on type "SiteSiteMetadata"`
+- `Cannot query field "defaultImage" on type "SiteSiteMetadata"`
+- `Cannot query field "keywords" on type "SiteSiteMetadata"`
 
-Node count juga turun drastis (`Total nodes: 23`) yang jadi indikator kuat kalau config aktif bukan config project yang benar.
+Also node count crashed (`Total nodes: 23`). Big red flag.
 
-## Akar Masalah
+## Root Cause (No Fluff)
 
-Ini bukan single bug. Ini gabungan beberapa issue:
+This was multi-layer, not one bug:
 
-1. **Ketergantungan `createPages` pada query `allMdx` saat schema belum stabil di CI.**
-2. **Perbedaan format module (CJS vs ESM) untuk dependency MDX.**
-3. **Adanya varian config `.js` dan `.mjs` bersamaan di runtime CI, sehingga Gatsby memilih `.js` dan bukan `.mjs`.**
-4. **Konfigurasi workflow Pages yang membuka peluang override/injeksi perilaku generator Gatsby.**
+1. Page creation depended on a GraphQL query path that was brittle during CI bootstrap.
+2. ESM vs CJS config behavior was mixed.
+3. Dual Gatsby config variants (`.js` + `.mjs`) created non-deterministic config selection.
+4. Workflow setup around Pages/configuration made that conflict easier to trigger.
 
-## Perbaikan yang Dilakukan
+## Full Fix Timeline
 
-### A) Menstabilkan page creation di `gatsby-node.js`
+### 1) Stabilize Build Flow in `gatsby-node.js`
 
-`createPages` dipindah dari GraphQL query `allMdx` ke `getNodesByType('Mdx')`, lalu ditambah guard untuk node/template yang tidak valid.
+We moved page creation away from the brittle query path and hardened schema handling.
 
-Manfaat:
+- `createPages` moved to `getNodesByType('Mdx')` + safety guards.
+- `createSchemaCustomization` was tightened so MDX fields used by queries are explicit.
 
-- tidak fragile terhadap kondisi schema bootstrap,
-- proses create page lebih deterministic di CI.
+Why this mattered: CI bootstrap became way less fragile.
 
-### B) Menetapkan schema MDX secara eksplisit
+### 2) Normalize Workflow Behavior
 
-Di `createSchemaCustomization`, tipe `Mdx`/`MdxFrontmatter` didefinisikan eksplisit, termasuk field `status` yang dipakai filter query.
+In GitHub Actions:
 
-Manfaat:
+- dependency install locked with `yarn install --frozen-lockfile`
+- insecure TLS override removed
 
-- query `frontmatter.status` tidak lagi bergantung inference,
-- konsisten antara lokal dan CI clean build.
+Why this mattered: reproducible install + cleaner runtime.
 
-### C) Menjadikan config Gatsby ESM tunggal
+### 3) Force ESM Gatsby Config Path
 
-Config dipastikan hanya dalam **`gatsby-config.mjs`** (bukan CJS), supaya import ESM seperti `remark-gfm`, `rehype-slug`, `rehype-autolink-headings` berjalan aman.
+We standardized on `gatsby-config.mjs` for ESM-native imports (`remark-gfm`, `rehype-*`).
 
-### D) Hardening GitHub Actions workflow
+Why this mattered: killed the `ERR_REQUIRE_ESM` path.
 
-Di workflow deploy:
+### 4) Stop Config Override/Collision in CI
 
-- hapus `static_site_generator: gatsby` pada step `configure-pages`,
-- tambah guard `Enforce Gatsby ESM config` untuk memastikan `gatsby-config.mjs` ada,
-- hapus `gatsby-config.js` jika tiba-tiba muncul,
-- install dependency dengan `yarn install --frozen-lockfile`.
+Workflow was hardened so Gatsby doesn’t get tricked into loading a stale/extra config variant.
 
-## Validasi Setelah Fix
+- removed static generator override behavior that could interfere with Gatsby config expectations
+- added guard step to enforce `gatsby-config.mjs`
+- auto-remove `gatsby-config.js` if it appears in runner workspace
 
-Validasi lokal produksi:
+Why this mattered: no more `.js` vs `.mjs` roulette.
+
+### 5) Post-Incident UX Follow-up
+
+After CI was green, we fixed article sidebar featured image behavior:
+
+- landscape image stays landscape
+- portrait image stays portrait
+- no awkward crop vibe above “Share on LinkedIn”
+
+That patch was not core CI infra, but it was part of the same stabilization sprint.
+
+## Commit Trail
+
+- `6ec32d1` - explicit `MdxFields` schema patch attempt (later refined)
+- `2c31ec0` - rollback of over-restrictive schema customization
+- `5e06472` - workflow cache/TLS cleanup
+- `7a52eea` - major Gatsby build stabilization pass
+- `c00c3d2` - switch back to `gatsby-config.mjs` for ESM-only plugins
+- `bc68027` - prevent config override path in GitHub Pages workflow
+- `8e8be1c` - initial postmortem article
+- `77495f8` - preserve featured image orientation in article aside
+
+## Verification We Ran
 
 ```bash
 yarn gatsby build
 yarn build
 ```
 
-Hasil:
+Final state:
 
-- build sukses,
-- pages terbentuk normal,
-- node count kembali normal (`~345`),
-- error GraphQL dan ESM tidak muncul lagi.
+- build passes
+- schema loads as expected
+- MDX pages generate normally
+- image queries resolve normally
+- deploy pipeline returns to green
 
-## Commit Penting
+## What We Learned
 
-- `7a52eea` - stabilisasi build + workflow awal
-- `c00c3d2` - migrasi config ke `gatsby-config.mjs` (ESM)
-- `bc68027` - prevent override config dari workflow Pages
+1. Local success means nothing if CI boots differently.
+2. Gatsby config must be single-source-of-truth. Pick one format and lock it.
+3. Schema inference is cute until CI goes chaotic. Critical fields should be explicit.
+4. CI workflow tools can mutate behavior in subtle ways, so treat workflow config like production code.
 
-## Lessons Learned
+## Final Take
 
-1. **CI bukan replika sempurna lokal.** `yarn develop` lolos tidak menjamin `gatsby build` CI lolos.
-2. **Untuk Gatsby + plugin modern, tentukan satu format config saja.** Jangan campur `.js` dan `.mjs`.
-3. **Schema inference itu nyaman, tapi rapuh.** Untuk field penting di query, lebih aman explicit type.
-4. **Workflow action pihak ketiga wajib di-audit efek sampingnya ke working tree/config.**
+This incident was basically a chain reaction: config format mismatch, schema fragility, then workflow side effects
+stacking on top. Once we treated it as a systems problem instead of a single error string, fixes became straightforward
+and durable.
 
-## Penutup
-
-Incident ini jadi pengingat bahwa masalah CI biasanya berlapis: schema, module system, dan workflow bisa saling memicu. Setelah serangkaian patch di config, `gatsby-node`, dan workflow Actions, pipeline deploy kembali hijau dan publish normal.
+Now the pipeline is back to acting normal.
