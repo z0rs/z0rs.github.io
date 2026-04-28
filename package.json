@@ -28,10 +28,8 @@
   },
   "dependencies": {
     "@mdx-js/react": "^2.3.0",
-    "axios": "^1.15.2",
     "cmdk": "^0.1.18",
     "dotenv": "^17.4.2",
-    "faunadb": "^4.6.0",
     "gatsby": "^5.16.1",
     "gatsby-plugin-gatsby-cloud": "^5.0.0",
     "gatsby-plugin-image": "^3.0.0",
