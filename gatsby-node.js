@@ -1,6 +1,22 @@
 const path = require('path');
 const { createFilePath, createRemoteFileNode } = require('gatsby-source-filesystem');
 
+// Block private/internal network targets to prevent SSRF via user-controlled frontmatter URLs.
+function isAllowedUrl(url) {
+  try {
+    const { hostname, protocol } = new URL(url);
+    if (!['http:', 'https:'].includes(protocol)) return false;
+    const blocked = ['localhost', '127.0.0.1', '0.0.0.0'];
+    if (blocked.includes(hostname)) return false;
+    const isPrivate =
+      /^10\.|^172\.(1[6-9]|2\d|3[01])\.|^192\.168\.|^127\./.test(hostname) ||
+      hostname === '169.254.169.254'; // AWS metadata
+    return !isPrivate;
+  } catch {
+    return false;
+  }
+}
+
 exports.createSchemaCustomization = async ({ actions: { createTypes } }) => {
   createTypes(`
     type Mdx implements Node {
@@ -75,7 +91,7 @@ exports.onCreateNode = async ({
   }
 
   if (node.internal.type === 'Mdx') {
-    if (node.frontmatter.featuredImage) {
+    if (node.frontmatter.featuredImage && isAllowedUrl(node.frontmatter.featuredImage)) {
       try {
         let featuredImage = await createRemoteFileNode({
           url: node.frontmatter.featuredImage,
@@ -92,11 +108,17 @@ exports.onCreateNode = async ({
         console.warn(`[gatsby-node] Could not fetch featuredImage for "${node.frontmatter.title}": ${err.message}`);
         console.warn(`  URL: ${node.frontmatter.featuredImage}`);
       }
+    } else if (node.frontmatter.featuredImage) {
+      console.warn(`[gatsby-node] Blocked SSRF attempt — invalid URL in featuredImage for "${node.frontmatter.title}": ${node.frontmatter.featuredImage}`);
     }
 
     if (node.frontmatter.embeddedImages) {
       const embeddedImages = await Promise.all(
         node.frontmatter.embeddedImages.map(async (url) => {
+          if (!isAllowedUrl(url)) {
+            console.warn(`[gatsby-node] Blocked SSRF attempt — invalid URL in embeddedImages for "${node.frontmatter.title}": ${url}`);
+            return null;
+          }
           try {
             return await createRemoteFileNode({
               url,
@@ -123,7 +145,7 @@ exports.onCreateNode = async ({
       }
     }
 
-    if (node.frontmatter.logo) {
+    if (node.frontmatter.logo && isAllowedUrl(node.frontmatter.logo)) {
       try {
         let logo = await createRemoteFileNode({
           url: node.frontmatter.logo,
@@ -140,6 +162,8 @@ exports.onCreateNode = async ({
         console.warn(`[gatsby-node] Could not fetch logo for "${node.frontmatter.title}": ${err.message}`);
         console.warn(`  URL: ${node.frontmatter.logo}`);
       }
+    } else if (node.frontmatter.logo) {
+      console.warn(`[gatsby-node] Blocked SSRF attempt — invalid URL in logo for "${node.frontmatter.title}": ${node.frontmatter.logo}`);
     }
   }
 };
