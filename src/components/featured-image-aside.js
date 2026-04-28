@@ -4,11 +4,13 @@ import { GatsbyImage, getImage } from 'gatsby-plugin-image';
 import NavigationIcon from './navigation-icon';
 
 const FeaturedImageAside = ({ alt, thumbnail, shareText }) => {
+  const image = getImage(thumbnail);
+
   return (
     <div className="grid gap-4 rounded border border-outline bg-surface/50 px-4 sm:px-6 py-6">
-      {thumbnail ? (
+      {image ? (
         <div className="rounded shadow-lg overflow-hidden w-full">
-          <GatsbyImage alt={alt} image={getImage(thumbnail)} />
+          <GatsbyImage alt={alt} image={image} objectFit="contain" imgStyle={{ objectFit: 'contain' }} />
         </div>
       ) : null}
       <a

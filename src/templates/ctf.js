@@ -77,7 +77,7 @@ export const query = graphql`
       }
       featuredImage {
         childImageSharp {
-          thumbnail: gatsbyImageData(width: 240)
+          thumbnail: gatsbyImageData(width: 240, layout: CONSTRAINED, transformOptions: { fit: CONTAIN })
           og: gatsbyImageData(width: 1200)
         }
       }

@@ -37,12 +37,12 @@ const Page = ({
       <ul className="list-none m-0 p-0 flex flex-wrap gap-2 mb-12">
         {tags
           ? tags.map((tag, index) => {
-            return (
-              <li key={index} className="m-0 p-0">
-                <Tag tag={tag} />
-              </li>
-            );
-          })
+              return (
+                <li key={index} className="m-0 p-0">
+                  <Tag tag={tag} />
+                </li>
+              );
+            })
           : null}
       </ul>
       <MdxParser embedded={embeddedImages}>{children}</MdxParser>
@@ -78,7 +78,7 @@ export const query = graphql`
       }
       featuredImage {
         childImageSharp {
-          thumbnail: gatsbyImageData(width: 240)
+          thumbnail: gatsbyImageData(width: 240, layout: CONSTRAINED, transformOptions: { fit: CONTAIN })
           og: gatsbyImageData(width: 1200)
         }
       }
@@ -115,6 +115,14 @@ export const Head = ({
 }) => {
   const ogImage = featuredImage?.childImageSharp?.og?.images?.fallback?.src ?? null;
   return (
-    <Seo type="article" title={title} description={excerpt} slug={slug} image={ogImage} tags={tags} siteMetadata={siteMetadata} />
+    <Seo
+      type="article"
+      title={title}
+      description={excerpt}
+      slug={slug}
+      image={ogImage}
+      tags={tags}
+      siteMetadata={siteMetadata}
+    />
   );
 };
