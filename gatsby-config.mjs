@@ -1,10 +1,11 @@
-import { createRequire } from 'module';
-const require = createRequire(import.meta.url);
-
 import dotenv from 'dotenv';
 dotenv.config({
   path: `.env.${process.env.NODE_ENV || 'production'}`
 });
+
+import { dirname } from 'path';
+import { fileURLToPath } from 'url';
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 import remarkGfm from 'remark-gfm';
 import rehypeSlug from 'rehype-slug';
@@ -78,19 +79,19 @@ export default {
     {
       resolve: 'gatsby-source-filesystem',
       options: {
-        path: `${import.meta.dirname}/content/pages/`
+        path: `${__dirname}/content/pages/`
       }
     },
     {
       resolve: 'gatsby-source-filesystem',
       options: {
-        path: `${import.meta.dirname}/content/articles/`
+        path: `${__dirname}/content/articles/`
       }
     },
     {
       resolve: 'gatsby-source-filesystem',
       options: {
-        path: `${import.meta.dirname}/content/ctfs/`
+        path: `${__dirname}/content/ctfs/`
       }
     }
   ],
