@@ -68,6 +68,9 @@ jobs:
       - name: Install dependencies
         run: ${{ steps.detect-package-manager.outputs.manager }} ${{ steps.detect-package-manager.outputs.command }}
 
+      - name: Clear stale Gatsby cache before build
+        run: rm -rf .cache public
+
       - name: Build with Gatsby
         env:
           NODE_TLS_REJECT_UNAUTHORIZED: 0 # Increase heap size for large Gatsby builds; TLS verification must remain enabled
