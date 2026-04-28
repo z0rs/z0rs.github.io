@@ -19,19 +19,6 @@ function isAllowedUrl(url) {
 
 exports.createSchemaCustomization = async ({ actions: { createTypes } }) => {
   createTypes(`
-    type Mdx implements Node {
-      frontmatter: Frontmatter
-      fields: MdxFields
-      featuredImage: File @link(from: "fields.featuredImage")
-      embeddedImages: [File] @link(from: "fields.embeddedImages")
-      logo: File @link(from: "fields.logo")
-    }
-    type MdxFields {
-      slug: String
-      featuredImage: File
-      embeddedImages: [File]
-      logo: File
-    }
     type Frontmatter @dontInfer {
       type: String
         title: String
