@@ -1,19 +1,23 @@
-require('dotenv').config({
+import dotenv from 'dotenv';
+import { dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+import remarkGfm from 'remark-gfm';
+import rehypeSlug from 'rehype-slug';
+import rehypeAutolinkHeadings from 'rehype-autolink-headings';
+
+dotenv.config({
   path: `.env.${process.env.NODE_ENV || 'production'}`
 });
 
-const importDefault = (mod) => (mod && mod.default) || mod;
-
-const remarkGfm = importDefault(require('remark-gfm'));
-const rehypeSlug = importDefault(require('rehype-slug'));
-const rehypeAutolinkHeadings = importDefault(require('rehype-autolink-headings'));
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const canonicalSiteUrl =
   process.env.URL ||
   process.env.SITE_URL ||
   (process.env.NODE_ENV === 'production' ? 'https://z0rs.github.io' : 'http://localhost:8000');
 
-module.exports = {
+export default {
   trailingSlash: 'always',
   siteMetadata: {
     name: 'Eno Leriand',
