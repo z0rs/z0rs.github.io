@@ -1,3 +1,4 @@
+const fs = require('fs');
 const path = require('path');
 const { createFilePath, createRemoteFileNode } = require('gatsby-source-filesystem');
 
@@ -9,8 +10,7 @@ function isAllowedUrl(url) {
     const blocked = ['localhost', '127.0.0.1', '0.0.0.0'];
     if (blocked.includes(hostname)) return false;
     const isPrivate =
-      /^10\.|^172\.(1[6-9]|2\d|3[01])\.|^192\.168\.|^127\./.test(hostname) ||
-      hostname === '169.254.169.254'; // AWS metadata
+      /^10\.|^172\.(1[6-9]|2\d|3[01])\.|^192\.168\.|^127\./.test(hostname) || hostname === '169.254.169.254'; // AWS metadata
     return !isPrivate;
   } catch {
     return false;
@@ -19,25 +19,44 @@ function isAllowedUrl(url) {
 
 exports.createSchemaCustomization = async ({ actions: { createTypes } }) => {
   createTypes(`
-    type Frontmatter @dontInfer {
+    type Mdx implements Node @dontInfer {
+      id: ID!
+      body: String
+      excerpt(pruneLength: Int = 140): String
+      tableOfContents(maxDepth: Int): JSON
+      frontmatter: MdxFrontmatter
+      fields: MdxFields
+      featuredImage: File @link(from: "fields.featuredImage")
+      embeddedImages: [File] @link(from: "fields.embeddedImages")
+      logo: File @link(from: "fields.logo")
+    }
+
+    type MdxFrontmatter @dontInfer {
       type: String
-        title: String
-        name: String
-        icon: String
-        tags: [String]
-        url: String
-        date: Date @dateformat(formatString: "MMMM DD, YYYY")
-        dateModified: Date @dateformat(formatString: "MMMM DD, YYYY")
-        author: String
-        show: String
-        role: String
-        publication: String
-        status: String
-        isPrivate: Boolean
-        pinned: Boolean
-        logo: String
-        featuredImage: String
-        embeddedImages: [String]
+      title: String
+      name: String
+      icon: String
+      tags: [String]
+      url: String
+      date: Date @dateformat(formatString: "MMMM DD, YYYY")
+      dateModified: Date @dateformat(formatString: "MMMM DD, YYYY")
+      author: String
+      show: String
+      role: String
+      publication: String
+      status: String
+      isPrivate: Boolean
+      pinned: Boolean
+      logo: String
+      featuredImage: String
+      embeddedImages: [String]
+    }
+
+    type MdxFields @dontInfer {
+      slug: String
+      featuredImage: String
+      embeddedImages: [String]
+      logo: String
     }
   `);
 
@@ -103,14 +122,18 @@ exports.onCreateNode = async ({
         console.warn(`  URL: ${node.frontmatter.featuredImage}`);
       }
     } else if (node.frontmatter.featuredImage) {
-      console.warn(`[gatsby-node] Blocked SSRF attempt — invalid URL in featuredImage for "${node.frontmatter.title}": ${node.frontmatter.featuredImage}`);
+      console.warn(
+        `[gatsby-node] Blocked SSRF attempt — invalid URL in featuredImage for "${node.frontmatter.title}": ${node.frontmatter.featuredImage}`
+      );
     }
 
     if (node.frontmatter.embeddedImages) {
       const embeddedImages = await Promise.all(
         node.frontmatter.embeddedImages.map(async (url) => {
           if (!isAllowedUrl(url)) {
-            console.warn(`[gatsby-node] Blocked SSRF attempt — invalid URL in embeddedImages for "${node.frontmatter.title}": ${url}`);
+            console.warn(
+              `[gatsby-node] Blocked SSRF attempt — invalid URL in embeddedImages for "${node.frontmatter.title}": ${url}`
+            );
             return null;
           }
           try {
@@ -157,46 +180,40 @@ exports.onCreateNode = async ({
         console.warn(`  URL: ${node.frontmatter.logo}`);
       }
     } else if (node.frontmatter.logo) {
-      console.warn(`[gatsby-node] Blocked SSRF attempt — invalid URL in logo for "${node.frontmatter.title}": ${node.frontmatter.logo}`);
+      console.warn(
+        `[gatsby-node] Blocked SSRF attempt — invalid URL in logo for "${node.frontmatter.title}": ${node.frontmatter.logo}`
+      );
     }
   }
 };
 
-exports.createPages = async ({ graphql, actions: { createPage, createRedirect } }) => {
-  const {
-    data: { allMdx }
-  } = await graphql(`
-    query {
-      allMdx(filter: { frontmatter: { status: { ne: "draft" } } }) {
-        nodes {
-          id
-          internal {
-            contentFilePath
-          }
-          fields {
-            slug
-          }
-          frontmatter {
-            type
-          }
-        }
-      }
-    }
-  `);
+exports.createPages = async ({ getNodesByType, actions: { createPage, createRedirect }, reporter }) => {
+  const mdxNodes = getNodesByType('Mdx').filter((node) => node.frontmatter?.status !== 'draft');
 
-  allMdx.nodes.forEach((node) => {
-    const {
-      id,
-      internal: { contentFilePath },
-      fields: { slug },
-      frontmatter: { type }
-    } = node;
+  mdxNodes.forEach((node) => {
+    const id = node.id;
+    const contentFilePath = node.internal?.contentFilePath;
+    const slug = node.fields?.slug;
+    const type = node.frontmatter?.type;
+
+    if (!id || !contentFilePath || !slug || !type) {
+      reporter.warn(
+        `[gatsby-node] Skipping MDX page creation for node "${
+          id || 'unknown'
+        }" due to missing slug/type/contentFilePath.`
+      );
+      return;
+    }
 
     // gatsby-plugin-mdx v5 requires ?__contentFilePath=<absolute_path_to_mdx_file>
     // appended to the component path so Gatsby knows which MDX file to compile and
     // inject as the `children` prop into the template component.
     // Without this, `children` is undefined and the page renders blank.
     const template = path.join(__dirname, `./src/templates/${type}.js`);
+    if (!fs.existsSync(template)) {
+      reporter.warn(`[gatsby-node] Template not found for type "${type}" (node "${id}"): ${template}`);
+      return;
+    }
 
     createPage({
       path: slug,

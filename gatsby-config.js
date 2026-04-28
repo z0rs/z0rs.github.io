@@ -1,22 +1,19 @@
-import dotenv from 'dotenv';
-dotenv.config({
+require('dotenv').config({
   path: `.env.${process.env.NODE_ENV || 'production'}`
 });
 
-import { dirname } from 'path';
-import { fileURLToPath } from 'url';
-const __dirname = dirname(fileURLToPath(import.meta.url));
+const importDefault = (mod) => (mod && mod.default) || mod;
 
-import remarkGfm from 'remark-gfm';
-import rehypeSlug from 'rehype-slug';
-import rehypeAutolinkHeadings from 'rehype-autolink-headings';
+const remarkGfm = importDefault(require('remark-gfm'));
+const rehypeSlug = importDefault(require('rehype-slug'));
+const rehypeAutolinkHeadings = importDefault(require('rehype-autolink-headings'));
 
 const canonicalSiteUrl =
   process.env.URL ||
   process.env.SITE_URL ||
   (process.env.NODE_ENV === 'production' ? 'https://z0rs.github.io' : 'http://localhost:8000');
 
-export default {
+module.exports = {
   trailingSlash: 'always',
   siteMetadata: {
     name: 'Eno Leriand',
@@ -59,10 +56,7 @@ export default {
         extensions: ['.mdx', '.md'],
         mdxOptions: {
           remarkPlugins: [remarkGfm],
-          rehypePlugins: [
-            rehypeSlug,
-            [rehypeAutolinkHeadings, { behavior: 'wrap' }]
-          ]
+          rehypePlugins: [rehypeSlug, [rehypeAutolinkHeadings, { behavior: 'wrap' }]]
         }
       }
     },

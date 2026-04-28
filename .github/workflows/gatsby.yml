@@ -31,7 +31,7 @@ jobs:
         run: |
           if [ -f "${{ github.workspace }}/yarn.lock" ]; then
             echo "manager=yarn" >> $GITHUB_OUTPUT
-            echo "command=install" >> $GITHUB_OUTPUT
+            echo "command=install --frozen-lockfile" >> $GITHUB_OUTPUT
             echo "runner=yarn" >> $GITHUB_OUTPUT
           elif [ -f "${{ github.workspace }}/package.json" ]; then
             echo "manager=npm" >> $GITHUB_OUTPUT
@@ -62,7 +62,6 @@ jobs:
 
       - name: Build with Gatsby
         env:
-          NODE_TLS_REJECT_UNAUTHORIZED: "0"
           NODE_OPTIONS: '--max-old-space-size=4096'
         run: ${{ steps.detect-package-manager.outputs.runner }} gatsby build
 
