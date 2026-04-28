@@ -4,11 +4,11 @@
   "description": "Eno",
   "main": "index.js",
   "scripts": {
-    "develop": "gatsby develop",
-    "clean": "gatsby clean",
-    "start": "gatsby develop",
-    "build": "gatsby build && yarn robots",
-    "serve": "gatsby serve",
+    "develop": "GATSBY_FEEDBACK_DISABLED=1 GATSBY_TELEMETRY_DISABLED=1 gatsby develop",
+    "clean": "GATSBY_FEEDBACK_DISABLED=1 GATSBY_TELEMETRY_DISABLED=1 gatsby clean",
+    "start": "GATSBY_FEEDBACK_DISABLED=1 GATSBY_TELEMETRY_DISABLED=1 gatsby develop",
+    "build": "GATSBY_FEEDBACK_DISABLED=1 GATSBY_TELEMETRY_DISABLED=1 gatsby build && yarn robots",
+    "serve": "GATSBY_FEEDBACK_DISABLED=1 GATSBY_TELEMETRY_DISABLED=1 gatsby serve",
     "robots": "cp robots.txt public/",
     "prettier": "prettier --config ./.prettierrc.js --ignore-path ./.prettierignore --write \"**/*.{json,js,ts,tsx,mdx}\"",
     "prepare": "husky install"
@@ -18,7 +18,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/PaulieScanlon/z0rs/z0rs.github.io.git"
+    "url": "git+https://github.com/z0rs/z0rs.github.io.git"
   },
   "keywords": [],
   "author": "",
@@ -27,34 +27,26 @@
     "url": "https://github.com/z0rs.github.io/issues"
   },
   "dependencies": {
-    "@google-analytics/data": "^3.0.0",
-    "@mdx-js/mdx": "^1.6.22",
-    "@mdx-js/react": "^1.6.22",
-    "@react-three/drei": "^9.22.4",
-    "@react-three/fiber": "^8.3.1",
+    "@mdx-js/react": "^2.3.0",
+    "axios": "^1.15.2",
     "cmdk": "^0.1.18",
-    "country-flag-icons": "^1.5.5",
-    "d3-geo": "^3.0.1",
-    "dotted-map": "^2.2.3",
+    "dotenv": "^17.4.2",
     "faunadb": "^4.6.0",
-    "gatsby": "^5.0.0",
+    "gatsby": "^5.16.1",
     "gatsby-plugin-gatsby-cloud": "^5.0.0",
-    "gatsby-plugin-google-analytics": "^5.0.0",
     "gatsby-plugin-image": "^3.0.0",
-    "gatsby-plugin-mdx": "^3.20.0",
+    "gatsby-plugin-mdx": "^5.0.0",
     "gatsby-plugin-sharp": "^5.0.0",
     "gatsby-plugin-sitemap": "^6.0.0",
     "gatsby-source-filesystem": "^5.0.0",
-    "gatsby-transformer-json": "^5.0.0",
     "gatsby-transformer-sharp": "^5.0.0",
-    "googleapis": "^105.0.0",
     "prism-react-renderer": "^1.3.5",
+    "prop-types": "^15.8.1",
     "react": "18.0.0",
     "react-dom": "18.0.0",
-    "rehype-autolink-headings": "6.1.1",
-    "rehype-slug": "5.0.1",
-    "three": "^0.143.0",
-    "three-geojson-geometry": "^1.1.7"
+    "rehype-autolink-headings": "5.1.0",
+    "rehype-slug": "4.0.1",
+    "remark-gfm": "2.0.0"
   },
   "devDependencies": {
     "@commitlint/cli": "^12.1.4",
@@ -65,7 +57,6 @@
     "husky": "^7.0.1",
     "postcss": "^8.4.14",
     "prettier": "^2.3.2",
-    "prop-types": "^15.8.1",
     "tailwindcss": "^3.1.6"
   }
 }

@@ -1,7 +1,6 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import { MDXProvider } from '@mdx-js/react';
-import { MDXRenderer } from 'gatsby-plugin-mdx';
 
 import { Link } from 'gatsby';
 import { GatsbyImage, getImage } from 'gatsby-plugin-image';
@@ -9,13 +8,30 @@ import { GatsbyImage, getImage } from 'gatsby-plugin-image';
 import MarkdownCtaLink from './markdown-cta-link';
 import PrismSyntaxHighlight from './prism-syntax-highlight.js';
 
-import { transformImages } from '../utils/transform-images';
 import { stripLeadingSlash } from '../utils/strip-leading-slash';
 import Tweet from '../components/tweet';
 import YouTube from '../components/youtube';
 import Vimeo from '../components/vimeo';
+import LatestArticles from '../components/latest-articles';
+import LatestCtfs from '../components/latest-ctfs';
+import AllArticles from '../components/all-articles';
+import AllCtfs from '../components/all-ctfs';
 
 const components = {
+  table: ({ children }) => (
+    <div className="overflow-x-auto my-8">
+      <table className="w-full border-collapse text-[1em]">{children}</table>
+    </div>
+  ),
+  th: ({ children }) => (
+    <th className="text-left px-3 py-2 text-secondary border-b-2 border-outline font-semibold">
+      {children}
+    </th>
+  ),
+  td: ({ children }) => (
+    <td className="px-3 py-2 border-b border-outline align-top">{children}</td>
+  ),
+
   a: ({ href, children }) => {
     // If it's an external url, use <a> and target _blank
     if (href.match(/^(http|https|mailto):/g)) {
@@ -43,20 +59,25 @@ const components = {
   MarkdownCtaLink,
   Tweet,
   YouTube,
-  Vimeo
+  Vimeo,
+  // Page-level components used directly in MDX files.
+  // Providing them here via MDXProvider avoids direct imports inside MDX content files,
+  // which are unreliable in gatsby-plugin-mdx v5 / MDX v2.
+  LatestArticles,
+  LatestCtfs,
+  AllArticles,
+  AllCtfs
 };
 
-const MdxParser = ({ children, embedded }) => {
-  return (
-    <MDXProvider components={components}>
-      <MDXRenderer embedded={transformImages(embedded)}>{children}</MDXRenderer>
-    </MDXProvider>
-  );
+// gatsby-plugin-mdx v5 renders MDX as React components passed directly as `children`.
+// MDXRenderer (from gatsby-plugin-mdx v3) and the `body` GraphQL field no longer exist in v5.
+const MdxParser = ({ children }) => {
+  return <MDXProvider components={components}>{children}</MDXProvider>;
 };
 
 MdxParser.propTypes = {
-  /** Embedded image dtails */
-  embedded: PropTypes.any
+  /** MDX content rendered as React children (gatsby-plugin-mdx v5) */
+  children: PropTypes.node
 };
 
 export default MdxParser;

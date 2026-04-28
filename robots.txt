@@ -1,2 +1,4 @@
 User-agent: *
 Allow: /
+Sitemap: https://z0rs.github.io/sitemap-index.xml
+Host: z0rs.github.io
