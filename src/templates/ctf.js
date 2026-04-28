@@ -9,15 +9,13 @@ import Tag from '../components/tag';
 import Seo from '../components/seo';
 import TableOfContents from '../components/table-of-contents';
 import WebmentionAside from '../components/webmention-aside';
-import getFirstImageUrl from '../utils/get-first-image-url';
 
 const Page = ({
   data: {
     mdx: {
       fields: { slug },
-      body,
       excerpt,
-      frontmatter: { type, title, date, dateModified, author, tags, featuredImage: frontmatterFeaturedImage },
+      frontmatter: { type, title, date, dateModified, author, tags },
       featuredImage,
       embeddedImages,
       tableOfContents: { items: toc }
@@ -29,8 +27,6 @@ const Page = ({
   children
 }) => {
   const thumbnail = featuredImage?.childImageSharp?.thumbnail ?? null;
-  const contentImageUrl = getFirstImageUrl(body);
-  const featuredImageUrl = frontmatterFeaturedImage ?? contentImageUrl;
   return (
     <Fragment>
       <div className="grid lg:grid-cols-1fr-auto">
@@ -41,22 +37,17 @@ const Page = ({
       <ul className="list-none m-0 p-0 flex flex-wrap gap-2 mb-12">
         {tags
           ? tags.map((tag, index) => {
-            return (
-              <li key={index} className="m-0 p-0">
-                <Tag tag={tag} />
-              </li>
-            );
-          })
+              return (
+                <li key={index} className="m-0 p-0">
+                  <Tag tag={tag} />
+                </li>
+              );
+            })
           : null}
       </ul>
       <MdxParser embedded={embeddedImages}>{children}</MdxParser>
       <AsideElement>
-        <FeaturedImageAside
-          alt={title}
-          thumbnail={thumbnail}
-          featuredImageUrl={featuredImageUrl}
-          shareText={`${title}\n ${siteUrl}${slug}`}
-        />
+        <FeaturedImageAside alt={title} thumbnail={thumbnail} shareText={`${title}\n ${siteUrl}${slug}`} />
         {toc ? (
           <div className="px-6">
             <h5 className="mb-3 text-lg leading-6 font-semibold uppercase text-secondary">On this page</h5>
@@ -75,7 +66,6 @@ export const query = graphql`
       fields {
         slug
       }
-      body
       excerpt
       frontmatter {
         type
@@ -84,7 +74,6 @@ export const query = graphql`
         dateModified(formatString: "MMMM DD, YYYY")
         author
         tags
-        featuredImage
       }
       featuredImage {
         childImageSharp {
@@ -116,17 +105,23 @@ export const Head = ({
   data: {
     mdx: {
       fields: { slug },
-      body,
       excerpt,
-      frontmatter: { type, title, tags, featuredImage: frontmatterFeaturedImage },
+      frontmatter: { type, title, tags },
       featuredImage
     },
     site: { siteMetadata }
   }
 }) => {
-  const contentImageUrl = getFirstImageUrl(body);
-  const ogImage = featuredImage?.childImageSharp?.og?.images?.fallback?.src ?? frontmatterFeaturedImage ?? contentImageUrl ?? null;
+  const ogImage = featuredImage?.childImageSharp?.og?.images?.fallback?.src ?? null;
   return (
-    <Seo type="ctf" title={title} description={excerpt} slug={slug} image={ogImage} tags={tags} siteMetadata={siteMetadata} />
+    <Seo
+      type="ctf"
+      title={title}
+      description={excerpt}
+      slug={slug}
+      image={ogImage}
+      tags={tags}
+      siteMetadata={siteMetadata}
+    />
   );
 };
