@@ -2,17 +2,14 @@ require('dotenv').config({
   path: `.env.${process.env.NODE_ENV || 'production'}`
 });
 
-const wrapESMPlugin = (name) =>
-  function wrapESM(opts) {
-    return async (...args) => {
-      const mod = await import(name);
-      const plugin = mod.default(opts);
-      return plugin(...args);
-    };
-  };
+const remarkGfm = require('remark-gfm');
+const remarkGfmPlugin = typeof remarkGfm === 'function' ? remarkGfm : remarkGfm.default;
+const canonicalSiteUrl =
+  process.env.URL ||
+  process.env.SITE_URL ||
+  (process.env.NODE_ENV === 'production' ? 'https://z0rs.github.io' : 'http://localhost:8000');
 
 module.exports = {
-  pathPrefix: "/z0rs.github.io",
   // flags: {
   //   FAST_DEV: true
   // },
@@ -38,7 +35,7 @@ module.exports = {
       'Component Library',
       'Serverless Functions'
     ],
-    siteUrl: process.env.URL,
+    siteUrl: canonicalSiteUrl,
     defaultImage: '/images/76135196.jpeg'
   },
   plugins: [
@@ -46,12 +43,23 @@ module.exports = {
     'gatsby-plugin-image',
     'gatsby-transformer-sharp',
     'gatsby-plugin-postcss',
-    'gatsby-transformer-json',
-    'gatsby-plugin-sitemap',
+    {
+      resolve: 'gatsby-plugin-sitemap',
+      options: {
+        excludes: ['/404/', '/404.html', '/dev-404-page/', '/offline-plugin-app-shell-fallback/']
+      }
+    },
     {
       resolve: 'gatsby-plugin-mdx',
       options: {
-        rehypePlugins: [wrapESMPlugin('rehype-slug'), [wrapESMPlugin('rehype-autolink-headings'), { behavior: 'wrap' }]]
+        extensions: ['.mdx', '.md'],
+        mdxOptions: {
+          remarkPlugins: [remarkGfmPlugin],
+          rehypePlugins: [
+            require('rehype-slug'),
+            [require('rehype-autolink-headings'), { behavior: 'wrap' }]
+          ]
+        }
       }
     },
     {

@@ -2,6 +2,7 @@ import React from 'react';
 import { useStaticQuery, graphql, Link } from 'gatsby';
 
 import CtfCard from '../components/ctf-card';
+import getFirstImageUrl from '../utils/get-first-image-url';
 
 const LatestCtfs = () => {
   const {
@@ -17,11 +18,13 @@ const LatestCtfs = () => {
           fields {
             slug
           }
+          body
           excerpt(pruneLength: 100)
           frontmatter {
             title
             date(formatString: "MMMM DD, YYYY")
             dateModified(formatString: "MMMM DD, YYYY")
+            featuredImage
           }
           featuredImage {
             childImageSharp {
@@ -41,12 +44,14 @@ const LatestCtfs = () => {
         {nodes.map((node, index) => {
           const {
             fields: { slug },
+            body,
             excerpt,
-            frontmatter: { title, date, dateModified },
-            featuredImage: {
-              childImageSharp: { thumbnail }
-            }
+            frontmatter: { title, date, dateModified, featuredImage: featuredImageUrl },
+            featuredImage
           } = node;
+          const thumbnail = featuredImage?.childImageSharp?.thumbnail ?? null;
+          const contentImageUrl = getFirstImageUrl(body);
+          const imageUrl = featuredImageUrl ?? contentImageUrl;
 
           return (
             <CtfCard
@@ -54,6 +59,7 @@ const LatestCtfs = () => {
               link={slug}
               title={title}
               thumbnail={thumbnail}
+              featuredImageUrl={imageUrl}
               date={date}
               dateModified={dateModified}
               excerpt={excerpt}

@@ -28,7 +28,7 @@ const Tweet = ({ tweetLink, theme = 'light', align = 'center' }) => {
     }, 100);
 
     return () => clearInterval(loadTweet);
-  }, [theme, align]);
+  }, [theme, align, tweetLink]);
 
   return (
     <div className="tweet-mdx-embed my-16">

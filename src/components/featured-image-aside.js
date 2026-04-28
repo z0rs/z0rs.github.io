@@ -3,12 +3,25 @@ import PropTypes from 'prop-types';
 import { GatsbyImage, getImage } from 'gatsby-plugin-image';
 import NavigationIcon from './navigation-icon';
 
-const FeaturedImageAside = ({ alt, thumbnail, shareText }) => {
+const FeaturedImageAside = ({ alt, thumbnail, featuredImageUrl, shareText }) => {
+  const image = thumbnail ? getImage(thumbnail) : null;
   return (
     <div className="grid gap-4 rounded border border-outline bg-surface/50 px-4 sm:px-6 py-6">
-      <div className="rounded shadow-lg overflow-hidden w-full">
-        <GatsbyImage alt={alt} image={getImage(thumbnail)} />
-      </div>
+      {(image || featuredImageUrl) ? (
+        <div className="rounded shadow-lg overflow-hidden w-full">
+          {image ? (
+            <GatsbyImage alt={alt} image={image} />
+          ) : (
+            <img
+              src={featuredImageUrl}
+              alt={alt}
+              loading="lazy"
+              decoding="async"
+              className="block h-auto w-full"
+            />
+          )}
+        </div>
+      ) : null}
       <a
         href={`https://www.linkedin.com/shareArticle?mini=true&url=${shareText}`}
         target="_blank"
@@ -25,9 +38,11 @@ const FeaturedImageAside = ({ alt, thumbnail, shareText }) => {
 FeaturedImageAside.propTypes = {
   /** The image alt tag */
   alt: PropTypes.string.isRequired,
-  /** Gatsby Image Data */
-  thumbnail: PropTypes.any.isRequired,
-  /** The text to populate the Tweet */
+  /** Gatsby Image Data — may be null if remote fetch failed */
+  thumbnail: PropTypes.any,
+  /** Featured image URL fallback from frontmatter/body */
+  featuredImageUrl: PropTypes.string,
+  /** The text to populate the share link */
   shareText: PropTypes.string.isRequired
 };
 

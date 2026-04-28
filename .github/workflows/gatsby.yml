@@ -61,7 +61,7 @@ jobs:
             public
             .cache
           # Hash the lock file so cache invalidates when dependencies change
-          key: ${{ runner.os }}-gatsby-build-${{ hashFiles('**/yarn.lock') }}
+          key: ${{ runner.os }}-gatsby-build-${{ hashFiles('**/package-lock.json') }}
           restore-keys: |
             ${{ runner.os }}-gatsby-build-
 
@@ -70,7 +70,6 @@ jobs:
 
       - name: Build with Gatsby
         env:
-          PREFIX_PATHS: 'true'
           NODE_TLS_REJECT_UNAUTHORIZED: 0 # Increase heap size for large Gatsby builds; TLS verification must remain enabled
           NODE_OPTIONS: '--max-old-space-size=4096'
         run: ${{ steps.detect-package-manager.outputs.runner }} gatsby build
