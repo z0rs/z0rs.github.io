@@ -5,8 +5,6 @@ import MdxParser from '../components/mdx-parser';
 import AsideElement from '../components/aside-element';
 import DateStamp from '../components/date-stamp';
 import FeaturedImageAside from '../components/featured-image-aside';
-import AddReaction from '../components/add-reaction';
-import UtterancesObserver from '../components/utterances-observer';
 import Tag from '../components/tag';
 import Seo from '../components/seo';
 import TableOfContents from '../components/table-of-contents';
@@ -18,18 +16,17 @@ const Page = ({
       fields: { slug },
       excerpt,
       frontmatter: { type, title, date, dateModified, author, tags },
-      featuredImage: {
-        childImageSharp: { thumbnail }
-      },
+      featuredImage,
       embeddedImages,
-      tableOfContents: { items: toc },
-      body
+      tableOfContents: { items: toc }
     },
     site: {
       siteMetadata: { siteUrl }
     }
-  }
+  },
+  children
 }) => {
+  const thumbnail = featuredImage?.childImageSharp?.thumbnail ?? null;
   return (
     <Fragment>
       <div className="grid lg:grid-cols-1fr-auto">
@@ -48,9 +45,7 @@ const Page = ({
           })
           : null}
       </ul>
-      <MdxParser embedded={embeddedImages}>{body}</MdxParser>
-      <AddReaction title={title} slug={slug} />
-      <UtterancesObserver />
+      <MdxParser embedded={embeddedImages}>{children}</MdxParser>
       <AsideElement>
         <FeaturedImageAside alt={title} thumbnail={thumbnail} shareText={`${title}\n ${siteUrl}${slug}`} />
         {toc ? (
@@ -79,6 +74,7 @@ export const query = graphql`
         dateModified(formatString: "MMMM DD, YYYY")
         author
         tags
+        featuredImage
       }
       featuredImage {
         childImageSharp {
@@ -92,11 +88,13 @@ export const query = graphql`
         }
       }
       tableOfContents
-      body
     }
     site {
       siteMetadata {
+        name
         siteUrl
+        defaultImage
+        keywords
       }
     }
   }
@@ -110,13 +108,13 @@ export const Head = ({
       fields: { slug },
       excerpt,
       frontmatter: { type, title, tags },
-      featuredImage: {
-        childImageSharp: { og }
-      }
-    }
+      featuredImage
+    },
+    site: { siteMetadata }
   }
 }) => {
+  const ogImage = featuredImage?.childImageSharp?.og?.images?.fallback?.src ?? null;
   return (
-    <Seo type="article" title={title} description={excerpt} slug={slug} image={og.images.fallback.src} tags={tags} />
+    <Seo type="article" title={title} description={excerpt} slug={slug} image={ogImage} tags={tags} siteMetadata={siteMetadata} />
   );
 };

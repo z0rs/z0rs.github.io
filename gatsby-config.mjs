@@ -1,21 +1,22 @@
-require('dotenv').config({
+import dotenv from 'dotenv';
+dotenv.config({
   path: `.env.${process.env.NODE_ENV || 'production'}`
 });
 
-const wrapESMPlugin = (name) =>
-  function wrapESM(opts) {
-    return async (...args) => {
-      const mod = await import(name);
-      const plugin = mod.default(opts);
-      return plugin(...args);
-    };
-  };
+import { dirname } from 'path';
+import { fileURLToPath } from 'url';
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
-module.exports = {
-  pathPrefix: "/z0rs.github.io",
-  // flags: {
-  //   FAST_DEV: true
-  // },
+import remarkGfm from 'remark-gfm';
+import rehypeSlug from 'rehype-slug';
+import rehypeAutolinkHeadings from 'rehype-autolink-headings';
+
+const canonicalSiteUrl =
+  process.env.URL ||
+  process.env.SITE_URL ||
+  (process.env.NODE_ENV === 'production' ? 'https://z0rs.github.io' : 'http://localhost:8000');
+
+export default {
   trailingSlash: 'always',
   siteMetadata: {
     name: 'Eno Leriand',
@@ -38,7 +39,7 @@ module.exports = {
       'Component Library',
       'Serverless Functions'
     ],
-    siteUrl: process.env.URL,
+    siteUrl: canonicalSiteUrl,
     defaultImage: '/images/76135196.jpeg'
   },
   plugins: [
@@ -46,12 +47,23 @@ module.exports = {
     'gatsby-plugin-image',
     'gatsby-transformer-sharp',
     'gatsby-plugin-postcss',
-    'gatsby-transformer-json',
-    'gatsby-plugin-sitemap',
+    {
+      resolve: 'gatsby-plugin-sitemap',
+      options: {
+        excludes: ['/404/', '/404.html', '/dev-404-page/', '/offline-plugin-app-shell-fallback/']
+      }
+    },
     {
       resolve: 'gatsby-plugin-mdx',
       options: {
-        rehypePlugins: [wrapESMPlugin('rehype-slug'), [wrapESMPlugin('rehype-autolink-headings'), { behavior: 'wrap' }]]
+        extensions: ['.mdx', '.md'],
+        mdxOptions: {
+          remarkPlugins: [remarkGfm],
+          rehypePlugins: [
+            rehypeSlug,
+            [rehypeAutolinkHeadings, { behavior: 'wrap' }]
+          ]
+        }
       }
     },
     {

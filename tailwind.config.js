@@ -2,25 +2,27 @@ module.exports = {
   content: [
     './src/components/**/*.{js,jsx,ts,tsx}',
     './src/pages/**/*.{js,jsx,ts,tsx}',
-    './src/templates/**/*.{js,jsx,ts,tsx}'
+    './src/templates/**/*.{js,jsx,ts,tsx}',
+    './content/**/*.{md,mdx}'
   ],
+
   safelist: [
-    '!mb-0', // This is used by the h1 in index.mdx
-    '!mt-0', // this is used by the p in index.mdx
-    'my-20', // this is used in the grid in index.mdx
+    '!mb-0',
+    '!mt-0',
+    'my-20',
     'grid',
-    'md:grid-cols-1fr-1fr', // this is used in index.mdx
+    'md:grid-cols-1fr-1fr',
     'gap-8',
     'gap-32',
     'text-base',
     'text-sm',
     'text-xs',
-    // this is for the toc
+
     'text-violet-300',
     'text-violet-400',
     'text-violet-500',
     'rotate-90',
-    // These are for the charts
+
     'stroke-teal',
     'stroke-mouve',
     'stroke-salmon',
@@ -48,6 +50,7 @@ module.exports = {
     'bg-starfleet',
     'bg-electric'
   ],
+
   theme: {
     extend: {
       colors: {
@@ -58,7 +61,6 @@ module.exports = {
         tertiary: '#58e6d9',
         muted: '#605c9d',
 
-        // these are used for the chart
         salmon: '#ff6090',
         mouve: '#3f51b5',
         teal: '#00bcd4',
@@ -74,83 +76,125 @@ module.exports = {
         surface: '#18162c',
         guide: '#2d2a58'
       },
+
       keyframes: {
         bar: {
           '0%': { width: '100%' },
           '100%': { width: '0%' }
         }
       },
+
       animation: {
         'scaling-bar': 'bar 60s linear infinite'
       },
+
       fontFamily: {
         sans: ['Inconsolata', 'ui-sans-serif', 'system-ui'],
         mono: ['ui-monospace', 'monospace']
       },
+
       maxWidth: {
         '8xl': '90rem'
       },
+
       gridTemplateColumns: {
-        ['auto-auto']: 'auto auto',
-        ['auto-1fr']: 'auto 1fr',
-        ['1fr-auto']: '1fr auto',
-        ['1fr-1fr']: '1fr 1fr'
+        'auto-auto': 'auto auto',
+        'auto-1fr': 'auto 1fr',
+        '1fr-auto': '1fr auto',
+        '1fr-1fr': '1fr 1fr'
       },
+
       typography: (theme) => ({
         DEFAULT: {
           css: {
             color: theme('colors.text'),
+
             '*': {
               wordBreak: 'break-word'
             },
+
+            /* TABLE SUPPORT FOR MDX */
+
+            table: {
+              width: '100%',
+              borderCollapse: 'collapse',
+              fontSize: theme('fontSize.sm')[0]
+            },
+
+            'thead th': {
+              color: theme('colors.secondary'),
+              borderBottomWidth: '2px',
+              borderBottomColor: theme('colors.outline'),
+              padding: '0.5rem 0.75rem',
+              textAlign: 'left'
+            },
+
+            'tbody td': {
+              borderBottomWidth: '1px',
+              borderBottomColor: theme('colors.outline'),
+              padding: '0.5rem 0.75rem',
+              verticalAlign: 'top'
+            },
+
+            'tbody tr:last-child td': {
+              borderBottomWidth: '0'
+            },
+
             h1: {
               color: theme('colors.text'),
-              fontWieght: theme('font-bold'),
+              fontWeight: theme('fontWeight.bold'),
               a: {
                 color: theme('colors.text')
               }
             },
+
             h2: {
               color: theme('colors.salmon'),
-              fontWieght: theme('font-bold'),
+              fontWeight: theme('fontWeight.bold'),
               a: {
                 color: theme('colors.salmon')
               }
             },
+
             h3: {
               color: theme('colors.salmon'),
-              fontWieght: theme('font-bold'),
+              fontWeight: theme('fontWeight.bold'),
               a: {
                 color: theme('colors.salmon')
               }
             },
+
             h4: {
               color: theme('colors.salmon'),
-              fontWieght: theme('font-bold'),
+              fontWeight: theme('fontWeight.bold'),
               a: {
                 color: theme('colors.salmon')
               }
             },
+
             h5: {
               color: theme('colors.salmon'),
-              fontWieght: theme('font-bold'),
+              fontWeight: theme('fontWeight.bold'),
               a: {
                 color: theme('colors.salmon')
               }
             },
+
             h6: {
               color: theme('colors.salmon'),
-              fontWieght: theme('font-bold'),
+              fontWeight: theme('fontWeight.bold'),
               a: {
                 color: theme('colors.salmon')
               }
             },
+
             strong: {
               color: theme('colors.text')
             },
+
             a: {
               color: theme('colors.secondary'),
-              fontWieght: theme('font-bold'),
+              fontWeight: theme('fontWeight.bold'),
               '&:hover': {
                 color: theme('colors.muted'),
                 transition: 'all 0.2s ease'
@@ -159,23 +203,29 @@ module.exports = {
                 margin: 0
               }
             },
+
             pre: {
               background: theme('colors.surface')
             },
+
             code: {
-              '& .prism-code': {
-                background: theme('colors.transparent')
-              },
               color: theme('colors.tertiary'),
+
+              '& .prism-code': {
+                background: 'transparent'
+              },
+
               '&::before': {
                 content: '"" !important'
               },
+
               '&::after': {
                 content: '"" !important'
               }
             },
+
             blockquote: {
-              fontSize: '1rem!important',
+              fontSize: '1rem !important',
               color: theme('colors.text')
             }
           }
@@ -183,5 +233,6 @@ module.exports = {
       })
     }
   },
+
   plugins: [require('@tailwindcss/typography')]
 };
