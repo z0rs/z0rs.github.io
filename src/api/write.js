@@ -121,14 +121,18 @@ function yamlString(str) {
   return `"${str.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
 }
 
-function buildFilename(title) {
+function buildSlug(title) {
   const slug = title
     .toLowerCase()
     .replace(/[^a-z0-9\s-]/g, '')
     .trim()
     .replace(/\s+/g, '-')
     .replace(/-{2,}/g, '-');
-  return `${slug}-${Date.now()}.mdx`;
+  return slug || 'untitled-article';
+}
+
+function buildFilename(title) {
+  return `${buildSlug(title)}.mdx`;
 }
 
 function buildFrontmatter({ title, content, tags, author, date, featuredImage, status }) {
@@ -214,7 +218,7 @@ async function publishToGitHub({ title, content, tags, author, date, featuredIma
   const commitRes = await githubFetch(`/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${githubPath}`, token, {
     method: 'PUT',
     body: JSON.stringify({
-      message: `Add article: ${title}`,
+      message: `${sha ? 'Update' : 'Add'} article: ${title}`,
       content: encodedContent,
       ...(sha ? { sha } : {})
     })
