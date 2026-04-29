@@ -116,13 +116,14 @@ export default function WritePage() {
       }
 
       if (!res.ok) {
+        const errorMessage = data.detail ? `${data.error || 'Request failed'}: ${data.detail}` : data.error;
         if (res.status === 401) {
-          setStatus({ type: 'error', message: `Unauthorized: ${data.detail || data.error}` });
+          setStatus({ type: 'error', message: errorMessage || 'Unauthorized' });
           setTokenError(data.detail || '');
         } else {
           setStatus({
             type: 'error',
-            message: data.error || `Request failed with status ${res.status}`
+            message: errorMessage || `Request failed with status ${res.status}`
           });
         }
         return;
