@@ -32,8 +32,8 @@ const LABEL_CLASSES = 'block text-sm font-semibold text-secondary mb-2';
 const ERROR_CLASSES = 'text-salmon text-sm mt-1';
 
 const PANEL_CARD_CLASSES = 'px-0 sm:px-0';
-const FORM_STACK_CLASSES = 'mx-auto w-full max-w-3xl space-y-6 sm:space-y-7';
-const SECTION_CARD_CLASSES = 'space-y-4 sm:space-y-5';
+const FORM_STACK_CLASSES = 'mx-auto w-full max-w-3xl space-y-8 sm:space-y-10';
+const SECTION_CARD_CLASSES = 'space-y-5 sm:space-y-6';
 const SECTION_TITLE_CLASSES = 'text-sm font-semibold text-secondary';
 const MUTED_TEXT_CLASSES = 'text-sm leading-relaxed text-muted';
 const PRIMARY_BUTTON_CLASSES =
@@ -479,21 +479,23 @@ export default function WritePage({ data }) {
 
       <form onSubmit={handleSubmit} className={PANEL_CARD_CLASSES}>
         <div className={FORM_STACK_CLASSES}>
-          <section className={SECTION_CARD_CLASSES}>
-            <h2 className={SECTION_TITLE_CLASSES}>{isLocal ? 'Dev Token' : 'Write Secret Token'}</h2>
-            <p className={MUTED_TEXT_CLASSES}>
-              {isLocal ? (
-                <>
-                  In local dev, any non-empty bearer token is accepted. Example:{' '}
-                  <code className="bg-background px-1.5 py-0.5 rounded">my-dev-token</code>
-                </>
-              ) : (
-                <>
-                  Production deployment uses <code>WRITE_SECRET</code>. Set it in Netlify env, then paste the token
-                  here.
-                </>
-              )}
-            </p>
+          <section className="space-y-5">
+            <div>
+              <h2 className={SECTION_TITLE_CLASSES}>{isLocal ? 'Dev Token' : 'Write Secret Token'}</h2>
+              <p className={`mt-2 ${MUTED_TEXT_CLASSES}`}>
+                {isLocal ? (
+                  <>
+                    In local dev, any non-empty bearer token is accepted. Example:{' '}
+                    <code className="bg-background px-1.5 py-0.5 rounded">my-dev-token</code>
+                  </>
+                ) : (
+                  <>
+                    Production deployment uses <code>WRITE_SECRET</code>. Set it in Netlify env, then paste the token
+                    here.
+                  </>
+                )}
+              </p>
+            </div>
             <input
               id="token"
               type="text"
@@ -535,7 +537,7 @@ export default function WritePage({ data }) {
             </div>
           </section>
 
-          <section className="space-y-5">
+          <section className={SECTION_CARD_CLASSES}>
             <div>
               <label className={LABEL_CLASSES} htmlFor="title">
                 Title <span className="text-salmon">*</span>
@@ -556,7 +558,7 @@ export default function WritePage({ data }) {
               )}
             </div>
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
               <div>
                 <label className={LABEL_CLASSES} htmlFor="author">
                   Author
@@ -635,10 +637,10 @@ export default function WritePage({ data }) {
             </div>
           </section>
 
-          <section className="space-y-4">
+          <section className={SECTION_CARD_CLASSES}>
             <div>
               <h2 className={SECTION_TITLE_CLASSES}>Upload Image</h2>
-              <p className={MUTED_TEXT_CLASSES}>
+              <p className={`mt-2 ${MUTED_TEXT_CLASSES}`}>
                 Uploads to <code>/static/images/uploads/...</code>. URL can be used as featured image or inserted into
                 MDX content.
               </p>
@@ -667,7 +669,7 @@ export default function WritePage({ data }) {
               </div>
             ) : null}
 
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="mt-1 flex flex-col gap-3 sm:flex-row sm:items-center">
               <button
                 type="button"
                 onClick={handleUploadImage}
@@ -732,13 +734,13 @@ export default function WritePage({ data }) {
                 placeholder={`Write your article in MDX format.\n\n## Heading\n\nRegular text and **bold** and *italic*.\n\n\`\`\`js\nconsole.log("code block");\n\`\`\``}
                 className={`${FIELD_CLASSES} min-h-[18rem] resize-y font-mono text-sm leading-relaxed sm:min-h-[22rem]`}
               />
-              <p className="mt-1.5 text-center text-xs text-muted">
+              <p className="mt-2 text-center text-xs text-muted">
                 {form.content.length} characters &middot; Supports headings, links, tables, code blocks, and embeds.
               </p>
             </div>
           </section>
 
-          <section>
+          <section className="pt-2">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
               <button type="submit" disabled={status.type === 'loading'} className={PRIMARY_BUTTON_CLASSES}>
                 {status.type === 'loading'
@@ -781,7 +783,7 @@ export default function WritePage({ data }) {
             </div>
           </section>
 
-          <section className="space-y-4">
+          <section className={SECTION_CARD_CLASSES}>
             <div>
               <h2 className="m-0 text-base font-semibold text-secondary">Delete Article</h2>
               <p className={MUTED_TEXT_CLASSES}>
@@ -839,7 +841,7 @@ export default function WritePage({ data }) {
         <div>
           <h5 className="m-0 text-sm font-semibold uppercase tracking-wide text-secondary">Recent Articles</h5>
           <p className="mt-1 text-xs text-muted">Click to load for edit. Use slug to delete.</p>
-          <ul className="m-0 mt-4 list-none space-y-5 p-0">
+          <ul className="m-0 mt-5 list-none space-y-6 p-0">
             {recentArticles.map((node, index) => {
               const articlePath = node?.fields?.slug || '';
               const articleSlug = normalizeArticleSlugInput(articlePath);
@@ -855,10 +857,10 @@ export default function WritePage({ data }) {
                   >
                     {articleTitle}
                   </button>
-                  <code className="mt-0.5 block break-all text-xs text-muted">{articleSlug}</code>
-                  <div className="mt-2 flex items-center gap-3">
+                  <code className="mt-1 block break-all text-xs text-muted">{articleSlug}</code>
+                  <div className="mt-3 flex items-center justify-between gap-4">
                     <small className="text-[10px] uppercase tracking-wide text-muted">{articleStatus}</small>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-4">
                       <button
                         type="button"
                         onClick={() => setDeleteSlug(articleSlug)}
