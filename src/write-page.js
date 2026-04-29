@@ -27,7 +27,7 @@ const DEFAULT_FORM = {
 const FIELD_CLASSES =
   'w-full bg-surface border border-outline rounded-xl px-4 py-3 text-base text-text placeholder-muted focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors';
 
-const LABEL_CLASSES = 'block text-base font-semibold text-secondary mb-3';
+const LABEL_CLASSES = 'block text-sm font-semibold text-secondary mb-2';
 
 const ERROR_CLASSES = 'text-salmon text-sm mt-1';
 
@@ -88,7 +88,7 @@ export default function WritePage({ data }) {
     return (
       <div className="not-prose mx-auto w-full max-w-4xl">
         <h1 className="text-2xl font-bold text-text">Write Panel</h1>
-        <div className="bg-surface border border-outline rounded-xl p-6 text-center">
+        <div className="rounded-xl p-6 text-center">
           <p className="text-muted mb-4">The Write Panel requires a server-side runtime to handle file writes.</p>
           <p className="text-sm text-muted mb-2">
             On GitHub Pages, this page is served as static HTML and cannot write files.
@@ -505,42 +505,38 @@ export default function WritePage({ data }) {
             />
             {tokenError && <p className={ERROR_CLASSES}>{tokenError}</p>}
 
-            <div className="space-y-3 pt-1">
-              <label className={LABEL_CLASSES} htmlFor="status-published">
-                Status
-              </label>
-              <div className="flex flex-wrap items-center gap-5">
-                {['published', 'draft'].map((s) => (
-                  <label
-                    key={s}
-                    htmlFor={`status-${s}`}
-                    className={`inline-flex items-center gap-2 text-sm font-semibold transition-colors ${
-                      form.status === s ? 'text-primary' : 'text-secondary hover:text-primary'
-                    }`}
-                  >
-                    <input
-                      id={`status-${s}`}
-                      type="radio"
-                      name="status"
-                      value={s}
-                      checked={form.status === s}
-                      onChange={set('status')}
-                      className="accent-primary"
-                    />
-                    {s.charAt(0).toUpperCase() + s.slice(1)}
-                  </label>
-                ))}
-              </div>
+            <div className="flex flex-wrap items-center gap-6">
+              <span className="text-sm font-semibold text-secondary">Status</span>
+              {['published', 'draft'].map((s) => (
+                <label
+                  key={s}
+                  htmlFor={`status-${s}`}
+                  className={`inline-flex items-center gap-2 text-sm font-semibold transition-colors ${
+                    form.status === s ? 'text-primary' : 'text-secondary hover:text-primary'
+                  }`}
+                >
+                  <input
+                    id={`status-${s}`}
+                    type="radio"
+                    name="status"
+                    value={s}
+                    checked={form.status === s}
+                    onChange={set('status')}
+                    className="accent-primary"
+                  />
+                  {s.charAt(0).toUpperCase() + s.slice(1)}
+                </label>
+              ))}
               {form.status === 'draft' && (
-                <small className="block text-sm text-primary">
-                  Draft mode: will be skipped by gatsby-node.js in build output.
-                </small>
+                <span className="text-sm text-primary">
+                  Draft mode: skipped by gatsby-node.js in build output.
+                </span>
               )}
             </div>
           </section>
 
-          <section className={SECTION_CARD_CLASSES}>
-            <div className="space-y-3">
+          <section className="space-y-5">
+            <div>
               <label className={LABEL_CLASSES} htmlFor="title">
                 Title <span className="text-salmon">*</span>
               </label>
@@ -554,14 +550,14 @@ export default function WritePage({ data }) {
                 className={FIELD_CLASSES}
               />
               {previewSlug && (
-                <small className="text-sm text-muted block">
+                <small className="text-sm text-muted mt-1.5 block">
                   Preview slug: <code className="bg-background px-1 rounded">/articles/{previewSlug}/</code>
                 </small>
               )}
             </div>
 
-            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-              <div className="space-y-3">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
                 <label className={LABEL_CLASSES} htmlFor="author">
                   Author
                 </label>
@@ -574,7 +570,7 @@ export default function WritePage({ data }) {
                   className={FIELD_CLASSES}
                 />
               </div>
-              <div className="space-y-3">
+              <div>
                 <label className={LABEL_CLASSES} htmlFor="date">
                   Date
                 </label>
@@ -582,9 +578,9 @@ export default function WritePage({ data }) {
               </div>
             </div>
 
-            <div className="space-y-3">
+            <div>
               <label className={LABEL_CLASSES} htmlFor="tags">
-                Tags <span className="font-normal text-muted text-sm">(comma-separated)</span>
+                Tags <span className="font-normal text-muted text-xs">(comma-separated)</span>
               </label>
               <input
                 id="tags"
@@ -595,7 +591,7 @@ export default function WritePage({ data }) {
                 className={FIELD_CLASSES}
               />
               {form.tags && (
-                <div className="flex flex-wrap gap-2">
+                <div className="mt-2 flex flex-wrap gap-2">
                   {form.tags
                     .split(',')
                     .map((t) => t.trim())
@@ -603,7 +599,7 @@ export default function WritePage({ data }) {
                     .map((tag) => (
                       <span
                         key={tag}
-                        className="rounded-full border border-outline bg-background px-2.5 py-1 text-sm text-secondary"
+                        className="rounded-full border border-outline bg-background px-2.5 py-1 text-xs text-secondary"
                       >
                         {tag}
                       </span>
@@ -612,9 +608,9 @@ export default function WritePage({ data }) {
               )}
             </div>
 
-            <div className="space-y-3">
+            <div>
               <label className={LABEL_CLASSES} htmlFor="featuredImage">
-                Featured Image URL <span className="font-normal text-muted text-sm">(optional)</span>
+                Featured Image URL <span className="font-normal text-muted text-xs">(optional)</span>
               </label>
               <input
                 id="featuredImage"
@@ -625,7 +621,7 @@ export default function WritePage({ data }) {
                 className={FIELD_CLASSES}
               />
               {form.featuredImage && (
-                <div className="h-44 w-full max-w-md overflow-hidden rounded-xl border border-outline sm:h-52">
+                <div className="mt-2 h-44 w-full max-w-md overflow-hidden rounded-xl border border-outline sm:h-52">
                   <img
                     src={form.featuredImage}
                     alt="Preview"
@@ -639,12 +635,14 @@ export default function WritePage({ data }) {
             </div>
           </section>
 
-          <section className={SECTION_CARD_CLASSES}>
-            <h2 className={SECTION_TITLE_CLASSES}>Upload Image</h2>
-            <p className={MUTED_TEXT_CLASSES}>
-              Upload image to repo path <code>/static/images/uploads/...</code>, then reuse URL for featured image or
-              insert into MDX.
-            </p>
+          <section className="space-y-4">
+            <div>
+              <h2 className={SECTION_TITLE_CLASSES}>Upload Image</h2>
+              <p className={MUTED_TEXT_CLASSES}>
+                Uploads to <code>/static/images/uploads/...</code>. URL can be used as featured image or inserted into
+                MDX content.
+              </p>
+            </div>
 
             <input
               id="imageUpload"
@@ -659,7 +657,7 @@ export default function WritePage({ data }) {
               type="text"
               value={uploadAlt}
               onChange={(e) => setUploadAlt(e.target.value)}
-              placeholder="Alt text for markdown (optional)"
+              placeholder="Alt text (optional)"
               className={FIELD_CLASSES}
             />
 
@@ -680,8 +678,8 @@ export default function WritePage({ data }) {
               </button>
 
               {uploadStatus.type !== 'idle' && (
-                <div
-                  className={`min-w-0 text-sm ${
+                <span
+                  className={`text-sm ${
                     uploadStatus.type === 'error'
                       ? 'text-salmon'
                       : uploadStatus.type === 'success'
@@ -690,14 +688,16 @@ export default function WritePage({ data }) {
                   }`}
                 >
                   {uploadStatus.message}
-                </div>
+                </span>
               )}
             </div>
 
             {uploadedAsset?.imageUrl ? (
-              <div className="space-y-3 pt-1">
-                <code className="block break-all text-xs text-muted">{uploadedAsset.imageUrl}</code>
-                <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center">
+              <div className="space-y-3">
+                <code className="block break-all rounded bg-background px-2 py-1 text-xs text-muted">
+                  {uploadedAsset.imageUrl}
+                </code>
+                <div className="flex flex-col gap-2 sm:flex-row">
                   <button
                     type="button"
                     onClick={() => setForm((prev) => ({ ...prev, featuredImage: uploadedAsset.imageUrl }))}
@@ -717,8 +717,8 @@ export default function WritePage({ data }) {
             ) : null}
           </section>
 
-          <section className={SECTION_CARD_CLASSES}>
-            <div className="space-y-3">
+          <section>
+            <div>
               <label className={LABEL_CLASSES} htmlFor="content">
                 Content (MDX) <span className="text-salmon">*</span>
               </label>
@@ -730,15 +730,15 @@ export default function WritePage({ data }) {
                 required
                 rows={18}
                 placeholder={`Write your article in MDX format.\n\n## Heading\n\nRegular text and **bold** and *italic*.\n\n\`\`\`js\nconsole.log("code block");\n\`\`\``}
-                className={`${FIELD_CLASSES} min-h-[18rem] resize-y font-mono text-base leading-relaxed sm:min-h-[22rem]`}
+                className={`${FIELD_CLASSES} min-h-[18rem] resize-y font-mono text-sm leading-relaxed sm:min-h-[22rem]`}
               />
-              <p className="text-center text-sm text-muted">
+              <p className="mt-1.5 text-center text-xs text-muted">
                 {form.content.length} characters &middot; Supports headings, links, tables, code blocks, and embeds.
               </p>
             </div>
           </section>
 
-          <section className={`${SECTION_CARD_CLASSES} pt-5`}>
+          <section>
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
               <button type="submit" disabled={status.type === 'loading'} className={PRIMARY_BUTTON_CLASSES}>
                 {status.type === 'loading'
@@ -755,41 +755,42 @@ export default function WritePage({ data }) {
               </button>
 
               {status.type === 'success' && (
-                <div className="min-w-0 text-sm text-teal">
-                  <div className="flex items-start gap-2">
-                    <span>&#10003;</span>
+                <div className="flex items-start gap-2 text-sm text-teal">
+                  <span className="mt-0.5 shrink-0">&#10003;</span>
+                  <div>
                     <span className="break-words">{status.message}</span>
+                    {status.url && (
+                      <button
+                        type="button"
+                        onClick={() => navigate(status.url)}
+                        className="mt-1 block text-secondary underline underline-offset-2 hover:no-underline"
+                      >
+                        View article
+                      </button>
+                    )}
                   </div>
-                  {status.url && (
-                    <button
-                      type="button"
-                      onClick={() => navigate(status.url)}
-                      className="mt-2 inline-flex text-secondary underline underline-offset-2 hover:no-underline"
-                    >
-                      View article
-                    </button>
-                  )}
                 </div>
               )}
 
               {status.type === 'error' && (
-                <div className="min-w-0 text-sm text-salmon">
-                  <div className="flex items-start gap-2">
-                    <span>&#10007;</span>
-                    <span className="break-words">{status.message}</span>
-                  </div>
+                <div className="flex items-start gap-2 text-sm text-salmon">
+                  <span className="mt-0.5 shrink-0">&#10007;</span>
+                  <span className="break-words">{status.message}</span>
                 </div>
               )}
             </div>
           </section>
 
-          <section className={SECTION_CARD_CLASSES}>
-            <h2 className="m-0 text-xl font-bold text-text">Delete Article</h2>
-            <p className={MUTED_TEXT_CLASSES}>
-              Paste article slug or URL (for example <code>/articles/post-title-slug/</code>) to remove an article
-              without opening GitHub.
-            </p>
-            <div className="space-y-3">
+          <section className="space-y-4">
+            <div>
+              <h2 className="m-0 text-base font-semibold text-secondary">Delete Article</h2>
+              <p className={MUTED_TEXT_CLASSES}>
+                Paste a slug or full article URL (e.g. <code>/articles/post-title-slug/</code>) to delete without
+                opening GitHub.
+              </p>
+            </div>
+
+            <div>
               <label className={LABEL_CLASSES} htmlFor="deleteSlug">
                 Article Slug
               </label>
@@ -805,7 +806,8 @@ export default function WritePage({ data }) {
                 className={FIELD_CLASSES}
               />
             </div>
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
               <button
                 type="button"
                 onClick={handleDeleteSubmit}
@@ -816,20 +818,16 @@ export default function WritePage({ data }) {
               </button>
 
               {deleteStatus.type === 'success' && (
-                <div className="min-w-0 text-sm text-teal">
-                  <div className="flex items-start gap-2">
-                    <span>&#10003;</span>
-                    <span className="break-words">{deleteStatus.message}</span>
-                  </div>
+                <div className="flex items-start gap-2 text-sm text-teal">
+                  <span className="mt-0.5 shrink-0">&#10003;</span>
+                  <span className="break-words">{deleteStatus.message}</span>
                 </div>
               )}
 
               {deleteStatus.type === 'error' && (
-                <div className="min-w-0 text-sm text-salmon">
-                  <div className="flex items-start gap-2">
-                    <span>&#10007;</span>
-                    <span className="break-words">{deleteStatus.message}</span>
-                  </div>
+                <div className="flex items-start gap-2 text-sm text-salmon">
+                  <span className="mt-0.5 shrink-0">&#10007;</span>
+                  <span className="break-words">{deleteStatus.message}</span>
                 </div>
               )}
             </div>
@@ -838,10 +836,10 @@ export default function WritePage({ data }) {
       </form>
 
       <AsideElement>
-        <div className="space-y-4 px-2">
-          <h5 className="m-0 text-lg font-semibold uppercase leading-6 text-secondary">Recent Articles</h5>
-          <p className="text-sm text-muted">Load an article for edit or autofill slug for deletion.</p>
-          <ul className="m-0 list-none space-y-4 p-0">
+        <div>
+          <h5 className="m-0 text-sm font-semibold uppercase tracking-wide text-secondary">Recent Articles</h5>
+          <p className="mt-1 text-xs text-muted">Click to load for edit. Use slug to delete.</p>
+          <ul className="m-0 mt-4 list-none space-y-5 p-0">
             {recentArticles.map((node, index) => {
               const articlePath = node?.fields?.slug || '';
               const articleSlug = normalizeArticleSlugInput(articlePath);
@@ -849,7 +847,7 @@ export default function WritePage({ data }) {
               const articleStatus = node?.frontmatter?.status === 'draft' ? 'Draft' : 'Published';
 
               return (
-                <li key={`${articlePath}-${index}`} className="m-0 border-b border-outline/50 pb-3">
+                <li key={`${articlePath}-${index}`}>
                   <button
                     type="button"
                     onClick={() => handleLoadForEdit(articleSlug)}
@@ -857,18 +855,18 @@ export default function WritePage({ data }) {
                   >
                     {articleTitle}
                   </button>
-                  <code className="mt-1 block break-all text-xs text-muted">{articleSlug}</code>
-                  <div className="mt-3 flex items-center justify-between gap-3">
+                  <code className="mt-0.5 block break-all text-xs text-muted">{articleSlug}</code>
+                  <div className="mt-2 flex items-center gap-3">
                     <small className="text-[10px] uppercase tracking-wide text-muted">{articleStatus}</small>
                     <div className="flex items-center gap-3">
                       <button
                         type="button"
                         onClick={() => setDeleteSlug(articleSlug)}
-                        className="text-xs text-secondary transition-colors hover:text-primary"
+                        className="text-xs text-muted transition-colors hover:text-primary"
                       >
-                        Use for delete
+                        Delete
                       </button>
-                      <Link to={articlePath} className="text-xs text-secondary transition-colors hover:text-primary">
+                      <Link to={articlePath} className="text-xs text-muted transition-colors hover:text-primary">
                         Open
                       </Link>
                     </div>
