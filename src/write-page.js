@@ -1,4 +1,4 @@
-import React, { useState, Fragment } from 'react';
+import React, { useState } from 'react';
 import { Link, navigate, graphql } from 'gatsby';
 import Seo from './components/seo';
 
@@ -30,6 +30,8 @@ const LABEL_CLASSES = 'block text-sm font-semibold text-secondary mb-1';
 
 const ERROR_CLASSES = 'text-salmon text-sm mt-1';
 
+const PANEL_CARD_CLASSES = 'rounded-xl border border-outline bg-surface/70 p-4 sm:p-6';
+
 export default function WritePage() {
   const [form, setForm] = useState({ ...DEFAULT_FORM });
   const [status, setStatus] = useState({ type: 'idle', message: '' });
@@ -41,9 +43,9 @@ export default function WritePage() {
 
   if (isDisabled) {
     return (
-      <div className="prose">
-        <h1>Write Panel</h1>
-        <div className="bg-surface border border-outline rounded p-6 text-center">
+      <div className="not-prose mx-auto w-full max-w-4xl">
+        <h1 className="text-2xl font-bold text-text">Write Panel</h1>
+        <div className="bg-surface border border-outline rounded-xl p-6 text-center">
           <p className="text-muted mb-4">The Write Panel requires a server-side runtime to handle file writes.</p>
           <p className="text-sm text-muted mb-2">
             On GitHub Pages, this page is served as static HTML and cannot write files.
@@ -149,42 +151,55 @@ export default function WritePage() {
     .replace(/-{2,}/g, '-');
 
   return (
-    <div className="prose">
-      <div className="flex items-center gap-3 mb-8 not-prose">
-        <small className="leading-6 font-semibold text-yellow bg-surface border border-yellow/30 rounded px-2 py-0.5">
-          {isLocal ? 'LOCAL DEV' : 'NETLIFY'}
-        </small>
-        <p className="text-muted text-sm m-0">
+    <div className="not-prose mx-auto w-full max-w-4xl space-y-6">
+      <header className={PANEL_CARD_CLASSES}>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <h1 className="m-0 text-2xl font-bold text-text">Write Panel</h1>
+            <p className="mt-2 text-sm text-muted">
+              Create and publish MDX posts directly from the browser with runtime-aware behavior.
+            </p>
+          </div>
+          <small className="shrink-0 self-start rounded-full border border-yellow/30 bg-background px-3 py-1 text-xs font-semibold tracking-wide text-yellow">
+            {isLocal ? 'LOCAL DEV' : isNetlify ? 'NETLIFY' : 'RUNTIME'}
+          </small>
+        </div>
+        <p className="mt-4 text-sm text-secondary">
           {isLocal
-            ? 'Writing to local filesystem. Changes are lost unless committed to git manually.'
-            : 'Publishing via GitHub API. Content is committed to the repo and triggers a site rebuild.'}
+            ? 'Writing to local filesystem. Changes stay local until you commit and push manually.'
+            : 'Publishing via GitHub API. Content is committed to the repository and triggers site rebuild.'}
         </p>
-      </div>
-
-      <h1 className="not-prose">Write Panel</h1>
+      </header>
 
       {isLocal ? (
-        <div className="mb-8 not-prose">
-          <p className="text-xs text-muted mb-1">
-            In local dev, any non-empty bearer token is accepted. Use a placeholder like{' '}
-            <code className="bg-surface px-1 rounded">my-dev-token</code>.
+        <section className={PANEL_CARD_CLASSES}>
+          <label className={LABEL_CLASSES} htmlFor="dev-token">
+            Dev Token
+          </label>
+          <p className="text-xs text-muted mb-2">
+            In local dev, any non-empty bearer token is accepted. Example:{' '}
+            <code className="bg-background px-1.5 py-0.5 rounded">my-dev-token</code>
           </p>
           <input
+            id="dev-token"
             type="text"
             value={form.token}
             onChange={handleTokenChange}
             placeholder="Bearer token (any non-empty string works locally)"
-            className={`${FIELD_CLASSES} font-mono text-xs w-auto inline-block`}
+            className={`${FIELD_CLASSES} font-mono text-xs w-full sm:max-w-lg`}
           />
-        </div>
+        </section>
       ) : (
-        <div className="mb-8 not-prose bg-surface border border-yellow/30 rounded p-4">
-          <p className="text-xs text-yellow font-semibold mb-2">Production deployment — Netlify required</p>
-          <p className="text-xs text-muted mb-1">
-            Set <code>WRITE_SECRET</code> as an environment variable in your Netlify dashboard and enter it below. The
-            token is sent as <code>Authorization: Bearer &lt;token&gt;</code>.
+        <section className={`${PANEL_CARD_CLASSES} border-yellow/30`}>
+          <p className="text-xs text-yellow font-semibold mb-2">Production deployment - Netlify required</p>
+          <p className="text-xs text-muted mb-2">
+            Set <code>WRITE_SECRET</code> in Netlify environment variables, then use it below as bearer token.
           </p>
+          <label className={LABEL_CLASSES} htmlFor="prod-token">
+            Write Secret Token
+          </label>
           <input
+            id="prod-token"
             type="text"
             value={form.token}
             onChange={handleTokenChange}
@@ -193,37 +208,36 @@ export default function WritePage() {
             className={`${FIELD_CLASSES} font-mono text-xs ${tokenError ? 'border-salmon' : ''}`}
           />
           {tokenError && <p className={ERROR_CLASSES}>{tokenError}</p>}
-        </div>
+        </section>
       )}
 
-      {/* Write Form */}
-      <form onSubmit={handleSubmit} className="not-prose space-y-6">
-        {/* Status Toggle */}
-        <div className="flex items-center gap-4">
+      <form onSubmit={handleSubmit} className={`${PANEL_CARD_CLASSES} space-y-6`}>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <span className="text-sm font-semibold text-secondary">Status:</span>
-          {['published', 'draft'].map((s) => (
-            <label key={s} className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="radio"
-                name="status"
-                value={s}
-                checked={form.status === s}
-                onChange={set('status')}
-                className="accent-primary"
-              />
-              <span className={`text-sm ${form.status === s ? 'text-text' : 'text-muted'}`}>
-                {s.charAt(0).toUpperCase() + s.slice(1)}
-              </span>
-            </label>
-          ))}
+          <div className="flex flex-wrap items-center gap-4">
+            {['published', 'draft'].map((s) => (
+              <label key={s} className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="status"
+                  value={s}
+                  checked={form.status === s}
+                  onChange={set('status')}
+                  className="accent-primary"
+                />
+                <span className={`text-sm ${form.status === s ? 'text-text' : 'text-muted'}`}>
+                  {s.charAt(0).toUpperCase() + s.slice(1)}
+                </span>
+              </label>
+            ))}
+          </div>
           {form.status === 'draft' && (
-            <small className="text-xs text-yellow ml-2">
-              Draft — will be skipped by gatsby-node.js and not appear in build output
+            <small className="text-xs text-yellow sm:ml-2">
+              Draft mode: will be skipped by gatsby-node.js in build output.
             </small>
           )}
         </div>
 
-        {/* Title */}
         <div>
           <label className={LABEL_CLASSES} htmlFor="title">
             Title <span className="text-salmon">*</span>
@@ -239,12 +253,11 @@ export default function WritePage() {
           />
           {previewSlug && (
             <small className="text-xs text-muted mt-1 block">
-              Preview slug: <code className="bg-surface px-1 rounded">/articles/{previewSlug}/</code>
+              Preview slug: <code className="bg-background px-1 rounded">/articles/{previewSlug}/</code>
             </small>
           )}
         </div>
 
-        {/* Author + Date */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className={LABEL_CLASSES} htmlFor="author">
@@ -267,7 +280,6 @@ export default function WritePage() {
           </div>
         </div>
 
-        {/* Tags */}
         <div>
           <label className={LABEL_CLASSES} htmlFor="tags">
             Tags <span className="font-normal text-muted text-xs">(comma-separated)</span>
@@ -289,7 +301,7 @@ export default function WritePage() {
                 .map((tag) => (
                   <span
                     key={tag}
-                    className="text-xs bg-surface border border-outline rounded-full px-2 py-0.5 text-secondary"
+                    className="text-xs bg-background border border-outline rounded-full px-2 py-0.5 text-secondary"
                   >
                     {tag}
                   </span>
@@ -298,7 +310,6 @@ export default function WritePage() {
           )}
         </div>
 
-        {/* Featured Image */}
         <div>
           <label className={LABEL_CLASSES} htmlFor="featuredImage">
             Featured Image URL <span className="font-normal text-muted text-xs">(optional)</span>
@@ -312,7 +323,7 @@ export default function WritePage() {
             className={FIELD_CLASSES}
           />
           {form.featuredImage && (
-            <div className="mt-2 rounded overflow-hidden border border-outline w-32 h-20">
+            <div className="mt-3 rounded-lg overflow-hidden border border-outline w-full max-w-sm h-44 sm:h-52">
               <img
                 src={form.featuredImage}
                 alt="Preview"
@@ -325,7 +336,6 @@ export default function WritePage() {
           )}
         </div>
 
-        {/* Content */}
         <div>
           <label className={LABEL_CLASSES} htmlFor="content">
             Content (MDX) <span className="text-salmon">*</span>
@@ -335,80 +345,50 @@ export default function WritePage() {
             value={form.content}
             onChange={set('content')}
             required
-            rows={20}
+            rows={18}
             placeholder={`Write your article in MDX format.\n\n## Heading\n\nRegular text and **bold** and *italic*.\n\n\`\`\`js\nconsole.log("code block");\n\`\`\``}
-            className={`${FIELD_CLASSES} font-mono text-sm leading-relaxed resize-y min-h-[20rem]`}
+            className={`${FIELD_CLASSES} font-mono text-sm leading-relaxed resize-y min-h-[18rem] sm:min-h-[22rem]`}
           />
           <p className="text-xs text-muted mt-1">
-            {form.content.length} characters &middot; Supports MDX (headings, bold, italic, code blocks, links, etc.)
+            {form.content.length} characters &middot; Supports headings, links, tables, code blocks, and embeds.
           </p>
         </div>
 
-        {/* Submit */}
-        <div className="flex items-center gap-4 pt-2">
+        <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:items-start">
           <button
             type="submit"
             disabled={status.type === 'loading'}
-            className="bg-primary hover:bg-primary/80 disabled:opacity-50 disabled:cursor-not-allowed text-background font-bold px-6 py-2 rounded transition-colors"
+            className="inline-flex w-full sm:w-auto items-center justify-center rounded-lg bg-primary px-6 py-2.5 text-sm font-bold text-background transition-colors hover:bg-primary/80 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {status.type === 'loading' ? 'Publishing...' : form.status === 'draft' ? 'Save Draft' : 'Publish Article'}
           </button>
 
           {status.type === 'success' && (
-            <span className="text-teal text-sm flex items-center gap-2">
-              <span>&#10003;</span>
-              <span>{status.message}</span>
+            <div className="min-w-0 text-sm text-teal">
+              <div className="flex items-start gap-2">
+                <span>&#10003;</span>
+                <span className="break-words">{status.message}</span>
+              </div>
               {status.url && (
                 <button
                   type="button"
                   onClick={() => navigate(status.url)}
-                  className="underline hover:no-underline text-secondary"
+                  className="mt-2 inline-flex text-secondary underline hover:no-underline"
                 >
                   View article
                 </button>
               )}
-            </span>
+            </div>
           )}
 
           {status.type === 'error' && (
-            <span className="text-salmon text-sm flex items-center gap-2">
+            <div className="min-w-0 text-sm text-salmon flex items-start gap-2">
               <span>&#10007;</span>
-              {status.message}
-            </span>
+              <span className="break-words">{status.message}</span>
+            </div>
           )}
         </div>
       </form>
-
-      {/* MDX Reference */}
-      <section className="not-prose mt-12 bg-surface border border-outline rounded-lg p-6">
-        <h2 className="text-lg font-bold text-secondary mt-0 mb-4">MDX Quick Reference</h2>
-        <pre className="bg-background border border-outline rounded p-4 text-xs text-muted overflow-x-auto">{`## Heading 2
-
-### Heading 3
-
-**bold text** and *italic text*
-
-[link text](https://example.com)
-
-\`inline code\`
-
-\`\`\`python
-# code block with syntax highlighting
-def hello():
-    print("Hello, world!")
-\`\`\`
-
-> Blockquote text
-
-- Bullet list item
-1. Numbered list item
-
-| Column 1 | Column 2 |
-|----------|----------|
-| Cell     | Cell     |
-
-![alt text](https://example.com/image.jpg)`}</pre>
-      </section>
     </div>
   );
 }
