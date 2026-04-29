@@ -181,6 +181,9 @@ function buildFrontmatter({ title, content, tags, author, date, featuredImage, s
 
 function githubFetch(apiPath, token, options = {}) {
   return new Promise((resolve, reject) => {
+    const rawBody =
+      options.body == null ? '' : typeof options.body === 'string' ? options.body : JSON.stringify(options.body);
+
     const requestOptions = {
       hostname: 'api.github.com',
       path: apiPath,
@@ -188,9 +191,10 @@ function githubFetch(apiPath, token, options = {}) {
       headers: {
         Authorization: `Bearer ${token}`,
         Accept: 'application/vnd.github+json',
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/json; charset=utf-8',
         'X-GitHub-Api-Version': '2022-11-28',
         'User-Agent': 'z0rs-write-panel',
+        ...(rawBody ? { 'Content-Length': Buffer.byteLength(rawBody) } : {}),
         ...(options.headers || {})
       }
     };
@@ -219,7 +223,7 @@ function githubFetch(apiPath, token, options = {}) {
     });
 
     req.on('error', reject);
-    if (options.body) req.write(options.body);
+    if (rawBody) req.write(rawBody);
     req.end();
   });
 }
