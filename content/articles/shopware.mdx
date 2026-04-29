@@ -8,26 +8,34 @@ featuredImage: https://repository-images.githubusercontent.com/131995661/4800750
 ---
 
 ### Overview:
-Shopware is an open-source e-commerce platform built on the Symfony Framework and Vue.js. The default storefront, Shopware 6 Storefront, uses Twig and Bootstrap. Customizable with extensions, users can override Twig template files to personalize the appearance via the Shopware 6 Admin panel.
 
-This article highlights a bypass of CVE-2023-22731, tracked as issue [NEXT-24667](https://docs.shopware.com/en/shopware-6-en/security-updates/security-update-01-2023) by Shopware.
+Shopware is an open-source e-commerce platform built on the Symfony Framework and Vue.js. The default storefront,
+Shopware 6 Storefront, uses Twig and Bootstrap. Customizable with extensions, users can override Twig template files to
+personalize the appearance via the Shopware 6 Admin panel.
 
-A vulnerability in `Shopware\Core\Framework\Adapter\Twig\SecurityExtension` allows bypassing validation checks. This extension was introduced in commit `89d1ea1` to counter CVE-2023-22731 by overriding Twig filters such as `map()`, `filter()`, `reduce()`, and `sort()`. However, a flaw in validation occurs as it checks only string arguments, enabling an array argument to bypass the check.
+This article highlights a bypass of CVE-2023-22731, tracked as issue
+[NEXT-24667](https://docs.shopware.com/en/shopware-6-en/security-updates/security-update-01-2023) by Shopware.
 
-Thus, a remote attacker can invoke PHP functions and execute commands by accessing a Twig environment without the Sandbox extension, referencing callables with fully-qualified names as arrays of strings.
+A vulnerability in `Shopware\Core\Framework\Adapter\Twig\SecurityExtension` allows bypassing validation checks. This
+extension was introduced in commit `89d1ea1` to counter CVE-2023-22731 by overriding Twig filters such as `map()`,
+`filter()`, `reduce()`, and `sort()`. However, a flaw in validation occurs as it checks only string arguments, enabling
+an array argument to bypass the check.
+
+Thus, a remote attacker can invoke PHP functions and execute commands by accessing a Twig environment without the
+Sandbox extension, referencing callables with fully-qualified names as arrays of strings.
 
 ### Summary:
 
-| Product               | Shopware                                     |
-| ----------------------|----------------------------------------------|
-| Vendor                | Shopware AG                                  |
-| Severity              | High - Users with Shopware Admin login access may obtain remote code/command execution |
-| Affected Versions     | v6.4.18.1 - v6.4.20.0, v6.5.0.0-rc1 - v6.5.0.0-rc4 (Commit facfc88)|
-| Tested Versions       | v6.4.20.0 (Latest stable), v6.5.0.0-rc3 (Latest pre-release)|
-| CVE Identifier        | CVE-2023-2017                                |
-| Description           | Server-side Template Injection (SSTI) allows remote attackers with access to bypass `SecurityExtension` validation in `Shopware\Core\Framework\Adapter\Twig` and execute arbitrary code via callables. Update to v6.4.20.1 to resolve.|
-| CWE                   | CWE-184, CWE-1336                            |
-| CAPEC                 | CAPEC-242                                    |
+| Product           | Shopware                                                                                                                                                                                                                               |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Vendor            | Shopware AG                                                                                                                                                                                                                            |
+| Severity          | High - Users with Shopware Admin login access may obtain remote code/command execution                                                                                                                                                 |
+| Affected Versions | v6.4.18.1 - v6.4.20.0, v6.5.0.0-rc1 - v6.5.0.0-rc4 (Commit facfc88)                                                                                                                                                                    |
+| Tested Versions   | v6.4.20.0 (Latest stable), v6.5.0.0-rc3 (Latest pre-release)                                                                                                                                                                           |
+| CVE Identifier    | CVE-2023-2017                                                                                                                                                                                                                          |
+| Description       | Server-side Template Injection (SSTI) allows remote attackers with access to bypass `SecurityExtension` validation in `Shopware\Core\Framework\Adapter\Twig` and execute arbitrary code via callables. Update to v6.4.20.1 to resolve. |
+| CWE               | CWE-184, CWE-1336                                                                                                                                                                                                                      |
+| CAPEC             | CAPEC-242                                                                                                                                                                                                                              |
 
 ### CVSS3.1 Scoring:
 
@@ -53,14 +61,18 @@ class SecurityExtension extends AbstractExtension {
 ```
 
 ### Explanation:
-The vulnerability lies in callable validation within `map()`, `reduce()`, `filter()`, and `sort()` functions. The check bypasses validation if `function` is an array. When an array is passed, dangerous or unsafe PHP functions can be executed.
 
-Developers may mistakenly assume callable types must be strings, which is untrue as documented in PHP. This means calls to functions as arrays (e.g., `['Class', 'method']`) are valid.
+The vulnerability lies in callable validation within `map()`, `reduce()`, `filter()`, and `sort()` functions. The check
+bypasses validation if `function` is an array. When an array is passed, dangerous or unsafe PHP functions can be
+executed.
+
+Developers may mistakenly assume callable types must be strings, which is untrue as documented in PHP. This means calls
+to functions as arrays (e.g., `['Class', 'method']`) are valid.
 
 #### Exploiting Devices:
 
-1. **Using `CacheValueCompressor::uncompress()` to invoke `unserialize()`**:
-   Generate a serialized payload with `phpggc`:
+1. **Using `CacheValueCompressor::uncompress()` to invoke `unserialize()`**: Generate a serialized payload with
+   `phpggc`:
    ```bash
    ./phpggc -b Monolog/RCE8 system 'id'
    ```
@@ -69,6 +81,7 @@ Developers may mistakenly assume callable types must be strings, which is untrue
    php -r 'echo gzcompress(shell_exec("php phpggc Monolog/RCE8 system id"));' | hexdump -v -e '"\\\x" 1/1 "%02X"'
    ```
 
-This vulnerability exposes a system running Shopware to code injection via unsafe PHP functions when array arguments bypass `SecurityExtension` validation. 
+This vulnerability exposes a system running Shopware to code injection via unsafe PHP functions when array arguments
+bypass `SecurityExtension` validation.
 
 **Important**: Upgrade to v6.4.20.1 to mitigate this risk effectively.

@@ -11,22 +11,40 @@ const anthropic = new Anthropic({
 
 // Whitelist of text-based extensions that are safe and useful to read
 const TEXT_EXTENSIONS = new Set([
-  '.js', '.jsx', '.ts', '.tsx', '.mjs', '.cjs',
-  '.json', '.md', '.mdx', '.yml', '.yaml',
-  '.css', '.scss', '.html', '.txt', '.sh',
-  '.gitignore', '.prettierrc', '.nvmrc', '.env.example'
+  '.js',
+  '.jsx',
+  '.ts',
+  '.tsx',
+  '.mjs',
+  '.cjs',
+  '.json',
+  '.md',
+  '.mdx',
+  '.yml',
+  '.yaml',
+  '.css',
+  '.scss',
+  '.html',
+  '.txt',
+  '.sh',
+  '.gitignore',
+  '.prettierrc',
+  '.nvmrc',
+  '.env.example'
 ]);
 
 // Directories to always skip
-const SKIP_DIRS = new Set([
-  '.git', 'node_modules', 'public', '.cache',
-  'dist', 'build', '.next', '.husky'
-]);
+const SKIP_DIRS = new Set(['.git', 'node_modules', 'public', '.cache', 'dist', 'build', '.next', '.husky']);
 
 // Individual files to always skip (secrets, lockfiles, generated)
 const SKIP_FILES = new Set([
-  '.env', '.env.local', '.env.development', '.env.production',
-  'package-lock.json', 'yarn.lock', 'pnpm-lock.yaml'
+  '.env',
+  '.env.local',
+  '.env.development',
+  '.env.production',
+  'package-lock.json',
+  'yarn.lock',
+  'pnpm-lock.yaml'
 ]);
 
 // Hard cap on total repo content sent to Claude (~22k tokens at 4 chars/token)
@@ -107,7 +125,7 @@ function readRepo() {
   walk('.');
   console.log(
     `Repository snapshot: ${files.length} files, ${totalChars} chars. ` +
-    `Skipped ${skippedCount} files (binaries/secrets/oversized).`
+      `Skipped ${skippedCount} files (binaries/secrets/oversized).`
   );
   return files.join('\n\n');
 }
@@ -217,8 +235,7 @@ async function main() {
     'do not break existing functionality; include only files that exist in the repo.'
   ].join(' ');
 
-  const remediationUser =
-    `Based on this audit report, generate a unified diff patch:\n\n${auditReport}`;
+  const remediationUser = `Based on this audit report, generate a unified diff patch:\n\n${auditReport}`;
 
   console.log('Running Claude remediation...');
   let remediationResponse;

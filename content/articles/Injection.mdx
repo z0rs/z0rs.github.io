@@ -9,7 +9,9 @@ featuredImage: https://0x3n0.github.io/assets/img/blogging/Injection.jpg
 
 ![img-description](https://0x3n0.github.io/assets/img/blogging/Injection.jpg)_OWASP API Security Injection_
 
-So, you’ve probably heard of `Top 10 OWASP`, right? That’s basically the VIP list of security nightmares haunting `Webapps`. OWASP keeps this list fresh, and when it comes to `APIs`, they drop the `OWASP API Security Top 10`. Here’s the current lineup of threats you should definitely not ignore:
+So, you’ve probably heard of `Top 10 OWASP`, right? That’s basically the VIP list of security nightmares haunting
+`Webapps`. OWASP keeps this list fresh, and when it comes to `APIs`, they drop the `OWASP API Security Top 10`. Here’s
+the current lineup of threats you should definitely not ignore:
 
 - Broken Object Level Authorization
 - Broken User Authentication
@@ -24,15 +26,19 @@ So, you’ve probably heard of `Top 10 OWASP`, right? That’s basically the VIP
 
 ## OWASP API Security Injection
 
-Injection attacks are still out here ruining everyone’s day. We’re talking about `OWASP API Security #8`, **Injection**—a classic security fail that refuses to die. 
+Injection attacks are still out here ruining everyone’s day. We’re talking about `OWASP API Security #8`,
+**Injection**—a classic security fail that refuses to die.
 
-These bad boys cover everything from `SQL Injection`, `OS Command Injection`, to `XML Injection`. And trust me, if your app’s got an injection hole, hackers are gonna slide right in.
+These bad boys cover everything from `SQL Injection`, `OS Command Injection`, to `XML Injection`. And trust me, if your
+app’s got an injection hole, hackers are gonna slide right in.
 
 ## How Does Injection Happen?
 
-Long story short, it happens when apps don’t keep untrusted user input separate from legit code. 
+Long story short, it happens when apps don’t keep untrusted user input separate from legit code.
 
-Attackers love slipping their junk into `HTTP request parameters`, `headers`, `cookies`, or even database records. If your app lazily shoves user input into commands without checking, boom—you just gave hackers a free pass to mess with your system.
+Attackers love slipping their junk into `HTTP request parameters`, `headers`, `cookies`, or even database records. If
+your app lazily shoves user input into commands without checking, boom—you just gave hackers a free pass to mess with
+your system.
 
 Think of it like letting a shady dude into your house just because he “knows your name.” Not smart, right?
 
@@ -62,7 +68,8 @@ That SQL server? Yeah, it’s about to have a really bad day:
 DROP TABLE users;
 ```
 
-Just like that, all user data goes **poof**. This is `SQL Injection` 101, and if you’re concatenating user input straight into queries, you might as well hand out your database passwords too.
+Just like that, all user data goes **poof**. This is `SQL Injection` 101, and if you’re concatenating user input
+straight into queries, you might as well hand out your database passwords too.
 
 ### OWASP API Security Injection Example #2: Bye-Bye System Files
 
@@ -92,17 +99,22 @@ Injection attacks can wreck your data, your users, and your whole rep. But you c
 
 ### Input Validation: Don’t Trust, Always Verify
 
-Sanitize everything. Set up **allowlists** (only accept legit characters) or **denylists** (block shady ones). But be careful—denylists can miss stuff, and allowlists can be too strict. Imagine blocking apostrophes and telling O’Malley he can’t sign up. Awkward.
+Sanitize everything. Set up **allowlists** (only accept legit characters) or **denylists** (block shady ones). But be
+careful—denylists can miss stuff, and allowlists can be too strict. Imagine blocking apostrophes and telling O’Malley he
+can’t sign up. Awkward.
 
 ### Parameterization: Keep It Clean
 
-Instead of shoving user input into your commands raw, **use parameterized queries**. This keeps your queries and input separate, like food and poison. Wanna avoid an injection mess? This is your best bet.
+Instead of shoving user input into your commands raw, **use parameterized queries**. This keeps your queries and input
+separate, like food and poison. Wanna avoid an injection mess? This is your best bet.
 
 ### Escaping: Tell Special Characters to Chill
 
-Escaping turns potential attack characters into harmless data. Just make sure your escaping method matches the backend. Mess that up, and hackers will have a field day breaking your defenses.
+Escaping turns potential attack characters into harmless data. Just make sure your escaping method matches the backend.
+Mess that up, and hackers will have a field day breaking your defenses.
 
 ---
 
-Bottom line? Injection vulnerabilities are **hella dangerous**. If you’re not securing your APIs, you’re basically inviting hackers to the party. Lock it down, sanitize inputs, and stay paranoid. Security ain’t a one-time thing—it’s a **lifestyle**.
-
+Bottom line? Injection vulnerabilities are **hella dangerous**. If you’re not securing your APIs, you’re basically
+inviting hackers to the party. Lock it down, sanitize inputs, and stay paranoid. Security ain’t a one-time thing—it’s a
+**lifestyle**.

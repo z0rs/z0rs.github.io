@@ -47,7 +47,7 @@ const Page = ({
       </ul>
       <MdxParser embedded={embeddedImages}>{children}</MdxParser>
       <AsideElement>
-        <FeaturedImageAside alt={title} thumbnail={thumbnail} shareText={`${title}\n ${siteUrl}${slug}`} />
+        <FeaturedImageAside alt={title} thumbnail={thumbnail} shareText={`${siteUrl}${slug}`} />
         {toc ? (
           <div className="px-6">
             <h5 className="mb-3 text-lg leading-6 font-semibold uppercase text-secondary">On this page</h5>

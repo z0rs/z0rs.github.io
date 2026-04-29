@@ -188,6 +188,16 @@ exports.onCreateNode = async ({
 };
 
 exports.createPages = async ({ getNodesByType, actions: { createPage, createRedirect }, reporter }) => {
+  // Skip creating the /write/ page on GitHub Pages — it has no server runtime and the
+  // form would render but fail silently. The loader export alone doesn't prevent SSG HTML
+  // generation, so we gate the page creation here instead.
+  if (process.env.GATSBY_RUNTIME !== 'github') {
+    createPage({
+      path: '/write/',
+      component: path.resolve('./src/write-page.js')
+    });
+  }
+
   const mdxNodes = getNodesByType('Mdx').filter((node) => node.frontmatter?.status !== 'draft');
 
   mdxNodes.forEach((node) => {

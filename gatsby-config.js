@@ -1,23 +1,23 @@
-import dotenv from 'dotenv';
-import { dirname } from 'path';
-import { fileURLToPath } from 'url';
-
-import remarkGfm from 'remark-gfm';
-import rehypeSlug from 'rehype-slug';
-import rehypeAutolinkHeadings from 'rehype-autolink-headings';
-
-dotenv.config({
+require('dotenv').config({
   path: `.env.${process.env.NODE_ENV || 'production'}`
 });
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
+const path = require('path');
+
+const remarkGfm = require('remark-gfm');
+const rehypeSlug = require('rehype-slug');
+const rehypeAutolinkHeadings = require('rehype-autolink-headings');
+const netlifyAdapter = require('gatsby-adapter-netlify').default;
 
 const canonicalSiteUrl =
   process.env.URL ||
   process.env.SITE_URL ||
   (process.env.NODE_ENV === 'production' ? 'https://z0rs.github.io' : 'http://localhost:8000');
 
-export default {
+module.exports = {
+  adapter: netlifyAdapter({
+    excludeDatastoreFromEngineFunction: true
+  }),
   trailingSlash: 'always',
   siteMetadata: {
     name: 'Eno Leriand',

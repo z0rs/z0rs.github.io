@@ -24,13 +24,14 @@
   "author": "",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/z0rs.github.io/issues"
+    "url": "https://github.com/z0rs/z0rs.github.io/issues"
   },
   "dependencies": {
     "@mdx-js/react": "^2.3.0",
     "cmdk": "^0.1.18",
     "dotenv": "^17.4.2",
     "gatsby": "^5.16.1",
+    "gatsby-adapter-netlify": "^1.0.0",
     "gatsby-plugin-gatsby-cloud": "^5.0.0",
     "gatsby-plugin-image": "^3.0.0",
     "gatsby-plugin-mdx": "^5.0.0",

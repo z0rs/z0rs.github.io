@@ -9,11 +9,15 @@ featuredImage: https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ6DsQsJfRgJ
 
 ![Access Control Model](https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ6DsQsJfRgJQGGY78eiYbavHIALSTrPUBL8qKmoFaeHS9h7qXE3bIljTQfRfSDwR_EQjc&usqp=CAU)
 
-Yo, in today’s world, web apps ain’t just static pages anymore—they’re beasts with complex access control setups. Devs gotta set up tight permissions so users don’t go where they shouldn’t. That’s where API security comes in: keeping stuff locked down while still letting legit users do their thing.
+Yo, in today’s world, web apps ain’t just static pages anymore—they’re beasts with complex access control setups. Devs
+gotta set up tight permissions so users don’t go where they shouldn’t. That’s where API security comes in: keeping stuff
+locked down while still letting legit users do their thing.
 
 ## What’s an Access Control Model?
 
-Think of it as the bouncer for your API. It decides who gets in, what they can touch, and how much power they have. In a web app, this model defines the rules based on user roles. Like, an admin gets the golden key to everything, but a regular user? Nah, they only get what they need—no VIP access.
+Think of it as the bouncer for your API. It decides who gets in, what they can touch, and how much power they have. In a
+web app, this model defines the rules based on user roles. Like, an admin gets the golden key to everything, but a
+regular user? Nah, they only get what they need—no VIP access.
 
 ![Role-Based Access Control](https://raw.githubusercontent.com/0x3n0/0x3n0.github.io/master/assets/img/Access-Control-Model/Access_Control_Model1.png)
 
@@ -25,27 +29,36 @@ A classic example is **Role-Based Access Control (RBAC)**—where users get perm
 
 Alright, now let’s break down the common types of Access Control Models:
 
-- **RBAC (Role-Based Access Control)**: Keeps it simple by grouping users with similar access needs. No need to micromanage every single user.
-- **DAC (Discretionary Access Control)**: The asset owner decides who gets in. More flexibility, but also more room for screw-ups.
-- **MAC (Mandatory Access Control)**: Used in high-security environments (think gov/military). Data is labeled like `confidential`, `secret`, `top-secret`, and only the right peeps get access.
+- **RBAC (Role-Based Access Control)**: Keeps it simple by grouping users with similar access needs. No need to
+  micromanage every single user.
+- **DAC (Discretionary Access Control)**: The asset owner decides who gets in. More flexibility, but also more room for
+  screw-ups.
+- **MAC (Mandatory Access Control)**: Used in high-security environments (think gov/military). Data is labeled like
+  `confidential`, `secret`, `top-secret`, and only the right peeps get access.
 
 ## Broken Access Control: The Big Oops
 
-Web apps are getting wild, and security ain’t getting any easier. When access controls aren’t set up right, you get `Broken Access Control`—basically, an all-you-can-eat buffet for attackers. They slip in and get their hands on restricted info. Not a good look.
+Web apps are getting wild, and security ain’t getting any easier. When access controls aren’t set up right, you get
+`Broken Access Control`—basically, an all-you-can-eat buffet for attackers. They slip in and get their hands on
+restricted info. Not a good look.
 
 ## Classic Access Control Fails
 
 Mess up your access control, and you’ve got some real problems. Here are the usual suspects:
 
-- **Permissions Gone Wrong**: If `/api/users` needs `read:users`, but an attacker can still get in without it? Yeah, you got a problem.
-- **Permission Clash**: One permission accidentally overrides another. Like, if `read:users` sneakily gives access to `/api/reports` too? Whoops.
-- **Weird Permission Combos**: Some funky mix of permissions unlocks extra access by accident. Like `read:X` + `read:Y` somehow also giving `read:Z`? Yikes.
+- **Permissions Gone Wrong**: If `/api/users` needs `read:users`, but an attacker can still get in without it? Yeah, you
+  got a problem.
+- **Permission Clash**: One permission accidentally overrides another. Like, if `read:users` sneakily gives access to
+  `/api/reports` too? Whoops.
+- **Weird Permission Combos**: Some funky mix of permissions unlocks extra access by accident. Like `read:X` + `read:Y`
+  somehow also giving `read:Z`? Yikes.
 
 The real challenge? Testing for all these mess-ups before someone else finds them first.
 
 ## Breaking Access Controls (Like a Pro, But Ethically)
 
-Now, let’s talk about testing these bad boys. Security pros have a few tricks up their sleeves to spot broken access control:
+Now, let’s talk about testing these bad boys. Security pros have a few tricks up their sleeves to spot broken access
+control:
 
 - **Forward Approach**: Start with just one permission and test if you can sneak into restricted areas.
 
@@ -55,7 +68,8 @@ Give a user `read:users`, then see if they can wander into unauthorized API endp
 
 ![Forward Approach Example 1](https://raw.githubusercontent.com/0x3n0/0x3n0.github.io/master/assets/img/Access-Control-Model/Access_Control_Model3.png)
 
-- **Backward Approach**: Give a user all permissions except one, then check if they’re locked out of what they should be.
+- **Backward Approach**: Give a user all permissions except one, then check if they’re locked out of what they should
+  be.
 
 #### Example of Backward Approach:
 
@@ -63,21 +77,23 @@ Take away `read:users`, then see if they can still pull user data from `GET /api
 
 ![Backward Approach Example](https://raw.githubusercontent.com/0x3n0/0x3n0.github.io/master/assets/img/Access-Control-Model/Access_Control_Model6.png)
 
-- **Mixed Approach**: Throw in a random mix of permissions and see if it leads to unexpected access. It’s like stress-testing the system for accidental privilege escalations.
+- **Mixed Approach**: Throw in a random mix of permissions and see if it leads to unexpected access. It’s like
+  stress-testing the system for accidental privilege escalations.
 
 #### Example of Mixed Approach:
 
-A user with `read:users`, `write:docs`, and `write:logs` should not be able to access restricted API endpoints. But can they?
+A user with `read:users`, `write:docs`, and `write:logs` should not be able to access restricted API endpoints. But can
+they?
 
 ![Mixed Approach Example](https://raw.githubusercontent.com/0x3n0/0x3n0.github.io/master/assets/img/Access-Control-Model/Access_Control_Model8.png)
 
 ## Final Thoughts
 
-Locking down APIs means keeping everything scoped properly—no loose ends. Stuff like **Insecure Direct Object References (IDOR)** is just one type of access control fail, but trust me, there are plenty more ways to screw it up.
+Locking down APIs means keeping everything scoped properly—no loose ends. Stuff like **Insecure Direct Object References
+(IDOR)** is just one type of access control fail, but trust me, there are plenty more ways to screw it up.
 
 Got questions, wanna nerd out about API security? Hit me up:
 
 [z0rs.github.io](mailto:z0rs.github.io)
 
 Catch ya later.
-

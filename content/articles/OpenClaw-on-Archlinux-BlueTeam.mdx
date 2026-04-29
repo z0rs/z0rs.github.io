@@ -7,11 +7,15 @@ author: Eno
 featuredImage: https://raw.githubusercontent.com/z0rs/z0rs.github.io/refs/heads/master/content/Images/OpenClaw_BlueTeam.jpg
 ---
 
-> **Scope Reminder:** This guide is strictly for defensive security operations — log analysis, threat detection, incident response, system hardening, and vulnerability management on systems you own and operate.
+> **Scope Reminder:** This guide is strictly for defensive security operations — log analysis, threat detection,
+> incident response, system hardening, and vulnerability management on systems you own and operate.
 
 ---
 
-> **⚠️ Note on OpenClaw:** As noted in the companion red team guide, "OpenClaw" is not a widely documented public project as of my knowledge cutoff. Steps referencing its repo assume a Node.js/pnpm-based AI agent framework. **Verify the exact repo URL and build steps from the official source before proceeding.** All SOC tooling, systemd configuration, and monitoring integrations in this guide are fully accurate for Arch Linux.
+> **⚠️ Note on OpenClaw:** As noted in the companion red team guide, "OpenClaw" is not a widely documented public
+> project as of my knowledge cutoff. Steps referencing its repo assume a Node.js/pnpm-based AI agent framework. **Verify
+> the exact repo URL and build steps from the official source before proceeding.** All SOC tooling, systemd
+> configuration, and monitoring integrations in this guide are fully accurate for Arch Linux.
 
 ---
 
@@ -317,6 +321,7 @@ ls -la dist/ 2>/dev/null || ls -la .next/ 2>/dev/null || ls -la build/ 2>/dev/nu
 ### 3.4 Arch Linux Specific Troubleshooting
 
 **Problem: `node-gyp` native compilation fails**
+
 ```bash
 sudo pacman -S --noconfirm python2
 npm config set python /usr/bin/python3
@@ -324,6 +329,7 @@ pnpm rebuild
 ```
 
 **Problem: `EACCES` pnpm store permission error**
+
 ```bash
 pnpm config set store-dir ~/.local/share/pnpm/store
 pnpm store prune
@@ -332,6 +338,7 @@ pnpm install
 ```
 
 **Problem: Node version mismatch with `engines` field**
+
 ```bash
 # Check required version
 cat package.json | python -m json.tool | grep '"node"'
@@ -341,18 +348,21 @@ pnpm install
 ```
 
 **Problem: `better-sqlite3` fails to compile**
+
 ```bash
 sudo pacman -S --noconfirm sqlite
 pnpm rebuild better-sqlite3
 ```
 
 **Problem: `canvas` or `sharp` fails**
+
 ```bash
 sudo pacman -S --noconfirm cairo pango libpng libjpeg-turbo giflib librsvg pixman
 pnpm rebuild canvas sharp
 ```
 
 **Problem: inotify watcher limit**
+
 ```bash
 echo fs.inotify.max_user_watches=524288 | sudo tee /etc/sysctl.d/40-inotify.conf
 sudo sysctl --system
@@ -505,6 +515,7 @@ mkdir -p ~/ai/openclaw/scripts
 ```
 
 **`~/ai/openclaw/scripts/analyze-journal.sh`**
+
 ```bash
 #!/bin/bash
 # Exports recent journald events for AI analysis
@@ -890,6 +901,7 @@ sudo tail -f /var/log/suricata/eve.json | jq 'select(.event_type=="alert")'
 ```
 
 **Suricata Alert Parser Script:**
+
 ```bash
 cat > ~/ai/openclaw/scripts/parse-suricata-alerts.sh << 'EOF'
 #!/bin/bash
@@ -1040,6 +1052,7 @@ nano ~/.config/systemd/user/openclaw-soc.service
 ```
 
 **`~/.config/systemd/user/openclaw-soc.service`**
+
 ```ini
 [Unit]
 Description=OpenClaw SOC Defensive AI Assistant
@@ -1544,11 +1557,13 @@ chmod +x ~/ai/openclaw/scripts/collect-evidence.sh
 ### 11.1 Node.js Memory Tuning for i7-8650U
 
 In the `.env` or systemd service:
+
 ```dotenv
 NODE_OPTIONS=--max-old-space-size=2048
 ```
 
 For longer log analysis sessions:
+
 ```dotenv
 NODE_OPTIONS=--max-old-space-size=3072 --expose-gc
 ```
@@ -1726,6 +1741,7 @@ curl http://localhost:11434/api/generate -d '{
 ```
 
 Update `.env` for local model:
+
 ```dotenv
 USE_LOCAL_MODEL=true
 OLLAMA_BASE_URL=http://localhost:11434
@@ -1852,6 +1868,7 @@ sudo aa-enforce /etc/apparmor.d/openclaw-soc
 ---
 
 **Final Security Reminders:**
+
 - The `.env` file must always remain at `chmod 600`
 - The soc-agent user must never have `sudo` privileges
 - Bind OpenClaw to `127.0.0.1` only — never expose the port externally

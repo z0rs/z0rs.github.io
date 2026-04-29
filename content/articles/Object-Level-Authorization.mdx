@@ -7,13 +7,18 @@ author: Eno
 featuredImage: https://raw.githubusercontent.com/0x3n0/0x3n0.github.io/master/assets/img/blogging/API_Security.jpg
 ---
 
-![Desktop View](https://raw.githubusercontent.com/0x3n0/0x3n0.github.io/master/assets/img/blogging/API_Security.jpg)_API Security Object Level Authorization_
+![Desktop View](https://raw.githubusercontent.com/0x3n0/0x3n0.github.io/master/assets/img/blogging/API_Security.jpg)_API
+Security Object Level Authorization_
 
-In the world of modern apps, APIs are the backbone—handling data, running the show, and unfortunately, making juicy targets for attackers. That’s why knowing API security inside-out isn’t just an option; it’s a **must** if you don’t wanna be the next data breach headline.
+In the world of modern apps, APIs are the backbone—handling data, running the show, and unfortunately, making juicy
+targets for attackers. That’s why knowing API security inside-out isn’t just an option; it’s a **must** if you don’t
+wanna be the next data breach headline.
 
 ## OWASP API Security - Broken Object Level Authorization
 
-You’ve probably heard of **OWASP’s Top 10** web app vulnerabilities, right? Well, APIs get their own **API Security Top 10**, and at the very top of the list? **Broken Object Level Authorization (BOLA)**—aka the hacker’s golden ticket to your sensitive data. Here’s the full hit list:
+You’ve probably heard of **OWASP’s Top 10** web app vulnerabilities, right? Well, APIs get their own **API Security Top
+10**, and at the very top of the list? **Broken Object Level Authorization (BOLA)**—aka the hacker’s golden ticket to
+your sensitive data. Here’s the full hit list:
 
 - Broken Object Level Authorization (BOLA)
 - Broken User Authentication
@@ -26,11 +31,13 @@ You’ve probably heard of **OWASP’s Top 10** web app vulnerabilities, right? 
 - Improper Asset Management
 - Insufficient Logging & Monitoring
 
-Most of these can mess up any part of your app, but APIs are often where they hit the hardest. Let’s break down **BOLA** and why it’s the **#1 enemy** for APIs.
+Most of these can mess up any part of your app, but APIs are often where they hit the hardest. Let’s break down **BOLA**
+and why it’s the **#1 enemy** for APIs.
 
 ### What’s the Deal with Broken Object Level Authorization?
 
-APIs often rely on object identifiers, and when they don’t enforce **strict** access control, attackers can snatch data they have **zero** business accessing. It’s a problem across **REST, SOAP, GraphQL—you name it.**
+APIs often rely on object identifiers, and when they don’t enforce **strict** access control, attackers can snatch data
+they have **zero** business accessing. It’s a problem across **REST, SOAP, GraphQL—you name it.**
 
 Here’s a **real-world mess-up**: Let’s say an API exposes user payment info via `user_id`:
 
@@ -38,7 +45,8 @@ Here’s a **real-world mess-up**: Let’s say an API exposes user payment info 
 https://api.example.com/v1.1/users/payment/show?user_id=12
 ```
 
-If this API doesn’t double-check **who’s asking**, anyone who figures out a valid `user_id` can waltz in and steal payment details. All it takes is some **guessing or brute-forcing IDs** to start a data heist.
+If this API doesn’t double-check **who’s asking**, anyone who figures out a valid `user_id` can waltz in and steal
+payment details. All it takes is some **guessing or brute-forcing IDs** to start a data heist.
 
 Some APIs use object `IDs` instead of user IDs, which makes things **worse**. Check this out:
 
@@ -46,26 +54,31 @@ Some APIs use object `IDs` instead of user IDs, which makes things **worse**. Ch
 https://api.example.com/v1.1/messages/show?id=1337
 ```
 
-Without proper access control, an attacker can cycle through IDs (`id=1338`, `id=1339`, etc.) and pull **everyone’s** messages. That’s **BOLA** in action—giving unauthorized users access to **whatever they want** just by tweaking an `ID`.
+Without proper access control, an attacker can cycle through IDs (`id=1338`, `id=1339`, etc.) and pull **everyone’s**
+messages. That’s **BOLA** in action—giving unauthorized users access to **whatever they want** just by tweaking an `ID`.
 
-But wait—it gets worse. If an attacker can also **update, delete, or create** records, the damage jumps to **a whole new level**. In `GraphQL` APIs, for example, changing the `ID` in a mutation request could let someone edit or wipe out someone else’s data.
+But wait—it gets worse. If an attacker can also **update, delete, or create** records, the damage jumps to **a whole new
+level**. In `GraphQL` APIs, for example, changing the `ID` in a mutation request could let someone edit or wipe out
+someone else’s data.
 
 ### Why is This a Nightmare?
 
-The level of chaos depends on **what’s exposed**. If an API leaks PII (Personally Identifiable Information), credentials, or financial details, attackers can:
+The level of chaos depends on **what’s exposed**. If an API leaks PII (Personally Identifiable Information),
+credentials, or financial details, attackers can:
 
 - **Scrape** user data in bulk
 - **Hijack accounts**
 - **Sell stolen data** or **commit fraud**
 
-Picture this: an **eCommerce API** leaks bank details and addresses. An **insurance API** leaks policyholder info. A **healthcare API** exposes medical records. See where this is going? Total disaster mode.
+Picture this: an **eCommerce API** leaks bank details and addresses. An **insurance API** leaks policyholder info. A
+**healthcare API** exposes medical records. See where this is going? Total disaster mode.
 
 ## Locking Down Object Level Authorization
 
 To shut down **BOLA**, APIs need to **validate** user access **on every request**. That means:
 
 - **Using access tokens** instead of trusting user input (no `user_id` in the URL, please)
-- **Checking permissions at the object level** (just because you’re logged in doesn’t mean you can see *everything*)
+- **Checking permissions at the object level** (just because you’re logged in doesn’t mean you can see _everything_)
 - **Using unpredictable, secure object IDs** instead of plain numeric ones
 
 For example, switching from:
@@ -82,14 +95,15 @@ https://api.example.com/v1.1/messages/show?id=d0c240ea139206019f692d
 
 makes **brute-forcing way harder**. But don’t rely on just that—**always enforce access control**.
 
-Also, random IDs won’t save you if your API **blindly trusts** requests. If an attacker **snags a valid ID**, they’re still in. That’s why **strict authentication & authorization checks** matter more than anything.
+Also, random IDs won’t save you if your API **blindly trusts** requests. If an attacker **snags a valid ID**, they’re
+still in. That’s why **strict authentication & authorization checks** matter more than anything.
 
 ### Final Thoughts
 
-If you’re building or securing APIs, **Object Level Authorization should be at the top of your checklist**. Even with strong access controls, there are **other** attack vectors, so never sleep on security.
+If you’re building or securing APIs, **Object Level Authorization should be at the top of your checklist**. Even with
+strong access controls, there are **other** attack vectors, so never sleep on security.
 
-APIs **run the internet**, but if they’re not locked down properly, they **open the door for hackers**. Time to fix that.
+APIs **run the internet**, but if they’re not locked down properly, they **open the door for hackers**. Time to fix
+that.
 
 Stay secure. 🔥
-
-

@@ -1,32 +1,31 @@
 ---
 type: ctf
-title : ASIS CTF 2015 Quals - Saw this (1 & 2)
+title: ASIS CTF 2015 Quals - Saw this (1 & 2)
 tags: [ASIS CTF, Saw this]
-date : 2015-05-23
+date: 2015-05-23
 author: Eno
 featuredImage:
 ---
 
-**Category:** pwn
-**Points:** 100 (Saw this-1), 400 (Saw this-2)
+**Category:** pwn **Points:** 100 (Saw this-1), 400 (Saw this-2)
 
-> Survive and get the flag!
-> Note: This challenge contains two flags, one of them is easier to fetch, the other is harder. 
-> The easier flag will be clearly indicated as "Flag 1", the harder flag as "Flag 2"
-> nc 87.107.123.3 31337
+> Survive and get the flag! Note: This challenge contains two flags, one of them is easier to fetch, the other is
+> harder. The easier flag will be clearly indicated as "Flag 1", the harder flag as "Flag 2" nc 87.107.123.3 31337
 
+64 bit ELF. Lauch it with the almighty IDA Pro and press the powerful F5 key, we'll find that the service first ask us
+to input our user name and a lucky number. Then, it will use `srand` to set up the random number seed, and generate a
+random number sequence.
 
-64 bit ELF. Lauch it with the almighty IDA Pro and press the powerful F5 key, we'll find that the service first ask us to input our user name and a lucky number. Then, it will use `srand` to set up the random number seed, and generate a random number sequence.  
 ```c
  srand(seed + lucky_number);
  v10 : 0;
  format : "YOU LOST THE GAME! IT'S OVER!";
  v8 : (signed int)floor(gen_rand_double() * 13.0 + 4.0);
  printf("I've thought of %d numbers. If you guess them correctly, you are free!\n", v8);
- 
+
  for ( i : 0; i < v8; ++i )
     s[i] : (signed int)floor(gen_rand_double() * 256.0);
-    
+
  for ( j : 0; j < v8; ++j )
  {
     printf("Number #%d: ", j + 1);
@@ -38,7 +37,7 @@ featuredImage:
       format : "YOU WON! You are free now!";
     }
  }
- 
+
  printf(format);
  if ( v10 != 1 )
     exit(0);
@@ -54,57 +53,61 @@ featuredImage:
  return 0;
 ```
 
-For **Saw this-1**, we'll have to try to guess all the random numbers. By investigating the memory, we found that our `user_name` start from `0x603108`, and the `seed` variable's at `0x603148`. Since it let us input at most 64 characters, we can leak the `seed` by input a `user_name` which length's 64 characters long. After we leak the `seed`, we can enter a `lucky_number` which cause the line `srand(seed + lucky_number);` into `srand(0)`. This will cause the server always generate a same group of random numbers, and so we can easily beat the game and get the flag1.
+For **Saw this-1**, we'll have to try to guess all the random numbers. By investigating the memory, we found that our
+`user_name` start from `0x603108`, and the `seed` variable's at `0x603148`. Since it let us input at most 64 characters,
+we can leak the `seed` by input a `user_name` which length's 64 characters long. After we leak the `seed`, we can enter
+a `lucky_number` which cause the line `srand(seed + lucky_number);` into `srand(0)`. This will cause the server always
+generate a same group of random numbers, and so we can easily beat the game and get the flag1.
 
 ```
 I've thought of 10 numbers. If you guess them correctly, you are free!
-Number #1: 
+Number #1:
 [+] sending: 44
-Number #2: 
+Number #2:
 [+] sending: 79
-Number #3: 
+Number #3:
 [+] sending: 136
-Number #4: 
+Number #4:
 [+] sending: 242
-Number #5: 
+Number #5:
 [+] sending: 43
-Number #6: 
+Number #6:
 [+] sending: 179
-Number #7: 
+Number #7:
 [+] sending: 57
-Number #8: 
+Number #8:
 [+] sending: 126
-Number #9: 
+Number #9:
 [+] sending: 31
-Number #10: 
+Number #10:
 [+] sending: 21
 [*] Switching to interactive mode
-YOU WON! You are free now!      _   _  _____ _ _____   _   _ _____ _____   _____ _   _ _____ _   _ 
+YOU WON! You are free now!      _   _  _____ _ _____   _   _ _____ _____   _____ _   _ _____ _   _
      | | | ||  ___( )  ___| | \ | |  _  |_   _| |  ___| | | |  ___| \ | |
      | |_| || |__ |/\ `--.  |  \| | | | | | |   | |__ | | | | |__ |  \| |
      |  _  ||  __|   `--. \ | . ` | | | | | |   |  __|| | | |  __|| . ` |
      | | | || |___  /\__/ / | |\  \ \_/ / | |   | |___\ \_/ / |___| |\  |
      \_| |_/\____/  \____/  \_| \_/\___/  \_/   \____/ \___/\____/\_| \_/
 
-.........[ascii art picture]......   
+.........[ascii art picture]......
 
-      _____ _   _   _____ _   _  _____  ______ _____ _____  _   _ _____ 
+      _____ _   _   _____ _   _  _____  ______ _____ _____  _   _ _____
      |_   _| \ | | |_   _| | | ||  ___| | ___ \_   _|  __ \| | | |_   _|
-       | | |  \| |   | | | |_| || |__   | |_/ / | | | |  \/| |_| | | |  
-       | | | . ` |   | | |  _  ||  __|  |    /  | | | | __ |  _  | | |  
-      _| |_| |\  |   | | | | | || |___  | |\ \ _| |_| |_\ \| | | | | |  
-      \___/\_| \_/   \_/ \_| |_/\____/  \_| \_|\___/ \____/\_| |_/ \_/  
-     
-                  _____   ___   _____ _____ _      _____ 
+       | | |  \| |   | | | |_| || |__   | |_/ / | | | |  \/| |_| | | |
+       | | | . ` |   | | |  _  ||  __|  |    /  | | | | __ |  _  | | |
+      _| |_| |\  |   | | | | | || |___  | |\ \ _| |_| |_\ \| | | | | |
+      \___/\_| \_/   \_/ \_| |_/\____/  \_| \_|\___/ \____/\_| |_/ \_/
+
+                  _____   ___   _____ _____ _      _____
                  /  __ \ / _ \ /  ___|_   _| |    |  ___|
-                 | /  \// /_\ \\ `--.  | | | |    | |__  
-                 | |    |  _  | `--. \ | | | |    |  __| 
-                 | \__/\| | | |/\__/ / | | | |____| |___ 
-                  \____/\_| |_/\____/  \_/ \_____/\____/ 
+                 | /  \// /_\ \\ `--.  | | | |    | |__
+                 | |    |  _  | `--. \ | | | |    |  __|
+                 | \__/\| | | |/\__/ / | | | |____| |___
+                  \____/\_| |_/\____/  \_/ \_____/\____/
 
 
 
-               Good job Mario, but your princess isn't here! 
+               Good job Mario, but your princess isn't here!
 
                                Get a shell!
 
@@ -112,11 +115,20 @@ YOU WON! You are free now!      _   _  _____ _ _____   _   _ _____ _____   _____
 Flag 1: ASIS{109096cca8948d1cebee782a11d2472b}
 ```
 
-For **Saw this-2**, we'll have to try to get a shell. The above pseudo code show us that there's a **format string vulnerability** in the program. It seems that the `format` variable is hard-coded in the program, we can't control it directly. But it's on the stack, so if we can find a way to overwrite the `format` pointer, we'll be able to trigger the format string vulnerability. 
+For **Saw this-2**, we'll have to try to get a shell. The above pseudo code show us that there's a **format string
+vulnerability** in the program. It seems that the `format` variable is hard-coded in the program, we can't control it
+directly. But it's on the stack, so if we can find a way to overwrite the `format` pointer, we'll be able to trigger the
+format string vulnerability.
 
-It seems our only chance is to control the content of `v7[j]`. If `j` is big enough, we'll be able to overwrite all the vairables on the stack, **even the return address**. We found that `v8` (the variable holds the iteration number) is exactly at `v7[16]`. So we'll have to try to make `v8` >= 17, which is, making the return value of `(signed int)floor(gen_rand_double() * 13.0 + 4.0)` : 17.  
+It seems our only chance is to control the content of `v7[j]`. If `j` is big enough, we'll be able to overwrite all the
+vairables on the stack, **even the return address**. We found that `v8` (the variable holds the iteration number) is
+exactly at `v7[16]`. So we'll have to try to make `v8` >= 17, which is, making the return value of
+`(signed int)floor(gen_rand_double() * 13.0 + 4.0)` : 17.
 
-For random numbers, the only variable we can control is `lucky_number`. We'll have to find a proper number `N` : `seed` + `lucky_number`, and let `srand(N)` set the right random number seed so `(signed int)floor(gen_rand_double() * 13.0 + 4.0)` will be equal to 17. And so I wrote a C program to achieve the requirement: 
+For random numbers, the only variable we can control is `lucky_number`. We'll have to find a proper number `N` :
+`seed` + `lucky_number`, and let `srand(N)` set the right random number seed so
+`(signed int)floor(gen_rand_double() * 13.0 + 4.0)` will be equal to 17. And so I wrote a C program to achieve the
+requirement:
 
 ```c
 #include <stdio.h>
@@ -154,27 +166,37 @@ int main()
 
 ```
 
-The line `initstate(0, statebuf, 8)` is required to get the correct number, since the original binary has the exact same line of code in the initial process. Finally, we get `N` : `0x0dbdbb1e`
+The line `initstate(0, statebuf, 8)` is required to get the correct number, since the original binary has the exact same
+line of code in the initial process. Finally, we get `N` : `0x0dbdbb1e`
 
-So now everytime we send a `lucky_number`, it has to be `0x0dbdbb1e` - `seed`. Since `v8` is set to 17 now, whenever we send the 17th number, `v8` will be modify to the number we send, which means we can control the iteration numbers, and so are the variables on the stack.  
+So now everytime we send a `lucky_number`, it has to be `0x0dbdbb1e` - `seed`. Since `v8` is set to 17 now, whenever we
+send the 17th number, `v8` will be modify to the number we send, which means we can control the iteration numbers, and
+so are the variables on the stack.
 
 Here are some important variables we'll have to modify (overwrite):
-1. `v8`. The iteration number
-2. `v10`. Overwrite it to **1** so we won't lose the game. 
-3. `format`. Modify the pointer to the `user_name` buffer's address (`0x603108`). Now we can trigger the format string vulnerability.
-    
-Notice that other important variables (ex.`luck_number`) will have to remain the same value after you overwrite the stack. As for the format string payload, at first I try to use **%n** to write the memory, until I found that the service **won't let us input our user name for second time**. Since we can't reuse the vulnerability, I decided to leak the **stack canary** and the **return address** ( which returns to `__libc_start_main` ).
 
-Now we have the stack canary and the libc address. We can use the libc address to calculate the libc's base address, and get the address of `system`, `pop rdi, ret` gadget and `/bin/sh` string pointer. After we have all the information, we can overwrite the stack canary and the return address to launch a return-2-libc attack.
+1. `v8`. The iteration number
+2. `v10`. Overwrite it to **1** so we won't lose the game.
+3. `format`. Modify the pointer to the `user_name` buffer's address (`0x603108`). Now we can trigger the format string
+   vulnerability.
+
+Notice that other important variables (ex.`luck_number`) will have to remain the same value after you overwrite the
+stack. As for the format string payload, at first I try to use **%n** to write the memory, until I found that the
+service **won't let us input our user name for second time**. Since we can't reuse the vulnerability, I decided to leak
+the **stack canary** and the **return address** ( which returns to `__libc_start_main` ).
+
+Now we have the stack canary and the libc address. We can use the libc address to calculate the libc's base address, and
+get the address of `system`, `pop rdi, ret` gadget and `/bin/sh` string pointer. After we have all the information, we
+can overwrite the stack canary and the return address to launch a return-2-libc attack.
 
 To sum up, here's the exploitation of Saw this-2:
+
 1. Brute-Force the `srand` seed so `v8`(the iteration number) can be set to `17`.
 2. Overwrite `v7[16]` (=`v8`), so we can overwrite the variables on the stack.
 3. Overwrite `format` to the `user_name` buffer so we can trigger the format string vulnerability.
 4. Leak the stack canary & return address.
 5. Use the return adress to calculate libc's base address, so we can get `system`, `pop rdi, ret` & `/bin/sh`'s address.
-6. Overwrite the stack canary & return address to launch the return-2-libc attack.  
-
+6. Overwrite the stack canary & return address to launch the return-2-libc attack.
 
 ```python exp.py
 from pwn import *
@@ -403,7 +425,7 @@ r.interactive()
 And Finally, we get the flag2:
 
 ```
-               Good job Mario, but your princess isn't here! 
+               Good job Mario, but your princess isn't here!
 
                                Get a shell!
 

@@ -24,13 +24,9 @@ const components = {
     </div>
   ),
   th: ({ children }) => (
-    <th className="text-left px-3 py-2 text-secondary border-b-2 border-outline font-semibold">
-      {children}
-    </th>
+    <th className="text-left px-3 py-2 text-secondary border-b-2 border-outline font-semibold">{children}</th>
   ),
-  td: ({ children }) => (
-    <td className="px-3 py-2 border-b border-outline align-top">{children}</td>
-  ),
+  td: ({ children }) => <td className="px-3 py-2 border-b border-outline align-top">{children}</td>,
 
   a: ({ href, children }) => {
     // If it's an external url, use <a> and target _blank

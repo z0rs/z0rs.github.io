@@ -6,9 +6,7 @@ export const useAllMdx = () => {
   } = useStaticQuery(graphql`
     {
       allMdx(
-        filter: {
-          frontmatter: { status: { ne: "draft" }, type: { in: ["post", "article", "ctf"] } }
-        }
+        filter: { frontmatter: { status: { ne: "draft" }, type: { in: ["post", "article", "ctf"] } } }
         sort: { frontmatter: { date: DESC } }
       ) {
         nodes {

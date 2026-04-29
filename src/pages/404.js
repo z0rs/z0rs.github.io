@@ -31,6 +31,10 @@ export const query = graphql`
   }
 `;
 
-export const Head = ({ data: { site: { siteMetadata } } }) => {
+export const Head = ({
+  data: {
+    site: { siteMetadata }
+  }
+}) => {
   return <Seo title="Page Not Found" description="Blast!" slug="/404" noindex siteMetadata={siteMetadata} />;
 };

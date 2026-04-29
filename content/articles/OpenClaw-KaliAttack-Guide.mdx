@@ -8,16 +8,17 @@ featuredImage: https://raw.githubusercontent.com/z0rs/z0rs.github.io/refs/heads/
 ---
 
 ## Arch Linux | All Kali Tools Installed + Full Attack Scenarios
+
 ### Authorized Lab Environments Only: DVWA · Juice Shop · Metasploitable2
 
-> ⚠️ **ETHICAL CONSTRAINT:** Every technique, tool, and payload in this guide
-> is used EXCLUSIVELY against: your own Docker lab containers, local VMs,
-> CTF platforms, or systems with explicit written authorization.
-> Unauthorized use is illegal. OpenClaw enforces this.
+> ⚠️ **ETHICAL CONSTRAINT:** Every technique, tool, and payload in this guide is used EXCLUSIVELY against: your own
+> Docker lab containers, local VMs, CTF platforms, or systems with explicit written authorization. Unauthorized use is
+> illegal. OpenClaw enforces this.
 
 ---
 
 ## PART 0 — AUTO-INSTALLER
+
 ### Install All Kali-Equivalent Tools on Arch Linux
 
 ```bash
@@ -1223,6 +1224,7 @@ openclaw
 ```
 
 Then type:
+
 ```
 Run a full web attack against http://localhost (DVWA lab).
 Start with feroxbuster recon, then nuclei scan, then sqlmap injection on the sqli endpoint.
@@ -1231,6 +1233,7 @@ Generate a markdown pentest report when done.
 ```
 
 Or for network attacks:
+
 ```
 Run a full Metasploit attack chain against 192.168.56.101 (Metasploitable2 lab).
 Use the resource file at ~/ai-security-lab/scripts/automation/openclaw_msf_attack.rc.
@@ -1338,4 +1341,4 @@ python3 ~/ai-security-lab/tools/exploitation/PEASS-ng/linPEAS/linpeas.sh
 
 ---
 
-*Kali-Grade Attack Ops — Arch Linux | Authorized Labs Only*
+_Kali-Grade Attack Ops — Arch Linux | Authorized Labs Only_

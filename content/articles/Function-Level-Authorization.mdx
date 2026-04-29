@@ -1,18 +1,21 @@
 ---
-type: article  
-title: Broken Function Level Authorization  
-tags: [OWASP, Broken Function Level Authorization]  
-date: 2018-01-30 
-author: Eno  
-featuredImage: https://raw.githubusercontent.com/0x3n0/0x3n0.github.io/master/assets/img/blogging/Function-Level-Authorization.jpg  
+type: article
+title: Broken Function Level Authorization
+tags: [OWASP, Broken Function Level Authorization]
+date: 2018-01-30
+author: Eno
+featuredImage: https://raw.githubusercontent.com/0x3n0/0x3n0.github.io/master/assets/img/blogging/Function-Level-Authorization.jpg
 ---
 
 ![Desktop View](https://raw.githubusercontent.com/0x3n0/0x3n0.github.io/master/assets/img/blogging/Function-Level-Authorization.jpg)  
-*API Security: Function Level Authorization*
+_API Security: Function Level Authorization_
 
-In today’s app-driven world, APIs are the backbone of everything. But if your API security is weak, you might as well be handing hackers a VIP pass. In this *API Security 101* series, we’re breaking down common API flaws, why they happen, and how to lock ‘em down.
+In today’s app-driven world, APIs are the backbone of everything. But if your API security is weak, you might as well be
+handing hackers a VIP pass. In this _API Security 101_ series, we’re breaking down common API flaws, why they happen,
+and how to lock ‘em down.
 
-You’ve probably heard of the OWASP Top 10 for web security. Well, APIs got their own hit list—the **OWASP API Security Top 10**, featuring these usual suspects:
+You’ve probably heard of the OWASP Top 10 for web security. Well, APIs got their own hit list—the **OWASP API Security
+Top 10**, featuring these usual suspects:
 
 - Broken Object Level Authorization
 - Broken User Authentication
@@ -23,17 +26,23 @@ You’ve probably heard of the OWASP Top 10 for web security. Well, APIs got the
 - Security Misconfiguration
 - Injection
 - Improper Asset Management
-- Insufficient Logging & Monitoring  
+- Insufficient Logging & Monitoring
 
 Today, we’re zooming in on **OWASP API Security #5: Broken Function Level Authorization.** Let’s get into it.
 
 ## What’s the Deal with Broken Function Level Authorization?
 
-Before we go deep, you might wanna check out my post on [OWASP API Security Broken Object Level Authorization](https://z0rs.github.io/object-level-authorization/). Quick recap: APIs expose object identifiers to grant access, and if the right controls aren’t in place, attackers can snatch what ain't theirs.
+Before we go deep, you might wanna check out my post on
+[OWASP API Security Broken Object Level Authorization](https://z0rs.github.io/object-level-authorization/). Quick recap:
+APIs expose object identifiers to grant access, and if the right controls aren’t in place, attackers can snatch what
+ain't theirs.
 
-Now, **Broken Function Level Authorization** is a whole different beast. This flaw lets unauthorized users perform restricted actions—think regular users doing admin-level stuff. It happens when apps don’t enforce strict function-based access control, either due to bad config or straight-up missing checks.
+Now, **Broken Function Level Authorization** is a whole different beast. This flaw lets unauthorized users perform
+restricted actions—think regular users doing admin-level stuff. It happens when apps don’t enforce strict function-based
+access control, either due to bad config or straight-up missing checks.
 
-That means someone could edit, delete, or access admin functions just by tweaking their request. Let’s check out some real-world screw-ups.
+That means someone could edit, delete, or access admin functions just by tweaking their request. Let’s check out some
+real-world screw-ups.
 
 ### Example 1: Hijacking Someone’s Post
 
@@ -43,7 +52,8 @@ Say an API lets users fetch blog posts like this:
 GET /api/v1.1/user/1337/posts?id=32
 ```
 
-That’s cool—public posts should be viewable. But what if the API doesn’t check permissions for `DELETE` and `PUT` methods? Then any random user could do this:
+That’s cool—public posts should be viewable. But what if the API doesn’t check permissions for `DELETE` and `PUT`
+methods? Then any random user could do this:
 
 ```
 DELETE /api/v1.1/user/1337/posts?id=32
@@ -67,7 +77,8 @@ The system “knows” it’s an admin by checking a request header:
 Admin: 1
 ```
 
-See the problem? If an attacker slaps `Admin: 1` onto their request, congrats—now they’re an admin. If access control isn’t enforced properly, you just gave them the keys to the kingdom.
+See the problem? If an attacker slaps `Admin: 1` onto their request, congrats—now they’re an admin. If access control
+isn’t enforced properly, you just gave them the keys to the kingdom.
 
 ### Example 3: Security Through Obscurity Ain’t It
 
@@ -77,7 +88,8 @@ Now picture an admin-only endpoint for site stats:
 GET /api/v1.1/site/stats/hd216zla
 ```
 
-No user authentication, no role checks, just a long, weird-looking URL string. The devs might think, “Nobody will guess this.” Spoiler: someone *will* guess it. If an attacker stumbles upon this URL, it’s game over.
+No user authentication, no role checks, just a long, weird-looking URL string. The devs might think, “Nobody will guess
+this.” Spoiler: someone _will_ guess it. If an attacker stumbles upon this URL, it’s game over.
 
 ## How Bad Can It Get?
 
@@ -88,7 +100,7 @@ The impact of **Broken Function Level Authorization** depends on what’s expose
 - Modify accounts that ain’t theirs
 - Take full admin control
 
-Yeah, it’s that bad. So what’s the move? Enforce *strict* role-based access control (RBAC) across **all** API functions. No shortcuts, no weak checks based on headers or parameters. Lock it down properly or risk getting wrecked.
+Yeah, it’s that bad. So what’s the move? Enforce _strict_ role-based access control (RBAC) across **all** API functions.
+No shortcuts, no weak checks based on headers or parameters. Lock it down properly or risk getting wrecked.
 
 Stay sharp, stay secure.
-

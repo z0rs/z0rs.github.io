@@ -7,9 +7,12 @@ author: Eno
 featuredImage: https://raw.githubusercontent.com/0x3n0/0x3n0.github.io/master/assets/img/blogging/Mass-Assignment.jpg
 ---
 
-![img-description](https://raw.githubusercontent.com/0x3n0/0x3n0.github.io/master/assets/img/blogging/Mass-Assignment.jpg)_OWASP API Security_
+![img-description](https://raw.githubusercontent.com/0x3n0/0x3n0.github.io/master/assets/img/blogging/Mass-Assignment.jpg)_OWASP
+API Security_
 
-Alright, you’ve probably heard about the `OWASP Top 10`, the ultimate hall of shame for web app security nightmares. But did you know OWASP also has a hit list just for API security? Yup, it’s called the `OWASP API Security Top 10`, and here’s the rundown:
+Alright, you’ve probably heard about the `OWASP Top 10`, the ultimate hall of shame for web app security nightmares. But
+did you know OWASP also has a hit list just for API security? Yup, it’s called the `OWASP API Security Top 10`, and
+here’s the rundown:
 
 - Broken Object Level Authorization
 - Broken User Authentication
@@ -22,27 +25,32 @@ Alright, you’ve probably heard about the `OWASP Top 10`, the ultimate hall of 
 - Improper Assets Management
 - Insufficient Logging & Monitoring
 
-Today, we’re zooming in on one of the sneakiest API security flaws—**Mass Assignment**. Sounds harmless, right? But this bad boy can straight-up wreck your app’s security. Let’s break it down with an example.
+Today, we’re zooming in on one of the sneakiest API security flaws—**Mass Assignment**. Sounds harmless, right? But this
+bad boy can straight-up wreck your app’s security. Let’s break it down with an example.
 
 ## API Security and Object Properties 101
 
-So, apps usually deal with objects that hold a bunch of properties. Think of a `user` object in an app—could look something like this:
+So, apps usually deal with objects that hold a bunch of properties. Think of a `user` object in an app—could look
+something like this:
 
 ```json
-{ 
-  "id": 1337, 
-  "name": "eno", 
-  "location": "Blk 335 Smith Street, SG", 
-  "admin": false, 
-  "group_membership": [121, 322, 457] 
+{
+  "id": 1337,
+  "name": "eno",
+  "location": "Blk 335 Smith Street, SG",
+  "admin": false,
+  "group_membership": [121, 322, 457]
 }
 ```
 
-Now, a regular user should only be tweaking harmless fields like `name` and `location`, not touching serious stuff like `admin` status or `group_membership`. But here’s where things get dicey.
+Now, a regular user should only be tweaking harmless fields like `name` and `location`, not touching serious stuff like
+`admin` status or `group_membership`. But here’s where things get dicey.
 
 ## Mass Assignment: The Silent Killer
 
-Mass Assignment is what happens when an app just blindly accepts whatever the user throws at it and updates object properties without checking. If your API isn’t carefully filtering inputs, a sneaky attacker can go from "just another user" to "admin boss mode" in seconds.
+Mass Assignment is what happens when an app just blindly accepts whatever the user throws at it and updates object
+properties without checking. If your API isn’t carefully filtering inputs, a sneaky attacker can go from "just another
+user" to "admin boss mode" in seconds.
 
 Let’s say your app lets users update their names with a simple request:
 
@@ -50,8 +58,8 @@ Let’s say your app lets users update their names with a simple request:
 
 ```http
 PUT /api/v1.1/user/1337
-{ 
-  "name": "eno" 
+{
+  "name": "eno"
 }
 ```
 
@@ -59,26 +67,28 @@ Looks innocent enough. But what if someone gets a little creative?
 
 ```http
 PUT /api/v1.1/user/1337
-{ 
-  "name": "enogans", 
-  "admin": true 
+{
+  "name": "enogans",
+  "admin": true
 }
 ```
 
-If your app isn’t locking down which fields can be changed, boom—this user just upgraded themselves to admin status. Not exactly what you had in mind, huh?
+If your app isn’t locking down which fields can be changed, boom—this user just upgraded themselves to admin status. Not
+exactly what you had in mind, huh?
 
 ### OWASP API Security Example #2: Mass Assignment
 
 ```http
 PUT /api/v1.1/user/1337
-{ 
-  "name": "eno", 
-  "admin": true, 
-  "group_membership": [1, 35, 121, 322, 457] 
+{
+  "name": "eno",
+  "admin": true,
+  "group_membership": [1, 35, 121, 322, 457]
 }
 ```
 
-Now they’re adding themselves to VIP groups too? Yeah, this is why Mass Assignment is a total disaster if not handled right.
+Now they’re adding themselves to VIP groups too? Yeah, this is why Mass Assignment is a total disaster if not handled
+right.
 
 ## How to Keep Mass Assignment in Check
 
@@ -89,4 +99,3 @@ If you don’t want your app getting played like a cheap fiddle, here’s what y
 - Double-check and sanitize inputs like your security depends on it—because it does.
 
 Stay sharp, lock down your API, and don’t let Mass Assignment turn your app into a hacker’s playground!
-

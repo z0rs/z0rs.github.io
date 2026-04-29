@@ -7,7 +7,9 @@ author: Eno
 featuredImage: https://raw.githubusercontent.com/z0rs/z0rs.github.io/refs/heads/master/content/Images/260419-2121-39.png
 ---
 
-Bet. You got an old Samsung A51 lying around? Or maybe you just wanna flex a wireless mic setup without dropping bags on a Blue Yeti? Say less. This guide is for the Arch Linux gang who wanna use their phone as a mic AND keep their TWS earbuds connected via `bluetoothctl`. No cap, this setup is lowkey goated.
+Bet. You got an old Samsung A51 lying around? Or maybe you just wanna flex a wireless mic setup without dropping bags on
+a Blue Yeti? Say less. This guide is for the Arch Linux gang who wanna use their phone as a mic AND keep their TWS
+earbuds connected via `bluetoothctl`. No cap, this setup is lowkey goated.
 
 ## The Vibe Check
 
@@ -38,9 +40,10 @@ pactl load-module module-null-sink sink_name=android_mic_sink
 pactl load-module module-remap-source master=android_mic_sink.monitor source_name=android_mic_source
 ```
 
-**What does this do?**  
-- `android_mic_sink` = a ghost speaker. Your phone will "play" audio into it.  
-- `android_mic_source` = a ghost mic. Discord/Telegram/Google Meet will think it's a real mic.  
+**What does this do?**
+
+- `android_mic_sink` = a ghost speaker. Your phone will "play" audio into it.
+- `android_mic_source` = a ghost mic. Discord/Telegram/Google Meet will think it's a real mic.
 
 Ngl, if you skip the second command, you'll be stuck like "why my virtual mic not showing?" So don't skip it, bestie.
 
@@ -70,7 +73,8 @@ Then run `sudo grub-mkconfig -o /boot/grub/grub.cfg` and reboot. That's the "sto
 
 ## Step 4: Download & Run AndroidMic on Your PC
 
-Go to [AndroidMic releases on GitHub](https://github.com/teamclouday/AndroidMic/releases/latest), grab the `.AppImage` file. Then:
+Go to [AndroidMic releases on GitHub](https://github.com/teamclouday/AndroidMic/releases/latest), grab the `.AppImage`
+file. Then:
 
 ```bash
 chmod +x AndroidMic-*.AppImage
@@ -78,6 +82,7 @@ chmod +x AndroidMic-*.AppImage
 ```
 
 In the GUI:
+
 - **Network adapter:** pick your WiFi interface (like `wlp2s0` with your local IP, e.g., 10.132.x.x)
 - **Audio Device:** `Default ALSA Output (currently PipeWire Media Server)`
 - **Connection:** `WIFI / LAN (TCP)` (UDP is faster but risky, no cap)
@@ -101,15 +106,20 @@ pavucontrol
 ```
 
 Now do this:
-1. **Playback tab** → find **"PipeWire ALSA [android-mic]: ALSA Playback on"** → click the dropdown button (speaker icon) → select **`android_mic_sink`** (NOT your TWS or speakers).
-2. **Recording tab** → when you're on a call in Discord/Telegram, make sure the input device is **`android_mic_source`**. You can also set it as default:
+
+1. **Playback tab** → find **"PipeWire ALSA [android-mic]: ALSA Playback on"** → click the dropdown button (speaker
+   icon) → select **`android_mic_sink`** (NOT your TWS or speakers).
+2. **Recording tab** → when you're on a call in Discord/Telegram, make sure the input device is
+   **`android_mic_source`**. You can also set it as default:
    ```bash
    pactl set-default-source android_mic_source
    ```
-3. **Output Devices tab** → make sure your TWS is selected as the output for system sounds (so you can hear your friends while using your phone as mic).
+3. **Output Devices tab** → make sure your TWS is selected as the output for system sounds (so you can hear your friends
+   while using your phone as mic).
 
 **Wait, my TWS mic?**  
-If you wanna use your TWS's built-in mic instead of the phone, just change the input device in your app to your TWS's "Headset" profile. But this guide is for using the PHONE as mic, so we ignore that.
+If you wanna use your TWS's built-in mic instead of the phone, just change the input device in your app to your TWS's
+"Headset" profile. But this guide is for using the PHONE as mic, so we ignore that.
 
 ![pavucontrol](https://raw.githubusercontent.com/z0rs/z0rs.github.io/refs/heads/master/content/Images/260419-2126-28.png)
 
@@ -136,18 +146,21 @@ Or create a systemd user service if you're extra. But the bashrc method is lowke
 
 ## Troubleshooting (For When Things Go Rizzless)
 
-| Problem | Fix (No panic) |
-|---------|----------------|
-| `android_mic_source` not showing in apps | Did you run the second `pactl` command? Check `pavucontrol` Input Devices tab. |
-| Audio from phone but can't hear in call | Go to Recording tab in pavucontrol → set app's input to `android_mic_source`. |
-| AndroidMic won't connect | Check firewall? Same WiFi? Try restarting app on phone and PC. Or use USB ADB mode instead. |
-| TWS disconnects after a while | Add `btusb.enable_autosuspend=n` to kernel params as shown above. |
-| Everything works but mic volume too low | In pavucontrol → Input Devices → increase volume for `android_mic_source`. |
+| Problem                                  | Fix (No panic)                                                                              |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `android_mic_source` not showing in apps | Did you run the second `pactl` command? Check `pavucontrol` Input Devices tab.              |
+| Audio from phone but can't hear in call  | Go to Recording tab in pavucontrol → set app's input to `android_mic_source`.               |
+| AndroidMic won't connect                 | Check firewall? Same WiFi? Try restarting app on phone and PC. Or use USB ADB mode instead. |
+| TWS disconnects after a while            | Add `btusb.enable_autosuspend=n` to kernel params as shown above.                           |
+| Everything works but mic volume too low  | In pavucontrol → Input Devices → increase volume for `android_mic_source`.                  |
 
 ## Final
 
-You just turned your old Samsung A51 into a pro-level wireless microphone on Arch Linux, while still vibing with your TWS earbuds. That's what we call a "budget slay." No need to buy a Blue Yeti or a standalone mic. Your phone + Arch + AndroidMic = infinite rizz.
+You just turned your old Samsung A51 into a pro-level wireless microphone on Arch Linux, while still vibing with your
+TWS earbuds. That's what we call a "budget slay." No need to buy a Blue Yeti or a standalone mic. Your phone + Arch +
+AndroidMic = infinite rizz.
 
-Now go flex on your Discord homies. And remember: **virtual devices first, then connect AndroidMic, then route audio in pavucontrol.** That's the cheat code.
+Now go flex on your Discord homies. And remember: **virtual devices first, then connect AndroidMic, then route audio in
+pavucontrol.** That's the cheat code.
 
 Catch you on the flip side, king/queen/nonbinary royalty.

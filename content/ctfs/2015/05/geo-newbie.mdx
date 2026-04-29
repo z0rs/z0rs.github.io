@@ -1,24 +1,39 @@
 ---
 type: ctf
-title : 0CTF 2015 Quals - geo newbie
+title: 0CTF 2015 Quals - geo newbie
 tags: [0CTF 2015, geo newbie]
-date : 2015-05-05
+date: 2015-05-05
 author: Eno
 featuredImage: https://p0.ssl.qhimg.com/t01659b0431147b285d.jpg
 ---
 
 > Talentyange gives lots of tedious apks and you know how bad he is now. Let's try some interesting geography knowledge.
-> 
->   nc 202.112.26.111  29995 /  nc 202.112.28.118 29995
+>
+> nc 202.112.26.111 29995 / nc 202.112.28.118 29995
 
-So basically we just connect to the server, and it will ask us a bunch of questions about geography. We'll have to pass 3 levels (75 questions) to get the flag.  
+So basically we just connect to the server, and it will ask us a bunch of questions about geography. We'll have to pass
+3 levels (75 questions) to get the flag.
 
-For level0, it asked us for the [alpha2 code](http://en.wikipedia.org/wiki/ISO_3166-1_alpha-2) of a country. For example, if they gave us "JAPAN", we'll have to send "JP" back to the server. To pass this level, I download a json file from the internet and use it as the alpha2 code database. Just extract the country name and send the corresponding alpha2 code. After answering 20 questions, we pass level0.  
+For level0, it asked us for the [alpha2 code](http://en.wikipedia.org/wiki/ISO_3166-1_alpha-2) of a country. For
+example, if they gave us "JAPAN", we'll have to send "JP" back to the server. To pass this level, I download a json file
+from the internet and use it as the alpha2 code database. Just extract the country name and send the corresponding
+alpha2 code. After answering 20 questions, we pass level0.
 
-For level1, it gave us a location (ex. Mount Fuji), and we'll have to answer the country (in alpha2 code format, ex. **Mount Fuji** --> **JP**) that contains the location. To pass the level, I use the [google API](http://maps.googleapis.com/maps/api/geocode/json) to solve the problems. Extract the location and pass it as the "address" parameter, the API will respond with a json format response. Parse the response and get the correct country 
-name. Notice that sometimes google API will respond a wrong country(mostly it respond US instead of the correct country), so we will need to handle some special cases (by hard-code the correct answer in the script). This level has 50 questions, solve them all and we'll be able to reach level2.
+For level1, it gave us a location (ex. Mount Fuji), and we'll have to answer the country (in alpha2 code format, ex.
+**Mount Fuji** --> **JP**) that contains the location. To pass the level, I use the
+[google API](http://maps.googleapis.com/maps/api/geocode/json) to solve the problems. Extract the location and pass it
+as the "address" parameter, the API will respond with a json format response. Parse the response and get the correct
+country name. Notice that sometimes google API will respond a wrong country(mostly it respond US instead of the correct
+country), so we will need to handle some special cases (by hard-code the correct answer in the script). This level has
+50 questions, solve them all and we'll be able to reach level2.
 
-And for the last level, the server gave us a river or a moutain (ex. Congo River, Andes Mountains....etc), and we'll have to answer all the countries that the given river/mountain run across. To pass this level, I just hard-code all the answer in the script. First we'll have to reach level2 several times, collect as much rivers/mountains as we can, then google the answer, hard-code them in the script. I add some conditions in my script. If the program encounters a river/mountain that it already has the answer in the script, it will send the answer to the server. Or else, it'll switch to the interactive mode , and I'll take control of the situation -- by google & send the answer with my own hand ( you know, speed mode activated ! )
+And for the last level, the server gave us a river or a moutain (ex. Congo River, Andes Mountains....etc), and we'll
+have to answer all the countries that the given river/mountain run across. To pass this level, I just hard-code all the
+answer in the script. First we'll have to reach level2 several times, collect as much rivers/mountains as we can, then
+google the answer, hard-code them in the script. I add some conditions in my script. If the program encounters a
+river/mountain that it already has the answer in the script, it will send the answer to the server. Or else, it'll
+switch to the interactive mode , and I'll take control of the situation -- by google & send the answer with my own hand
+( you know, speed mode activated ! )
 
 Here's the script I used for solving the challenge:
 
@@ -49,7 +64,7 @@ def get_alpha2(s):
     for country in alpha2:
         name : country["Name"].encode('utf-8')
         if name.decode('utf-8') == s.decode('utf-8'):
-            return country["Code"]  
+            return country["Code"]
 
 def solve_level1(s):
 	if s == "Naples":
@@ -70,7 +85,7 @@ def solve_level1(s):
 		return "BD"
 	if s == "Mount Olympus":
 		return "GR"
-		
+
 	global url, values
 	values['address'] : s
 	data : urllib.urlencode(values)

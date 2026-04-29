@@ -1,24 +1,25 @@
 ---
 type: ctf
-title : ASIS CTF 2015 Quals - grids
+title: ASIS CTF 2015 Quals - grids
 tags: [ASIS CTF, grids]
-date : 2015-05-23
+date: 2015-05-23
 author: Eno
 featuredImage: https://ctftime.org/media/team/asis_logo_512.jpg
 ---
 
-**Category:** Programming
-**Points:** 300
+**Category:** Programming **Points:** 300
 
-> In each stage send the maximun size of area that can be covered by given points as a vertex of polygon in 2D.
-> nc 217.218.48.84 12433
-> mirror 1 : nc 217.218.48.84 12432
-> mirror 2 : nc 217.218.48.84 12434
-> mirror 2 : nc 217.218.48.84 12429
+> In each stage send the maximun size of area that can be covered by given points as a vertex of polygon in 2D. nc
+> 217.218.48.84 12433 mirror 1 : nc 217.218.48.84 12432 mirror 2 : nc 217.218.48.84 12434 mirror 2 : nc 217.218.48.84
+> 12429
 
 Took me a while to figure out that the challenge was asking us to solve a **Convex Hull** problem.
 
-The service provide us a list of vertices (2-D). We'll have to find the vertices that can form a convex hull and calculate its size of area. Fortunately, there's a python library call [scipy](http://docs.scipy.org/doc/scipy-dev/reference/generated/scipy.spatial.ConvexHull.html), which can be used to find a convex hull by giving an array of vertices. After we find all the vertices, we can simply calculate the size of area by using [determinant](http://en.wikipedia.org/wiki/Determinant).
+The service provide us a list of vertices (2-D). We'll have to find the vertices that can form a convex hull and
+calculate its size of area. Fortunately, there's a python library call
+[scipy](http://docs.scipy.org/doc/scipy-dev/reference/generated/scipy.spatial.ConvexHull.html), which can be used to
+find a convex hull by giving an array of vertices. After we find all the vertices, we can simply calculate the size of
+area by using [determinant](http://en.wikipedia.org/wiki/Determinant).
 
 ```python
 from pwn import *
@@ -62,7 +63,7 @@ while True:
     # parse the vertex list
     list_str : s[s.index("[["):s.index("What's"):].strip()
     real_list : ast.literal_eval(list_str)
-    
+
     # get the convex hull point
     points : array(real_list)
     hull : ConvexHull(points)

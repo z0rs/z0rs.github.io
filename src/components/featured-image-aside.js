@@ -14,7 +14,9 @@ const FeaturedImageAside = ({ alt, thumbnail, shareText }) => {
         </div>
       ) : null}
       <a
-        href={`https://www.linkedin.com/shareArticle?mini=true&url=${shareText}`}
+        href={`https://www.linkedin.com/shareArticle?mini=true&url=${encodeURIComponent(
+          shareText
+        )}&title=${encodeURIComponent(alt)}`}
         target="_blank"
         rel="noreferrer"
         className="flex items-center gap-4 no-underline text-sm text-center py-2 px-4 transition-all duration-300 rounded border border-outline bg-surface hover:text-white hover:bg-muted/20"

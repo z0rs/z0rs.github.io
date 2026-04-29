@@ -10,7 +10,8 @@ featuredImage: https://raw.githubusercontent.com/0x3n0/0x3n0.github.io/master/as
 ![API Security - Lack of Resources & Rate Limiting](https://raw.githubusercontent.com/0x3n0/0x3n0.github.io/master/assets/img/blogging/Lack-of-Resources-%26-Rate-Limiting.jpg)  
 _API Security Fundamentals: Lack of Resources & Rate Limiting_
 
-Alright, if you're into security, you’ve probably heard of the `OWASP Top 10`. It’s basically the Hall of Shame for web app vulnerabilities. But APIs got their own set of nightmares—meet the `API Security Top 10`. Here’s the list:
+Alright, if you're into security, you’ve probably heard of the `OWASP Top 10`. It’s basically the Hall of Shame for web
+app vulnerabilities. But APIs got their own set of nightmares—meet the `API Security Top 10`. Here’s the list:
 
 - Broken Object Level Authorization
 - Broken User Authentication
@@ -23,19 +24,25 @@ Alright, if you're into security, you’ve probably heard of the `OWASP Top 10`.
 - Improper Assets Management
 - Insufficient Logging & Monitoring
 
-Most of these don’t just mess with APIs but can wreck entire applications. But today, we’re zooming in on `#4`: **Lack of Resources & Rate Limiting**. Let’s break it down.
+Most of these don’t just mess with APIs but can wreck entire applications. But today, we’re zooming in on `#4`: **Lack
+of Resources & Rate Limiting**. Let’s break it down.
 
 ## What’s the Deal with Lack of Resources & Rate Limiting?
 
-This happens when an API doesn’t put a cap on how many requests a client can make. No brakes = free-for-all. If there’s no rate limiting, an API client could spam thousands of requests per second or pull ridiculous amounts of data in one go, turning your server into a smoldering wreck.
+This happens when an API doesn’t put a cap on how many requests a client can make. No brakes = free-for-all. If there’s
+no rate limiting, an API client could spam thousands of requests per second or pull ridiculous amounts of data in one
+go, turning your server into a smoldering wreck.
 
 ### Why Should You Care?
 
-First off, no rate limits = easy DoS (Denial of Service) attack. A single overenthusiastic client—or worse, an army of bots—can flood your API, making it unusable for legit users.
+First off, no rate limits = easy DoS (Denial of Service) attack. A single overenthusiastic client—or worse, an army of
+bots—can flood your API, making it unusable for legit users.
 
-Second, attackers love APIs with no limits. No rate caps mean brute-force attacks on login endpoints become a cakewalk. If `Broken Object Level Authorization` is also in play, it’s a buffet for hackers.
+Second, attackers love APIs with no limits. No rate caps mean brute-force attacks on login endpoints become a cakewalk.
+If `Broken Object Level Authorization` is also in play, it’s a buffet for hackers.
 
-And let’s not forget data scraping. If your API dishes out sensitive info without restrictions, someone’s gonna take advantage. Imagine an endpoint that returns emails—without limits, an attacker could scoop up thousands in minutes.
+And let’s not forget data scraping. If your API dishes out sensitive info without restrictions, someone’s gonna take
+advantage. Imagine an endpoint that returns emails—without limits, an attacker could scoop up thousands in minutes.
 
 ### Real-World Example: API Abuse in Injection Attacks
 
@@ -63,9 +70,13 @@ https://api.example.com/v1.1/profile/email/view?user_id=2345
 
 ### How to Not Screw This Up
 
-So, how do you stop your API from becoming a hacker’s playground? Enforce rate limits. Sounds easy, but getting it right is another story.
+So, how do you stop your API from becoming a hacker’s playground? Enforce rate limits. Sounds easy, but getting it right
+is another story.
 
-Not all API endpoints are equal. Login endpoints need stricter limits than, say, a public news feed. The trick is figuring out “normal” behavior and flagging requests that go off the rails.
+Not all API endpoints are equal. Login endpoints need stricter limits than, say, a public news feed. The trick is
+figuring out “normal” behavior and flagging requests that go off the rails.
 
-When setting limits, think about what’s at risk. Stay sharp, because in the next part, we’ll talk about another API security fail: `OWASP API Security #5` - [**Broken Function Level Authorization**](https://0x3n0.github.io/Function-Level-Authorizationd). You’ll wanna stick around for that one. 🚀
-
+When setting limits, think about what’s at risk. Stay sharp, because in the next part, we’ll talk about another API
+security fail: `OWASP API Security #5` -
+[**Broken Function Level Authorization**](https://0x3n0.github.io/Function-Level-Authorizationd). You’ll wanna stick
+around for that one. 🚀

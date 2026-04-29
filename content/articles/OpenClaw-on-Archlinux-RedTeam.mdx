@@ -7,11 +7,16 @@ author: Eno
 featuredImage: https://raw.githubusercontent.com/z0rs/z0rs.github.io/refs/heads/master/content/Images/OpenClaw.png
 ---
 
-> **Ethical Scope Reminder:** This guide is strictly for authorized penetration testing, owned lab environments, CTF challenges, and intentionally vulnerable platforms (DVWA, Metasploitable, Juice Shop, etc.). Unauthorized access to systems you do not own or have explicit written permission to test is illegal.
+> **Ethical Scope Reminder:** This guide is strictly for authorized penetration testing, owned lab environments, CTF
+> challenges, and intentionally vulnerable platforms (DVWA, Metasploitable, Juice Shop, etc.). Unauthorized access to
+> systems you do not own or have explicit written permission to test is illegal.
 
 ---
 
-> **⚠️ Note on OpenClaw:** "OpenClaw" is not a widely documented public project as of my knowledge cutoff. Throughout this guide, steps referencing the OpenClaw repo assume a Node.js/pnpm-based AI agent framework. **Verify the exact repo URL and build steps from the official source before proceeding.** Everything else in this guide (system prep, tooling, systemd, lab setup) is accurate for Arch Linux.
+> **⚠️ Note on OpenClaw:** "OpenClaw" is not a widely documented public project as of my knowledge cutoff. Throughout
+> this guide, steps referencing the OpenClaw repo assume a Node.js/pnpm-based AI agent framework. **Verify the exact
+> repo URL and build steps from the official source before proceeding.** Everything else in this guide (system prep,
+> tooling, systemd, lab setup) is accurate for Arch Linux.
 
 ---
 
@@ -301,6 +306,7 @@ ls -la dist/ || ls -la .next/ || ls -la build/
 ### 3.4 Arch Linux Specific Troubleshooting
 
 **Problem: `node-gyp` native module failures**
+
 ```bash
 # Install Python 2 compatibility shim if needed
 sudo pacman -S --noconfirm python2
@@ -311,6 +317,7 @@ pnpm rebuild
 ```
 
 **Problem: `EACCES` permission errors with pnpm store**
+
 ```bash
 # Set pnpm store to user-local directory
 pnpm config set store-dir ~/.local/share/pnpm/store
@@ -321,6 +328,7 @@ pnpm install
 ```
 
 **Problem: Node version mismatch**
+
 ```bash
 # Check required version in package.json
 cat package.json | grep '"node"'
@@ -332,6 +340,7 @@ pnpm install
 ```
 
 **Problem: `canvas` or `sharp` native deps fail**
+
 ```bash
 sudo pacman -S --noconfirm \
   cairo \
@@ -346,6 +355,7 @@ pnpm rebuild canvas sharp
 ```
 
 **Problem: `better-sqlite3` fails to build**
+
 ```bash
 sudo pacman -S --noconfirm sqlite
 pnpm rebuild better-sqlite3
@@ -496,6 +506,7 @@ mkdir -p ~/ai/openclaw/scripts
 ```
 
 **`~/ai/openclaw/scripts/scan-ports.sh`**
+
 ```bash
 #!/bin/bash
 # Usage: scan-ports.sh <target> <output-prefix>
@@ -521,6 +532,7 @@ echo "[+] Scan complete. Output saved to $OUTPUT_DIR"
 ```
 
 **`~/ai/openclaw/scripts/web-enum.sh`**
+
 ```bash
 #!/bin/bash
 # Usage: web-enum.sh <url> <output-prefix>
@@ -552,6 +564,7 @@ echo "[+] Web enumeration complete."
 ```
 
 **`~/ai/openclaw/scripts/vuln-scan.sh`**
+
 ```bash
 #!/bin/bash
 # Usage: vuln-scan.sh <target-url>
@@ -680,28 +693,31 @@ mkdir -p ~/ai/reports/templates
 ```
 
 **`~/ai/reports/templates/pentest-report-template.md`**
+
 ```markdown
 # Penetration Test Report
 
-**Target:** [TARGET_NAME]
-**Date:** [DATE]
-**Tester:** [YOUR_NAME]
-**Scope:** [SCOPE_DEFINITION]
-**Authorization Reference:** [AUTH_DOC_REF]
+**Target:** [TARGET_NAME] **Date:** [DATE] **Tester:** [YOUR_NAME] **Scope:** [SCOPE_DEFINITION] **Authorization
+Reference:** [AUTH_DOC_REF]
 
 ---
 
 ## Executive Summary
+
 [AI-GENERATED SUMMARY]
 
 ## Scope and Methodology
+
 ### In-Scope Assets
+
 - [LIST_TARGETS]
 
 ### Out-of-Scope
+
 - [LIST_EXCLUSIONS]
 
 ### Testing Methodology
+
 - Reconnaissance
 - Enumeration
 - Vulnerability Analysis
@@ -713,26 +729,27 @@ mkdir -p ~/ai/reports/templates
 
 ## Findings Summary
 
-| ID | Severity | Title | CVSS | Status |
-|----|----------|-------|------|--------|
-| F-001 | Critical | | | Open |
-| F-002 | High | | | Open |
+| ID    | Severity | Title | CVSS | Status |
+| ----- | -------- | ----- | ---- | ------ |
+| F-001 | Critical |       |      | Open   |
+| F-002 | High     |       |      | Open   |
 
 ---
 
 ## Detailed Findings
 
 ### F-001: [FINDING TITLE]
-**Severity:** Critical / High / Medium / Low / Informational
-**CVSS Score:** X.X
-**CVE Reference:** CVE-XXXX-XXXXX (if applicable)
 
-**Description:**
-[AI-ASSISTED DESCRIPTION]
+**Severity:** Critical / High / Medium / Low / Informational **CVSS Score:** X.X **CVE Reference:** CVE-XXXX-XXXXX (if
+applicable)
+
+**Description:** [AI-ASSISTED DESCRIPTION]
 
 **Evidence:**
 ```
+
 [TOOL OUTPUT / SCREENSHOTS]
+
 ```
 
 **Impact:**
@@ -807,6 +824,7 @@ nano ~/.config/systemd/user/openclaw.service
 ```
 
 **`~/.config/systemd/user/openclaw.service`**
+
 ```ini
 [Unit]
 Description=OpenClaw AI Red Team Assistant
@@ -855,7 +873,8 @@ RestrictRealtime=true
 WantedBy=default.target
 ```
 
-> **Note:** Update the Node.js path in `ExecStart` to match your actual `nvm` node version path. Run `which node` as the openclaw user to confirm.
+> **Note:** Update the Node.js path in `ExecStart` to match your actual `nvm` node version path. Run `which node` as the
+> openclaw user to confirm.
 
 ### 8.2 Enable Lingering and Start the Service
 
@@ -1013,7 +1032,7 @@ services:
       lab-network:
         ipv4_address: 192.168.200.10
     ports:
-      - "127.0.0.1:8080:80"
+      - '127.0.0.1:8080:80'
     restart: unless-stopped
 
   juiceshop:
@@ -1023,7 +1042,7 @@ services:
       lab-network:
         ipv4_address: 192.168.200.11
     ports:
-      - "127.0.0.1:3001:3000"
+      - '127.0.0.1:3001:3000'
     restart: unless-stopped
 
   webgoat:
@@ -1033,7 +1052,7 @@ services:
       lab-network:
         ipv4_address: 192.168.200.12
     ports:
-      - "127.0.0.1:8888:8080"
+      - '127.0.0.1:8888:8080'
     restart: unless-stopped
 
   vulhub-base:
@@ -1103,7 +1122,8 @@ chromium \
   http://localhost:8080
 ```
 
-> **Note:** The flags `--disable-web-security` and `--ignore-certificate-errors` should **only** be used with your dedicated testing profile pointed at lab targets. Never use them as your daily browser.
+> **Note:** The flags `--disable-web-security` and `--ignore-certificate-errors` should **only** be used with your
+> dedicated testing profile pointed at lab targets. Never use them as your daily browser.
 
 ### 10.4 Burp Suite Community Edition (AUR)
 
@@ -1314,6 +1334,7 @@ curl http://localhost:11434/api/generate -d '{
 ### 13.4 OpenClaw Configured for Local Ollama
 
 In your `.env`:
+
 ```dotenv
 USE_LOCAL_MODEL=true
 OLLAMA_BASE_URL=http://localhost:11434
@@ -1409,6 +1430,7 @@ docker network create \
 ---
 
 **Final Security Reminders:**
+
 - Keep `.env` at `chmod 600` — it contains API keys
 - Never expose OpenClaw's port beyond `127.0.0.1`
 - Keep `AUTHORIZED_TARGETS` scoped tightly in `.env`

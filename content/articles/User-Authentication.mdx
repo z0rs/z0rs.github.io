@@ -7,79 +7,101 @@ author: Eno
 featuredImage: https://raw.githubusercontent.com/0x3n0/0x3n0.github.io/master/assets/img/blogging/owasp1.jpg
 ---
 
-![img-description](https://raw.githubusercontent.com/0x3n0/0x3n0.github.io/master/assets/img/blogging/owasp1.jpg)_API Security_
+![img-description](https://raw.githubusercontent.com/0x3n0/0x3n0.github.io/master/assets/img/blogging/owasp1.jpg)_API
+Security_
 
-Yo, you’ve probably heard about `Top 10 OWASP`, aka the ten nastiest vulnerabilities haunting `Webapps`. Well, OWASP also drops a `Top 10` list just for `API` security, called `OWASP API Security Top 10`. Right now, the big bad threats are:
+Yo, you’ve probably heard about `Top 10 OWASP`, aka the ten nastiest vulnerabilities haunting `Webapps`. Well, OWASP
+also drops a `Top 10` list just for `API` security, called `OWASP API Security Top 10`. Right now, the big bad threats
+are:
 
-- Broken Object Level Authorization 
+- Broken Object Level Authorization
 - Broken User Authentication
 - Excessive Data Exposure
 - Lack of Resources & Rate Limiting
 - Broken Function Level Authorization
 - Mass Assignment
-- Security Misconfiguration 
+- Security Misconfiguration
 - Injection
 - Improper Assets Management
 - Insufficient Logging & Monitoring
 
-A lot of these bugs don’t just hit APIs but tend to show up in them the most. Last time, we talked about one of the usual suspects: **Broken Object Level Authorization.**
+A lot of these bugs don’t just hit APIs but tend to show up in them the most. Last time, we talked about one of the
+usual suspects: **Broken Object Level Authorization.**
 
 ## OWASP API Security Broken User Authentication
 
-From my experience breaking into `API`s, I’d bet most APIs out there have at least one case of **Broken Object Level Authorization**. But today, let’s zero in on `OWASP API #2`: **OWASP API Security Broken User Authentication.**
+From my experience breaking into `API`s, I’d bet most APIs out there have at least one case of **Broken Object Level
+Authorization**. But today, let’s zero in on `OWASP API #2`: **OWASP API Security Broken User Authentication.**
 
 ### Authentication for `API`s: A Wild West
 
-Unlike web apps, APIs can’t always rely on user credentials or fancy multi-factor authentication every time a request is made. Instead, they roll with access tokens—basically, tiny digital hall passes embedded in requests. If the auth system isn’t locked down tight, attackers can slip in through the cracks and start impersonating legit users. And trust me, that’s bad news.
+Unlike web apps, APIs can’t always rely on user credentials or fancy multi-factor authentication every time a request is
+made. Instead, they roll with access tokens—basically, tiny digital hall passes embedded in requests. If the auth system
+isn’t locked down tight, attackers can slip in through the cracks and start impersonating legit users. And trust me,
+that’s bad news.
 
 ## When APIs Just Don’t Bother with Authentication
 
-First off, some `API`s straight-up skip authentication. Yeah, you heard me. Devs sometimes assume their API will only be called by “trusted” apps and won’t get discovered by randos. So, if you know the structure, boom—you can fetch data or execute actions with zero hassle. That’s like leaving your front door open and hoping no one waltzes in.
+First off, some `API`s straight-up skip authentication. Yeah, you heard me. Devs sometimes assume their API will only be
+called by “trusted” apps and won’t get discovered by randos. So, if you know the structure, boom—you can fetch data or
+execute actions with zero hassle. That’s like leaving your front door open and hoping no one waltzes in.
 
 ## When Authentication is a Hot Mess
 
-APIs with zero auth are getting rarer, but weak authentication setups? Those are everywhere. The biggest offender? **Broken User Authentication** due to bad token design or implementation.
+APIs with zero auth are getting rarer, but weak authentication setups? Those are everywhere. The biggest offender?
+**Broken User Authentication** due to bad token design or implementation.
 
-A rookie mistake is generating weak access tokens. If your tokens are too short, predictable, or just plain weak, attackers can brute-force their way in. Here’s an example of a laughably bad API token:
+A rookie mistake is generating weak access tokens. If your tokens are too short, predictable, or just plain weak,
+attackers can brute-force their way in. Here’s an example of a laughably bad API token:
 
 ```
 access_token=RW5v==
 ```
 
-That’s literally just a `base64` encoding of the username “Eno.” Seriously? 
+That’s literally just a `base64` encoding of the username “Eno.” Seriously?
 
-Even APIs that avoid simple string tokens aren’t safe. Take `JSON Web Tokens` (JWTs)—if they’re improperly signed (or worse, not signed at all), attackers can tweak them and hijack accounts. And if those tokens are used for admin authentication? Say goodbye to security.
+Even APIs that avoid simple string tokens aren’t safe. Take `JSON Web Tokens` (JWTs)—if they’re improperly signed (or
+worse, not signed at all), attackers can tweak them and hijack accounts. And if those tokens are used for admin
+authentication? Say goodbye to security.
 
 ## Long-Lived Tokens: A Hacker’s Dream
 
-Even if your token is well-generated, how you handle expiration matters. If a token stays valid forever, a stolen token is basically a skeleton key to your system.
+Even if your token is well-generated, how you handle expiration matters. If a token stays valid forever, a stolen token
+is basically a skeleton key to your system.
 
-`API tokens` should expire regularly and get revoked after critical actions like `logout`, password changes, or account recovery. Otherwise, attackers can hold onto stolen tokens indefinitely and keep exploiting them.
+`API tokens` should expire regularly and get revoked after critical actions like `logout`, password changes, or account
+recovery. Otherwise, attackers can hold onto stolen tokens indefinitely and keep exploiting them.
 
 ## Leaky Tokens: Oops, You Dropped Your Keys
 
 Some devs unknowingly leak access tokens in URLs or over unencrypted traffic. Big mistake.
 
-If a token is passed in a URL, anyone who sees the URL—browser extensions, logs, or even someone peeking over your shoulder—can steal it:
+If a token is passed in a URL, anyone who sees the URL—browser extensions, logs, or even someone peeking over your
+shoulder—can steal it:
 
 ```
 https://api.example.com/v1.1/users/payment/show?user_id=1337&access_token=360f91d065e56a15a0d9a0b4e170967b
 ```
 
-And if a token is sent over unencrypted traffic? Say hello to a `Man in the Middle (MITM)` attack where hackers sniff out your traffic and snatch those juicy tokens right out of the air.
+And if a token is sent over unencrypted traffic? Say hello to a `Man in the Middle (MITM)` attack where hackers sniff
+out your traffic and snatch those juicy tokens right out of the air.
 
 ## Locking Down User Authentication Like a Pro
 
-Weak authentication is one of the fastest ways to get your API wrecked. If an attacker hijacks a user’s session, they can do whatever that user could. Bad news all around.
+Weak authentication is one of the fastest ways to get your API wrecked. If an attacker hijacks a user’s session, they
+can do whatever that user could. Bad news all around.
 
 Here’s how to lock it down:
 
-- Implement solid access control on all sensitive data and actions (see my last post on **Broken Object Level Authorization**).
+- Implement solid access control on all sensitive data and actions (see my last post on **Broken Object Level
+  Authorization**).
 - Generate `API tokens` that are **long, random, and impossible to predict**. No lazy base64 nonsense.
 - If your tokens are based on user info, use strong encryption and a `secret key` so users can’t spoof them.
 - If you’re rolling with JWTs, sign them **properly** and validate signatures before trusting them.
-- Set token expiration policies—force expiry after a while and immediately revoke them on `logout`, `password resets`, and `account deletions`.
+- Set token expiration policies—force expiry after a while and immediately revoke them on `logout`, `password resets`,
+  and `account deletions`.
 - Treat access tokens like sensitive keys: **Never send them in URLs or unencrypted traffic.**
 
-Broken User Authentication is no joke—it’s a VIP pass for attackers to own your system. Lock it down, or pay the price. Next up, we’ll dive into **Excessive Data Exposure**, a.k.a. “why is your API spilling secrets like a bad gossip?” Stay tuned.
-
+Broken User Authentication is no joke—it’s a VIP pass for attackers to own your system. Lock it down, or pay the price.
+Next up, we’ll dive into **Excessive Data Exposure**, a.k.a. “why is your API spilling secrets like a bad gossip?” Stay
+tuned.

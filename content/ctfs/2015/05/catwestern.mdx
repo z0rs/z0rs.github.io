@@ -1,16 +1,15 @@
 ---
 type: ctf
-title : DEFCON CTF 2015 Quals - catwestern
+title: DEFCON CTF 2015 Quals - catwestern
 tags: [DEFCON CTF, catwestern]
-date : 2015-05-23
+date: 2015-05-23
 author: Eno
 featuredImage: https://www.cylab.cmu.edu/_files/images/news/2023/0813-defcon-logo.png
 ---
 
-**Category:** Coding Challenge
-**Points:** 1
-> meow
-> catwestern_631d7907670909fc4df2defc13f2057c.quals.shallweplayaga.me 9999
+**Category:** Coding Challenge **Points:** 1
+
+> meow catwestern_631d7907670909fc4df2defc13f2057c.quals.shallweplayaga.me 9999
 
 Interesting challenge. First we connect to the service, it will send us the following message:
 
@@ -31,16 +30,19 @@ r13=0xe5e33405335ba0ff
 r14=0x633e16d0ec94137
 r15=0xb80a585e0cd42415
 ****Send Solution In The Same Format****
-About to send 74 bytes: 
+About to send 74 bytes:
 hŒråRI‡Ô�A]HÿÊI�Ç¢éNhIÿÊHÿÃ�HÎI�Ç^�…6H¤Ã
                                        M�ÃI÷ëH)ðH�ÆQØ8e�HÿÀIÁÕ�H5Œm'�Ã^C
 ```
 
-So it seem like the service gave us the registers' inital value, and a sequence of machine code. Apparently, they want us to execute the machine code and send them all the register values after the execution.  
+So it seem like the service gave us the registers' inital value, and a sequence of machine code. Apparently, they want
+us to execute the machine code and send them all the register values after the execution.
 
-After some thinking and researching, I decide to solve the challenge by using the following method:  
+After some thinking and researching, I decide to solve the challenge by using the following method:
 
-First, get all the registers' initial value and construct the machine code, start with `mov [reg], [val]`. Then, receive the machine code from the server, and append it to the current machine code. So the final machine code will be like this: 
+First, get all the registers' initial value and construct the machine code, start with `mov [reg], [val]`. Then, receive
+the machine code from the server, and append it to the current machine code. So the final machine code will be like
+this:
 
 ```
 ; if we convert it to assembly
@@ -52,7 +54,8 @@ mov r15, XXX
 [server's machine code]
 ```
 
-Now all we have to do is to execute the machine code and get all the registers' value. To achieve this requirement, I prepared a C code:
+Now all we have to do is to execute the machine code and get all the registers' value. To achieve this requirement, I
+prepared a C code:
 
 ```c shell.c
 char code[] : machine ;
@@ -67,11 +70,18 @@ int main(int argc, char **argv)
 }
 ```
 
-**"machine"** will be replace by the machine code I have (by using the `sed` command). After we finish building the C file, we can compile it by using the `gcc -g -z execstack -o real real.c` command.  
+**"machine"** will be replace by the machine code I have (by using the `sed` command). After we finish building the C
+file, we can compile it by using the `gcc -g -z execstack -o real real.c` command.
 
-Now we'll just need to excute the binary file we have compiled. I decide to execute it with gdb, since it'll make me more easier to get the register values. So now the problem is **how do we get the output from gdb by using python?** Fortunately, with the help of the internet, I found [this link](http://parsiya.net/blog/2014-05-25-pasting-shellcode-into-gdb-using-python/), which is pretty useful for me to solve the challenge. All I need to do is call gdb by using Popen, send 3 command to it (`b 8`, `r` & `i r`), then parse the result and send the answer to the server.
+Now we'll just need to excute the binary file we have compiled. I decide to execute it with gdb, since it'll make me
+more easier to get the register values. So now the problem is **how do we get the output from gdb by using python?**
+Fortunately, with the help of the internet, I found
+[this link](http://parsiya.net/blog/2014-05-25-pasting-shellcode-into-gdb-using-python/), which is pretty useful for me
+to solve the challenge. All I need to do is call gdb by using Popen, send 3 command to it (`b 8`, `r` & `i r`), then
+parse the result and send the answer to the server.
 
 Here's the final script:
+
 ```python code.py
 from pwn import *
 from subprocess import Popen , PIPE
@@ -120,7 +130,7 @@ def get_ans():
     sleep(0.5)
     s : getoutput(proc)
     proc.stdin.close()
-    
+
     # parse the result
     ans : ""
     all_register : s.split('\n')
@@ -177,6 +187,9 @@ r.interactive()
 
 ```
 
-Notice the line `context.endian : 'big'`. At first I use the **little endian** to solve the challenge, which gave me "Invalid solution" everytime I send the answer. Just before I was about to give up, teammate **bletchley** suggest me to change the endianness into big endian. And guess what? The flag appears on the screen right after I change the word "little" into "big"! What an end!
+Notice the line `context.endian : 'big'`. At first I use the **little endian** to solve the challenge, which gave me
+"Invalid solution" everytime I send the answer. Just before I was about to give up, teammate **bletchley** suggest me to
+change the endianness into big endian. And guess what? The flag appears on the screen right after I change the word
+"little" into "big"! What an end!
 
 Flag: `Cats with frickin lazer beamz on top of their heads!`

@@ -52,16 +52,6 @@ jobs:
         id: pages
         uses: actions/configure-pages@v4
 
-      - name: Enforce Gatsby ESM config
-        run: |
-          if [ ! -f gatsby-config.mjs ]; then
-            echo "Expected gatsby-config.mjs to exist, but it was not found."
-            exit 1
-          fi
-
-          # Keep only one Gatsby config variant. Gatsby prefers .js when both exist.
-          rm -f gatsby-config.js
-
       - name: Install dependencies
         run: ${{ steps.detect-package-manager.outputs.manager }} ${{ steps.detect-package-manager.outputs.command }}
 
@@ -70,6 +60,7 @@ jobs:
 
       - name: Build with Gatsby
         env:
+          GATSBY_RUNTIME: github
           NODE_OPTIONS: '--max-old-space-size=4096'
         run: ${{ steps.detect-package-manager.outputs.runner }} gatsby build
 

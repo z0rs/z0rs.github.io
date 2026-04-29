@@ -1,13 +1,15 @@
 ---
 type: ctf
-title : Cyberthon 2021 Finals - APCDB (pwn)
+title: Cyberthon 2021 Finals - APCDB (pwn)
 tags: [Cyberthon CTF, feuerfuchs challenge]
-date : 2021-05-19
+date: 2021-05-19
 author: Eno
 featuredImage: https://upload.wikimedia.org/wikipedia/commons/5/52/Cyberthon_2021.png
 ---
 
-> We've found a network service that seems to be posing as a fake directory of APOCALYPSE members. Although it doesn't seem to be hooked up to any actual database, it does look a tad vulnerable. Could u try to break in anyway? Who knows, access to this server might come in useful.
+> We've found a network service that seems to be posing as a fake directory of APOCALYPSE members. Although it doesn't
+> seem to be hooked up to any actual database, it does look a tad vulnerable. Could u try to break in anyway? Who knows,
+> access to this server might come in useful.
 >
 > Interact with the service at: aiodmb3uswokssp2pp7eum8qwcsdf52r.ctf.sg:30201
 >
@@ -47,7 +49,8 @@ Let's break down what the program is doing here:
 
 It is apparent that we have to use the format string exploit in order to win, as it is the only exploit available to us.
 
-However, there is no function that prints the flag or grants us a shell. System function is also **not imported** in this binary.
+However, there is no function that prints the flag or grants us a shell. System function is also **not imported** in
+this binary.
 
 Hence it becomes apparent that we have to call system with a **ret2libc** attack.
 
@@ -55,17 +58,20 @@ Hence the idea is as such:
 
 1. We have to first loop the program back so that our program doesnt just simply close after one loop.
 2. We have to leak the LIBC of the functions so we are able to find the LIBC used and obtain our offset.
-3. Find an ideal function to overwrite such that we can execute `system('/bin/sh')` and obtain a shell. _the only function that seems usable is printf_
+3. Find an ideal function to overwrite such that we can execute `system('/bin/sh')` and obtain a shell. _the only
+   function that seems usable is printf_
 
 Let's get started.
 
 ## Exploitation
 
-Our first objective is to loop the program back continuously. This can be done by overwriting **GOT entry for exit() to the address of main**.
+Our first objective is to loop the program back continuously. This can be done by overwriting **GOT entry for exit() to
+the address of main**.
 
 This is so that everytime the program tries to exit, it goes back to main instead.
 
-Since PIE is not enabled, our GOT addresses will remain constant so we can easily find the addresses we need, made even easier with pwntools.
+Since PIE is not enabled, our GOT addresses will remain constant so we can easily find the addresses we need, made even
+easier with pwntools.
 
 ```python
 from pwn import *
@@ -92,7 +98,7 @@ p.interactive()
 '''
 ```
 
-Next, we find the offset of our input with a simple payload ```AAAAAAAA.%p.%p.%p.%p.%p.%p```.
+Next, we find the offset of our input with a simple payload `AAAAAAAA.%p.%p.%p.%p.%p.%p`.
 
 ![image](https://user-images.githubusercontent.com/76640319/117538307-3217a680-b038-11eb-8bf8-9b51e4f6af43.png)
 
@@ -100,7 +106,8 @@ As you can see, our input offset is just nice on the 6th format string. Hence ou
 
 With that, we have everything we need to leak our global offset table values.
 
-Initially, I tried sending `p.sendline(p64(elf.got.printf) + b'%6$s')` to the program. However it did not yield me my expected leak.
+Initially, I tried sending `p.sendline(p64(elf.got.printf) + b'%6$s')` to the program. However it did not yield me my
+expected leak.
 
 This is because the scanf only reads up till the null terminator. Consider this:
 
@@ -153,9 +160,11 @@ By looking up the addresses of printf and puts in blukat, we find our libc.
 
 We can now calculate the libc base by using our leak to minus the libc symbol.
 
-With the libc base, we can find libc symbol for system, thus allowing us to overwrite **printf GOT entry with libc system**.
+With the libc base, we can find libc symbol for system, thus allowing us to overwrite **printf GOT entry with libc
+system**.
 
-Thus the next time we send **/bin/sh\x00** as our input, it will be executed by system rather than printf and we get a shell.
+Thus the next time we send **/bin/sh\x00** as our input, it will be executed by system rather than printf and we get a
+shell.
 
 ```python
 from pwn import *

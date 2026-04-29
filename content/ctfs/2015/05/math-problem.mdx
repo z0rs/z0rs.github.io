@@ -1,21 +1,23 @@
 ---
 type: ctf
-title : VolgaCTF 2015 Quals - math problem
+title: VolgaCTF 2015 Quals - math problem
 tags: [VolgaCTF, math problem]
-date : 2015-05-22
+date: 2015-05-22
 author: Eno
 featuredImage: https://static.wixstatic.com/media/acbc49_eafea6908cc44274ace2f6c77e1efa92~mv2.jpg/v1/fill/w_400,h_400,al_c/acbc49_eafea6908cc44274ace2f6c77e1efa92~mv2.jpg
 ---
 
-**Category:** PPC
-**Points:** 300
+**Category:** PPC **Points:** 300
+
 > nc mathproblem.2015.volgactf.ru 8888
 
 This problem remind me of [HITCON CTF 2014 -- 24](https://github.com/ctfs/write-ups-2014/tree/master/hitcon-ctf-2014/24)
 
-The server gave us 5 numbers `v1`, `v2`, `v3`, `v4` & `v5`, and ask us to use `+`, `-`, `*`, `/`, `(` & `)` to do some operation with `v1`, `v2`, `v3` & `v4`, and make it equal to `v5`
+The server gave us 5 numbers `v1`, `v2`, `v3`, `v4` & `v5`, and ask us to use `+`, `-`, `*`, `/`, `(` & `)` to do some
+operation with `v1`, `v2`, `v3` & `v4`, and make it equal to `v5`
 
-The solution is pretty simple: since it gave us a lot of time to solve a round, we can easily beat the challenge by brute-forcing all the possible combinations of operators & operands
+The solution is pretty simple: since it gave us a lot of time to solve a round, we can easily beat the challenge by
+brute-forcing all the possible combinations of operators & operands
 
 ```python
 from pwn import *
@@ -31,7 +33,7 @@ r : remote(HOST, PORT)
 def solve(numbers, answer):
     ops : "+ - * /".split(" ")
     wrap : ["", "(", ")"]
-    
+
     iterN : list(itertools.permutations(numbers, 4))
     iterO : list(itertools.product(ops, repeat=3))
     iterW : list(itertools.product(wrap, repeat=8))
@@ -69,4 +71,3 @@ while True:
 ```
 
 Flag: `{you_count_as_fast_as_a_calculator}`
-

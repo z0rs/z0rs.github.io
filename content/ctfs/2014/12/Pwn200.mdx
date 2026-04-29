@@ -1,15 +1,16 @@
 ---
 type: ctf
-title : SCTF 2014 - Pwn200
+title: SCTF 2014 - Pwn200
 tags: [SCTF CTF, Pwn200]
-date : 2014-12-08
+date: 2014-12-08
 author: Eno
 featuredImage: https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQiSbw35M3yI5QqN2MsUgkNsNsNFqpbVZdRlA&usqp=CAU
 ---
 
-[SCTF](http://ctf.sycsec.com/index.php/home) is a CTF contest hold by [XCTF](https://time.xctf.org.cn/) ( seems like a Chinese version's [CTFtime.org](https://ctftime.org/) ). Teaming up with my labmates, we have a lot of fun solving the challenges, and scored 2161 pts with the final rank 13/659. 
-{/* more */}
-In Pwn200, they gave us a binary file and a libc.so. First we open the binary file with IDA Pro, and check the main function:
+[SCTF](http://ctf.sycsec.com/index.php/home) is a CTF contest hold by [XCTF](https://time.xctf.org.cn/) ( seems like a
+Chinese version's [CTFtime.org](https://ctftime.org/) ). Teaming up with my labmates, we have a lot of fun solving the
+challenges, and scored 2161 pts with the final rank 13/659. {/* more */} In Pwn200, they gave us a binary file and a
+libc.so. First we open the binary file with IDA Pro, and check the main function:
 
 ```c
  .......................
@@ -18,7 +19,7 @@ In Pwn200, they gave us a binary file and a libc.so. First we open the binary fi
  .......................
   size_t n; // [sp+ACh] [bp-Ch]@1
  .......................
- ....................... 
+ .......................
  read(0, &buf, n + 1);
  if ( strlen((const char *)&buf) - 1 > 9 || strncmp("syclover", (const char *)&buf, 8u) )
  {
@@ -30,16 +31,27 @@ In Pwn200, they gave us a binary file and a libc.so. First we open the binary fi
     read(0, &v1, n);
     result : write(1, &v1, n);
  }
-```	
-notice at line `read(0, &buf, n + 1);`, we can overwrite the variable `n` by overflowing the `buf` variable. After we control `n`, we can input at most 255 characters at the line `read(0, &v1, n);`. By doing this, we can overwrite **(control)** the return address! 
+```
 
-But there's one problem: the program has enable the DEP protection. Since it gave us the libc.so, we think they might want us to use the **return-to-libc attack**. By checking the GOT entry using objdump, we know the GOT entry of `read()` is at address `0x08049850`. 
+notice at line `read(0, &buf, n + 1);`, we can overwrite the variable `n` by overflowing the `buf` variable. After we
+control `n`, we can input at most 255 characters at the line `read(0, &v1, n);`. By doing this, we can overwrite
+**(control)** the return address!
 
-So how do we get the address of `system()`? Well, since we can overwrite the return address, we can set the return address to `write()`'s GOT entry. By giving the parameter `0x08049850`, we can leak the function pointer of `read()`, and calculate `system()`'s address by adding the offset ( we can get the offset by checking libc.so ).
+But there's one problem: the program has enable the DEP protection. Since it gave us the libc.so, we think they might
+want us to use the **return-to-libc attack**. By checking the GOT entry using objdump, we know the GOT entry of `read()`
+is at address `0x08049850`.
 
-After getting the address of `system()`, we can set the return address back to the head of main function, so we can execute the whole program again and write the memory by using `read()`. We can write "/bin/sh" to a memory address in .bss section, and set the return address to `system()`, with **pointer to "/bin/sh"** as the parameter. Finally, we spawn a shell and capture the flag.
+So how do we get the address of `system()`? Well, since we can overwrite the return address, we can set the return
+address to `write()`'s GOT entry. By giving the parameter `0x08049850`, we can leak the function pointer of `read()`,
+and calculate `system()`'s address by adding the offset ( we can get the offset by checking libc.so ).
+
+After getting the address of `system()`, we can set the return address back to the head of main function, so we can
+execute the whole program again and write the memory by using `read()`. We can write "/bin/sh" to a memory address in
+.bss section, and set the return address to `system()`, with **pointer to "/bin/sh"** as the parameter. Finally, we
+spawn a shell and capture the flag.
 
 To sum up, here's the step of the exploitation:
+
 1. Overwrite `n`, so we can use `read()` to overwrite (control) the return address
 2. Set the return address to `write()`, with the parameter `0x08049850` (read()'s GOT entry)
 3. Calculate the address of `system()`
@@ -48,5 +60,5 @@ To sum up, here's the step of the exploitation:
 6. Repeat step 3 (for the final exploit)
 7. Set the return address to `system()`, with pointer to "/bin/sh" as the parameter
 8. Spawn the shell & capture the flag
- 
+
 flag: `SCTF{SH3NG_4_KAN_DAN__BU_FU_9_GANN}`

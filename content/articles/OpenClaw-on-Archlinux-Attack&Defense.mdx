@@ -8,9 +8,11 @@ featuredImage: https://raw.githubusercontent.com/z0rs/z0rs.github.io/refs/heads/
 ---
 
 ## Arch Linux | Authorized Lab Environments Only
+
 ### Red Team Offensive + Blue Team Defensive Playbooks
 
 > ⚠️ **ETHICAL NOTICE:** Every attack technique in this guide is performed **exclusively** against:
+>
 > - Your own local virtual machines
 > - Docker lab containers (DVWA, Juice Shop, Metasploitable2)
 > - CTF platforms
@@ -565,6 +567,7 @@ sudo airmon-ng stop wlan0mon
 ```
 
 ---
+
 ---
 
 # 🔵 BLUE TEAM — DEFENSIVE OPERATIONS
@@ -1012,11 +1015,11 @@ REPORT="$HOME/ai-security-lab/reports/incident-response/${INCIDENT_ID}.md"
 
 cat > "$REPORT" << TEMPLATE
 # Incident Response Report
-**Incident ID:** $INCIDENT_ID  
-**Date:** $(date '+%Y-%m-%d %H:%M:%S')  
-**Analyst:** $ANALYST  
-**Severity:** $SEVERITY  
-**Status:** In Progress  
+**Incident ID:** $INCIDENT_ID
+**Date:** $(date '+%Y-%m-%d %H:%M:%S')
+**Analyst:** $ANALYST
+**Severity:** $SEVERITY
+**Status:** In Progress
 
 ---
 
@@ -1086,9 +1089,9 @@ cat > "$REPORT" << TEMPLATE
 ---
 
 ## Recommendations
-1. 
-2. 
-3. 
+1.
+2.
+3.
 
 ---
 
@@ -1307,8 +1310,8 @@ echo "Suricata alerts total: $SURICATA_ALERTS"
 banner "Phase 5: Report Generation"
 cat > "$REPORT" << TEMPLATE
 # OpenClaw Security Drill Report
-**Date:** $DATE  
-**Environment:** Local Lab (Docker)  
+**Date:** $DATE
+**Environment:** Local Lab (Docker)
 **Targets:** DVWA (localhost:80), Juice Shop (localhost:3000)
 
 ## Recon Results
@@ -1380,5 +1383,5 @@ openclaw                        # Start AI assistant
 
 ---
 
-*Attack & Defense Ops — Arch Linux | Lab Environments Only*  
-*Blue Team + Red Team | Ethical Use Only*
+_Attack & Defense Ops — Arch Linux | Lab Environments Only_  
+_Blue Team + Red Team | Ethical Use Only_
