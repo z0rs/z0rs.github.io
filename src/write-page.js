@@ -31,10 +31,9 @@ const LABEL_CLASSES = 'block text-base font-semibold text-secondary mb-3';
 
 const ERROR_CLASSES = 'text-salmon text-sm mt-1';
 
-const PANEL_CARD_CLASSES = 'rounded-2xl border border-outline bg-surface px-5 py-6 sm:px-8 sm:py-8';
+const PANEL_CARD_CLASSES = 'px-0 sm:px-0';
 const FORM_STACK_CLASSES = 'mx-auto w-full max-w-3xl space-y-6 sm:space-y-7';
-const SECTION_CARD_CLASSES =
-  'rounded-2xl border border-outline/80 bg-background/25 px-4 py-5 sm:px-6 sm:py-6 space-y-4';
+const SECTION_CARD_CLASSES = 'space-y-4 sm:space-y-5';
 const SECTION_TITLE_CLASSES = 'text-sm font-semibold text-secondary';
 const MUTED_TEXT_CLASSES = 'text-sm leading-relaxed text-muted';
 const PRIMARY_BUTTON_CLASSES =
@@ -456,7 +455,7 @@ export default function WritePage({ data }) {
       </header>
 
       {editingSlug && (
-        <div className="rounded-xl border border-primary/50 bg-background/40 px-4 py-3.5 text-sm text-secondary">
+        <div className="px-1 text-sm text-secondary">
           <span className="font-semibold text-text">Editing mode:</span> <code>{editingSlug}</code>
           <button
             type="button"
@@ -470,12 +469,8 @@ export default function WritePage({ data }) {
 
       {editStatus.type !== 'idle' && (
         <div
-          className={`rounded-xl border px-4 py-3 text-sm ${
-            editStatus.type === 'error'
-              ? 'border-salmon/50 bg-salmon/10 text-salmon'
-              : editStatus.type === 'success'
-              ? 'border-teal/40 bg-teal/10 text-teal'
-              : 'border-outline bg-background/30 text-secondary'
+          className={`px-1 text-sm ${
+            editStatus.type === 'error' ? 'text-salmon' : editStatus.type === 'success' ? 'text-teal' : 'text-secondary'
           }`}
         >
           {editStatus.message}
@@ -514,15 +509,13 @@ export default function WritePage({ data }) {
               <label className={LABEL_CLASSES} htmlFor="status-published">
                 Status
               </label>
-              <div className="flex flex-wrap items-center gap-4 rounded-xl border border-outline bg-background/35 p-4 sm:px-5">
+              <div className="flex flex-wrap items-center gap-5">
                 {['published', 'draft'].map((s) => (
                   <label
                     key={s}
                     htmlFor={`status-${s}`}
-                    className={`inline-flex min-w-[140px] items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold transition-colors ${
-                      form.status === s
-                        ? 'border-primary/70 bg-primary/10 text-primary'
-                        : 'border-outline bg-surface text-secondary hover:text-primary'
+                    className={`inline-flex items-center gap-2 text-sm font-semibold transition-colors ${
+                      form.status === s ? 'text-primary' : 'text-secondary hover:text-primary'
                     }`}
                   >
                     <input
@@ -702,7 +695,7 @@ export default function WritePage({ data }) {
             </div>
 
             {uploadedAsset?.imageUrl ? (
-              <div className="space-y-3 rounded-xl border border-outline bg-surface/40 px-4 py-3.5">
+              <div className="space-y-3 pt-1">
                 <code className="block break-all text-xs text-muted">{uploadedAsset.imageUrl}</code>
                 <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center">
                   <button
@@ -762,7 +755,7 @@ export default function WritePage({ data }) {
               </button>
 
               {status.type === 'success' && (
-                <div className="min-w-0 rounded-lg border border-teal/40 bg-teal/10 px-4 py-3 text-sm text-teal">
+                <div className="min-w-0 text-sm text-teal">
                   <div className="flex items-start gap-2">
                     <span>&#10003;</span>
                     <span className="break-words">{status.message}</span>
@@ -780,7 +773,7 @@ export default function WritePage({ data }) {
               )}
 
               {status.type === 'error' && (
-                <div className="min-w-0 rounded-lg border border-salmon/50 bg-salmon/10 px-4 py-3 text-sm text-salmon">
+                <div className="min-w-0 text-sm text-salmon">
                   <div className="flex items-start gap-2">
                     <span>&#10007;</span>
                     <span className="break-words">{status.message}</span>
@@ -823,7 +816,7 @@ export default function WritePage({ data }) {
               </button>
 
               {deleteStatus.type === 'success' && (
-                <div className="min-w-0 rounded-lg border border-teal/40 bg-teal/10 px-4 py-3 text-sm text-teal">
+                <div className="min-w-0 text-sm text-teal">
                   <div className="flex items-start gap-2">
                     <span>&#10003;</span>
                     <span className="break-words">{deleteStatus.message}</span>
@@ -832,7 +825,7 @@ export default function WritePage({ data }) {
               )}
 
               {deleteStatus.type === 'error' && (
-                <div className="min-w-0 rounded-lg border border-salmon/50 bg-salmon/10 px-4 py-3 text-sm text-salmon">
+                <div className="min-w-0 text-sm text-salmon">
                   <div className="flex items-start gap-2">
                     <span>&#10007;</span>
                     <span className="break-words">{deleteStatus.message}</span>
@@ -845,7 +838,7 @@ export default function WritePage({ data }) {
       </form>
 
       <AsideElement>
-        <div className="space-y-4 rounded-2xl border border-outline bg-surface/60 px-5 py-6">
+        <div className="space-y-4 px-2">
           <h5 className="m-0 text-lg font-semibold uppercase leading-6 text-secondary">Recent Articles</h5>
           <p className="text-sm text-muted">Load an article for edit or autofill slug for deletion.</p>
           <ul className="m-0 list-none space-y-4 p-0">
@@ -856,10 +849,7 @@ export default function WritePage({ data }) {
               const articleStatus = node?.frontmatter?.status === 'draft' ? 'Draft' : 'Published';
 
               return (
-                <li
-                  key={`${articlePath}-${index}`}
-                  className="m-0 rounded-xl border border-outline/70 bg-background/25 p-3.5"
-                >
+                <li key={`${articlePath}-${index}`} className="m-0 border-b border-outline/50 pb-3">
                   <button
                     type="button"
                     onClick={() => handleLoadForEdit(articleSlug)}
