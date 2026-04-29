@@ -68,7 +68,7 @@ Approach     : Evidence-based — findings only when observable in live traffic
 ## 5. Testing Limitations
 
 | Limitation | Impact |
-|------------|--------|
+|:---|:--
 | No Braze REST API key provided | Unable to test authenticated API endpoints (`/api/v3/*`). Could not probe for IDOR, data exposure, or privilege escalation in the REST API. |
 | No second (lower-privilege) account provided | Unable to perform horizontal/vertical privilege escalation testing via Autorize. |
 | No active session after password step | Could not reach authenticated dashboard pages to test post-auth access controls, CSRF on state-changing actions, or IDOR on user data endpoints. |
