@@ -31,7 +31,18 @@ const LABEL_CLASSES = 'block text-base font-semibold text-secondary mb-3';
 
 const ERROR_CLASSES = 'text-salmon text-sm mt-1';
 
-const PANEL_CARD_CLASSES = 'rounded-xl border border-outline bg-surface px-6 py-7 sm:px-8 sm:py-8';
+const PANEL_CARD_CLASSES = 'rounded-2xl border border-outline bg-surface px-5 py-6 sm:px-8 sm:py-8';
+const FORM_STACK_CLASSES = 'mx-auto w-full max-w-3xl space-y-6 sm:space-y-7';
+const SECTION_CARD_CLASSES =
+  'rounded-2xl border border-outline/80 bg-background/25 px-4 py-5 sm:px-6 sm:py-6 space-y-4';
+const SECTION_TITLE_CLASSES = 'text-sm font-semibold text-secondary';
+const MUTED_TEXT_CLASSES = 'text-sm leading-relaxed text-muted';
+const PRIMARY_BUTTON_CLASSES =
+  'inline-flex w-full sm:w-auto items-center justify-center rounded-xl border border-primary/60 bg-primary px-7 py-3 text-base font-bold text-background transition-colors hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-50';
+const SECONDARY_BUTTON_CLASSES =
+  'inline-flex w-full sm:w-auto items-center justify-center rounded-lg border border-outline px-4 py-2 text-xs font-semibold text-secondary transition-colors hover:text-primary';
+const DELETE_BUTTON_CLASSES =
+  'inline-flex w-full sm:w-auto items-center justify-center rounded-xl border border-salmon/70 bg-salmon px-7 py-3 text-base font-bold text-background transition-colors hover:bg-primary disabled:cursor-not-allowed disabled:opacity-50';
 
 function normalizeArticleSlugInput(value) {
   if (!value || typeof value !== 'string') return '';
@@ -364,7 +375,10 @@ export default function WritePage({ data }) {
         status: article.status === 'draft' ? 'draft' : 'published'
       }));
       setStatus({ type: 'idle', message: '' });
-      setEditStatus({ type: 'success', message: `Loaded "${article.filename || `${normalizedSlug}.mdx`}" for editing.` });
+      setEditStatus({
+        type: 'success',
+        message: `Loaded "${article.filename || `${normalizedSlug}.mdx`}" for editing.`
+      });
     } catch (err) {
       setEditStatus({ type: 'error', message: `Network error: ${err.message}` });
     }
@@ -436,33 +450,43 @@ export default function WritePage({ data }) {
     .replace(/-{2,}/g, '-');
 
   return (
-    <div className="not-prose mx-auto w-full max-w-4xl space-y-12 sm:space-y-14">
-      <h1 className="m-0 text-3xl font-bold text-text sm:text-4xl">Write Panel</h1>
+    <div className="not-prose mx-auto w-full max-w-4xl space-y-8 sm:space-y-10">
+      <header className="space-y-2">
+        <h1 className="m-0 text-3xl font-bold text-text sm:text-4xl">Write Panel</h1>
+      </header>
+
       {editingSlug && (
-        <div className="rounded-xl border border-primary/50 bg-background/40 px-4 py-3 text-sm text-secondary">
-          Editing mode active: <code>{editingSlug}</code>
+        <div className="rounded-xl border border-primary/50 bg-background/40 px-4 py-3.5 text-sm text-secondary">
+          <span className="font-semibold text-text">Editing mode:</span> <code>{editingSlug}</code>
           <button
             type="button"
             onClick={handleResetEditor}
-            className="ml-3 inline-flex text-primary underline hover:no-underline"
+            className="ml-3 inline-flex text-primary underline underline-offset-2 hover:no-underline"
           >
             Reset form
           </button>
         </div>
       )}
+
       {editStatus.type !== 'idle' && (
-        <div className={`text-sm ${editStatus.type === 'error' ? 'text-salmon' : editStatus.type === 'success' ? 'text-teal' : 'text-secondary'}`}>
+        <div
+          className={`rounded-xl border px-4 py-3 text-sm ${
+            editStatus.type === 'error'
+              ? 'border-salmon/50 bg-salmon/10 text-salmon'
+              : editStatus.type === 'success'
+              ? 'border-teal/40 bg-teal/10 text-teal'
+              : 'border-outline bg-background/30 text-secondary'
+          }`}
+        >
           {editStatus.message}
         </div>
       )}
 
       <form onSubmit={handleSubmit} className={PANEL_CARD_CLASSES}>
-        <div className="mx-auto w-full max-w-3xl space-y-8 sm:space-y-9">
-          <div className="space-y-4">
-            <label className={LABEL_CLASSES} htmlFor="token">
-              {isLocal ? 'Dev Token' : 'Write Secret Token'}
-            </label>
-            <p className="text-sm text-muted leading-relaxed">
+        <div className={FORM_STACK_CLASSES}>
+          <section className={SECTION_CARD_CLASSES}>
+            <h2 className={SECTION_TITLE_CLASSES}>{isLocal ? 'Dev Token' : 'Write Secret Token'}</h2>
+            <p className={MUTED_TEXT_CLASSES}>
               {isLocal ? (
                 <>
                   In local dev, any non-empty bearer token is accepted. Example:{' '}
@@ -485,15 +509,24 @@ export default function WritePage({ data }) {
               className={`${FIELD_CLASSES} font-mono text-sm ${tokenError ? 'border-salmon' : ''}`}
             />
             {tokenError && <p className={ERROR_CLASSES}>{tokenError}</p>}
-          </div>
 
-          <div className="space-y-4 sm:space-y-3">
-            <div className="sm:grid sm:grid-cols-[120px_1fr] sm:items-center sm:gap-x-5">
-              <span className="block text-base font-semibold text-secondary mb-3 sm:mb-0">Status</span>
-              <div className="flex flex-wrap items-center justify-center sm:justify-start gap-x-10 gap-y-4 rounded-xl border border-outline bg-background/30 px-4 py-4 sm:px-5">
+            <div className="space-y-3 pt-1">
+              <label className={LABEL_CLASSES} htmlFor="status-published">
+                Status
+              </label>
+              <div className="flex flex-wrap items-center gap-4 rounded-xl border border-outline bg-background/35 p-4 sm:px-5">
                 {['published', 'draft'].map((s) => (
-                  <label key={s} className="flex items-center gap-2 cursor-pointer">
+                  <label
+                    key={s}
+                    htmlFor={`status-${s}`}
+                    className={`inline-flex min-w-[140px] items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold transition-colors ${
+                      form.status === s
+                        ? 'border-primary/70 bg-primary/10 text-primary'
+                        : 'border-outline bg-surface text-secondary hover:text-primary'
+                    }`}
+                  >
                     <input
+                      id={`status-${s}`}
                       type="radio"
                       name="status"
                       value={s}
@@ -501,123 +534,121 @@ export default function WritePage({ data }) {
                       onChange={set('status')}
                       className="accent-primary"
                     />
-                    <span className={`text-base ${form.status === s ? 'text-text' : 'text-muted'}`}>
-                      {s.charAt(0).toUpperCase() + s.slice(1)}
-                    </span>
+                    {s.charAt(0).toUpperCase() + s.slice(1)}
                   </label>
                 ))}
               </div>
+              {form.status === 'draft' && (
+                <small className="block text-sm text-primary">
+                  Draft mode: will be skipped by gatsby-node.js in build output.
+                </small>
+              )}
             </div>
-            {form.status === 'draft' && (
-              <small className="block text-sm text-primary sm:pl-[140px]">
-                Draft mode: will be skipped by gatsby-node.js in build output.
-              </small>
-            )}
-          </div>
+          </section>
 
-          <div className="space-y-3">
-            <label className={LABEL_CLASSES} htmlFor="title">
-              Title <span className="text-salmon">*</span>
-            </label>
-            <input
-              id="title"
-              type="text"
-              value={form.title}
-              onChange={set('title')}
-              required
-              placeholder="e.g. Understanding JWT Security"
-              className={FIELD_CLASSES}
-            />
-            {previewSlug && (
-              <small className="text-sm text-muted block">
-                Preview slug: <code className="bg-background px-1 rounded">/articles/{previewSlug}/</code>
-              </small>
-            )}
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+          <section className={SECTION_CARD_CLASSES}>
             <div className="space-y-3">
-              <label className={LABEL_CLASSES} htmlFor="author">
-                Author
+              <label className={LABEL_CLASSES} htmlFor="title">
+                Title <span className="text-salmon">*</span>
               </label>
               <input
-                id="author"
+                id="title"
                 type="text"
-                value={form.author}
-                onChange={set('author')}
-                placeholder="Eno"
+                value={form.title}
+                onChange={set('title')}
+                required
+                placeholder="e.g. Understanding JWT Security"
                 className={FIELD_CLASSES}
               />
+              {previewSlug && (
+                <small className="text-sm text-muted block">
+                  Preview slug: <code className="bg-background px-1 rounded">/articles/{previewSlug}/</code>
+                </small>
+              )}
             </div>
-            <div className="space-y-3">
-              <label className={LABEL_CLASSES} htmlFor="date">
-                Date
-              </label>
-              <input id="date" type="date" value={form.date} onChange={set('date')} className={FIELD_CLASSES} />
-            </div>
-          </div>
 
-          <div className="space-y-3">
-            <label className={LABEL_CLASSES} htmlFor="tags">
-              Tags <span className="font-normal text-muted text-sm">(comma-separated)</span>
-            </label>
-            <input
-              id="tags"
-              type="text"
-              value={form.tags}
-              onChange={set('tags')}
-              placeholder="Security, Web, CTF"
-              className={FIELD_CLASSES}
-            />
-            {form.tags && (
-              <div className="flex flex-wrap gap-2">
-                {form.tags
-                  .split(',')
-                  .map((t) => t.trim())
-                  .filter(Boolean)
-                  .map((tag) => (
-                    <span
-                      key={tag}
-                      className="text-sm bg-background border border-outline rounded-full px-2.5 py-1 text-secondary"
-                    >
-                      {tag}
-                    </span>
-                  ))}
-              </div>
-            )}
-          </div>
-
-          <div className="space-y-3">
-            <label className={LABEL_CLASSES} htmlFor="featuredImage">
-              Featured Image URL <span className="font-normal text-muted text-sm">(optional)</span>
-            </label>
-            <input
-              id="featuredImage"
-              type="url"
-              value={form.featuredImage}
-              onChange={set('featuredImage')}
-              placeholder="https://..."
-              className={FIELD_CLASSES}
-            />
-            {form.featuredImage && (
-              <div className="rounded-xl overflow-hidden border border-outline w-full max-w-sm h-44 sm:h-52">
-                <img
-                  src={form.featuredImage}
-                  alt="Preview"
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    e.target.style.display = 'none';
-                  }}
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+              <div className="space-y-3">
+                <label className={LABEL_CLASSES} htmlFor="author">
+                  Author
+                </label>
+                <input
+                  id="author"
+                  type="text"
+                  value={form.author}
+                  onChange={set('author')}
+                  placeholder="Eno"
+                  className={FIELD_CLASSES}
                 />
               </div>
-            )}
-          </div>
+              <div className="space-y-3">
+                <label className={LABEL_CLASSES} htmlFor="date">
+                  Date
+                </label>
+                <input id="date" type="date" value={form.date} onChange={set('date')} className={FIELD_CLASSES} />
+              </div>
+            </div>
 
-          <div className="space-y-4 rounded-xl border border-outline bg-background/20 px-4 py-4 sm:px-5 sm:py-5">
-            <label className={LABEL_CLASSES} htmlFor="imageUpload">
-              Upload Image
-            </label>
-            <p className="text-sm text-muted">
+            <div className="space-y-3">
+              <label className={LABEL_CLASSES} htmlFor="tags">
+                Tags <span className="font-normal text-muted text-sm">(comma-separated)</span>
+              </label>
+              <input
+                id="tags"
+                type="text"
+                value={form.tags}
+                onChange={set('tags')}
+                placeholder="Security, Web, CTF"
+                className={FIELD_CLASSES}
+              />
+              {form.tags && (
+                <div className="flex flex-wrap gap-2">
+                  {form.tags
+                    .split(',')
+                    .map((t) => t.trim())
+                    .filter(Boolean)
+                    .map((tag) => (
+                      <span
+                        key={tag}
+                        className="rounded-full border border-outline bg-background px-2.5 py-1 text-sm text-secondary"
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-3">
+              <label className={LABEL_CLASSES} htmlFor="featuredImage">
+                Featured Image URL <span className="font-normal text-muted text-sm">(optional)</span>
+              </label>
+              <input
+                id="featuredImage"
+                type="url"
+                value={form.featuredImage}
+                onChange={set('featuredImage')}
+                placeholder="https://..."
+                className={FIELD_CLASSES}
+              />
+              {form.featuredImage && (
+                <div className="h-44 w-full max-w-md overflow-hidden rounded-xl border border-outline sm:h-52">
+                  <img
+                    src={form.featuredImage}
+                    alt="Preview"
+                    className="h-full w-full object-cover"
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+          </section>
+
+          <section className={SECTION_CARD_CLASSES}>
+            <h2 className={SECTION_TITLE_CLASSES}>Upload Image</h2>
+            <p className={MUTED_TEXT_CLASSES}>
               Upload image to repo path <code>/static/images/uploads/...</code>, then reuse URL for featured image or
               insert into MDX.
             </p>
@@ -640,17 +671,17 @@ export default function WritePage({ data }) {
             />
 
             {uploadPreview ? (
-              <div className="rounded-xl overflow-hidden border border-outline w-full max-w-sm h-44 sm:h-52">
-                <img src={uploadPreview} alt="Upload preview" className="w-full h-full object-cover" />
+              <div className="h-44 w-full max-w-md overflow-hidden rounded-xl border border-outline sm:h-52">
+                <img src={uploadPreview} alt="Upload preview" className="h-full w-full object-cover" />
               </div>
             ) : null}
 
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
               <button
                 type="button"
                 onClick={handleUploadImage}
                 disabled={uploadStatus.type === 'loading'}
-                className="inline-flex w-full sm:w-auto items-center justify-center rounded-xl border border-primary/60 bg-primary px-6 py-2.5 text-sm font-bold text-background transition-colors hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-50"
+                className={PRIMARY_BUTTON_CLASSES}
               >
                 {uploadStatus.type === 'loading' ? 'Uploading...' : 'Upload Image'}
               </button>
@@ -661,8 +692,8 @@ export default function WritePage({ data }) {
                     uploadStatus.type === 'error'
                       ? 'text-salmon'
                       : uploadStatus.type === 'success'
-                        ? 'text-teal'
-                        : 'text-secondary'
+                      ? 'text-teal'
+                      : 'text-secondary'
                   }`}
                 >
                   {uploadStatus.message}
@@ -671,95 +702,97 @@ export default function WritePage({ data }) {
             </div>
 
             {uploadedAsset?.imageUrl ? (
-              <div className="space-y-3 rounded-lg border border-outline bg-surface/40 px-4 py-3">
-                <code className="block text-xs text-muted break-all">{uploadedAsset.imageUrl}</code>
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <div className="space-y-3 rounded-xl border border-outline bg-surface/40 px-4 py-3.5">
+                <code className="block break-all text-xs text-muted">{uploadedAsset.imageUrl}</code>
+                <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center">
                   <button
                     type="button"
                     onClick={() => setForm((prev) => ({ ...prev, featuredImage: uploadedAsset.imageUrl }))}
-                    className="inline-flex w-full sm:w-auto items-center justify-center rounded-lg border border-outline px-4 py-2 text-xs font-semibold text-secondary hover:text-primary transition-colors"
+                    className={SECONDARY_BUTTON_CLASSES}
                   >
                     Use as Featured Image
                   </button>
                   <button
                     type="button"
                     onClick={() => insertMarkdownIntoContent(`${uploadedAsset.markdownSnippet}\n`)}
-                    className="inline-flex w-full sm:w-auto items-center justify-center rounded-lg border border-outline px-4 py-2 text-xs font-semibold text-secondary hover:text-primary transition-colors"
+                    className={SECONDARY_BUTTON_CLASSES}
                   >
                     Insert into Content
                   </button>
                 </div>
               </div>
             ) : null}
-          </div>
+          </section>
 
-          <div className="space-y-3">
-            <label className={LABEL_CLASSES} htmlFor="content">
-              Content (MDX) <span className="text-salmon">*</span>
-            </label>
-            <textarea
-              ref={contentRef}
-              id="content"
-              value={form.content}
-              onChange={set('content')}
-              required
-              rows={18}
-              placeholder={`Write your article in MDX format.\n\n## Heading\n\nRegular text and **bold** and *italic*.\n\n\`\`\`js\nconsole.log("code block");\n\`\`\``}
-              className={`${FIELD_CLASSES} font-mono text-base leading-relaxed resize-y min-h-[18rem] sm:min-h-[22rem]`}
-            />
-            <p className="text-sm text-muted text-center">
-              {form.content.length} characters &middot; Supports headings, links, tables, code blocks, and embeds.
-            </p>
-          </div>
+          <section className={SECTION_CARD_CLASSES}>
+            <div className="space-y-3">
+              <label className={LABEL_CLASSES} htmlFor="content">
+                Content (MDX) <span className="text-salmon">*</span>
+              </label>
+              <textarea
+                ref={contentRef}
+                id="content"
+                value={form.content}
+                onChange={set('content')}
+                required
+                rows={18}
+                placeholder={`Write your article in MDX format.\n\n## Heading\n\nRegular text and **bold** and *italic*.\n\n\`\`\`js\nconsole.log("code block");\n\`\`\``}
+                className={`${FIELD_CLASSES} min-h-[18rem] resize-y font-mono text-base leading-relaxed sm:min-h-[22rem]`}
+              />
+              <p className="text-center text-sm text-muted">
+                {form.content.length} characters &middot; Supports headings, links, tables, code blocks, and embeds.
+              </p>
+            </div>
+          </section>
 
-          <div className="flex flex-col gap-4 pt-3 sm:flex-row sm:items-start">
-            <button
-              type="submit"
-              disabled={status.type === 'loading'}
-              className="inline-flex w-full sm:w-auto items-center justify-center rounded-xl border border-primary/60 bg-primary px-7 py-3 text-base font-bold text-background transition-colors hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {status.type === 'loading'
-                ? editingSlug
-                  ? 'Updating...'
-                  : 'Publishing...'
-                : editingSlug
+          <section className={`${SECTION_CARD_CLASSES} pt-5`}>
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+              <button type="submit" disabled={status.type === 'loading'} className={PRIMARY_BUTTON_CLASSES}>
+                {status.type === 'loading'
+                  ? editingSlug
+                    ? 'Updating...'
+                    : 'Publishing...'
+                  : editingSlug
                   ? form.status === 'draft'
                     ? 'Update Draft'
                     : 'Update Article'
                   : form.status === 'draft'
-                    ? 'Save Draft'
-                    : 'Publish Article'}
-            </button>
+                  ? 'Save Draft'
+                  : 'Publish Article'}
+              </button>
 
-            {status.type === 'success' && (
-              <div className="min-w-0 text-sm text-teal">
-                <div className="flex items-start gap-2">
-                  <span>&#10003;</span>
-                  <span className="break-words">{status.message}</span>
+              {status.type === 'success' && (
+                <div className="min-w-0 rounded-lg border border-teal/40 bg-teal/10 px-4 py-3 text-sm text-teal">
+                  <div className="flex items-start gap-2">
+                    <span>&#10003;</span>
+                    <span className="break-words">{status.message}</span>
+                  </div>
+                  {status.url && (
+                    <button
+                      type="button"
+                      onClick={() => navigate(status.url)}
+                      className="mt-2 inline-flex text-secondary underline underline-offset-2 hover:no-underline"
+                    >
+                      View article
+                    </button>
+                  )}
                 </div>
-                {status.url && (
-                  <button
-                    type="button"
-                    onClick={() => navigate(status.url)}
-                    className="mt-2 inline-flex text-secondary underline hover:no-underline"
-                  >
-                    View article
-                  </button>
-                )}
-              </div>
-            )}
+              )}
 
-            {status.type === 'error' && (
-              <div className="min-w-0 text-sm text-salmon flex items-start gap-2">
-                <span>&#10007;</span>
-                <span className="break-words">{status.message}</span>
-              </div>
-            )}
-          </div>
+              {status.type === 'error' && (
+                <div className="min-w-0 rounded-lg border border-salmon/50 bg-salmon/10 px-4 py-3 text-sm text-salmon">
+                  <div className="flex items-start gap-2">
+                    <span>&#10007;</span>
+                    <span className="break-words">{status.message}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </section>
 
-          <div className="space-y-4 border-t border-outline/80 pt-8 sm:pt-9">
+          <section className={SECTION_CARD_CLASSES}>
             <h2 className="m-0 text-xl font-bold text-text">Delete Article</h2>
-            <p className="text-sm text-muted leading-relaxed">
+            <p className={MUTED_TEXT_CLASSES}>
               Paste article slug or URL (for example <code>/articles/post-title-slug/</code>) to remove an article
               without opening GitHub.
             </p>
@@ -784,34 +817,38 @@ export default function WritePage({ data }) {
                 type="button"
                 onClick={handleDeleteSubmit}
                 disabled={deleteStatus.type === 'loading'}
-                className="inline-flex w-full sm:w-auto items-center justify-center rounded-xl border border-salmon/70 bg-salmon px-7 py-3 text-base font-bold text-background transition-colors hover:bg-primary disabled:cursor-not-allowed disabled:opacity-50"
+                className={DELETE_BUTTON_CLASSES}
               >
                 {deleteStatus.type === 'loading' ? 'Deleting...' : 'Delete Article'}
               </button>
 
               {deleteStatus.type === 'success' && (
-                <div className="min-w-0 text-sm text-teal flex items-start gap-2">
-                  <span>&#10003;</span>
-                  <span className="break-words">{deleteStatus.message}</span>
+                <div className="min-w-0 rounded-lg border border-teal/40 bg-teal/10 px-4 py-3 text-sm text-teal">
+                  <div className="flex items-start gap-2">
+                    <span>&#10003;</span>
+                    <span className="break-words">{deleteStatus.message}</span>
+                  </div>
                 </div>
               )}
 
               {deleteStatus.type === 'error' && (
-                <div className="min-w-0 text-sm text-salmon flex items-start gap-2">
-                  <span>&#10007;</span>
-                  <span className="break-words">{deleteStatus.message}</span>
+                <div className="min-w-0 rounded-lg border border-salmon/50 bg-salmon/10 px-4 py-3 text-sm text-salmon">
+                  <div className="flex items-start gap-2">
+                    <span>&#10007;</span>
+                    <span className="break-words">{deleteStatus.message}</span>
+                  </div>
                 </div>
               )}
             </div>
-          </div>
+          </section>
         </div>
       </form>
 
       <AsideElement>
-        <div className="px-6">
-          <h5 className="mb-3 text-lg leading-6 font-semibold uppercase text-secondary">Recent Articles</h5>
-          <p className="mb-4 text-sm text-muted">Load an article for edit or autofill slug for deletion.</p>
-          <ul className="m-0 p-0 list-none space-y-4">
+        <div className="space-y-4 rounded-2xl border border-outline bg-surface/60 px-5 py-6">
+          <h5 className="m-0 text-lg font-semibold uppercase leading-6 text-secondary">Recent Articles</h5>
+          <p className="text-sm text-muted">Load an article for edit or autofill slug for deletion.</p>
+          <ul className="m-0 list-none space-y-4 p-0">
             {recentArticles.map((node, index) => {
               const articlePath = node?.fields?.slug || '';
               const articleSlug = normalizeArticleSlugInput(articlePath);
@@ -819,26 +856,29 @@ export default function WritePage({ data }) {
               const articleStatus = node?.frontmatter?.status === 'draft' ? 'Draft' : 'Published';
 
               return (
-                <li key={`${articlePath}-${index}`} className="m-0 p-0">
+                <li
+                  key={`${articlePath}-${index}`}
+                  className="m-0 rounded-xl border border-outline/70 bg-background/25 p-3.5"
+                >
                   <button
                     type="button"
                     onClick={() => handleLoadForEdit(articleSlug)}
-                    className="block w-full text-left text-sm font-semibold text-secondary hover:text-primary transition-colors"
+                    className="block w-full text-left text-sm font-semibold text-secondary transition-colors hover:text-primary"
                   >
                     {articleTitle}
                   </button>
-                  <code className="block mt-1 text-xs text-muted break-all">{articleSlug}</code>
-                  <div className="mt-2 flex items-center justify-between gap-3">
-                    <small className="uppercase tracking-wide text-[10px] text-muted">{articleStatus}</small>
+                  <code className="mt-1 block break-all text-xs text-muted">{articleSlug}</code>
+                  <div className="mt-3 flex items-center justify-between gap-3">
+                    <small className="text-[10px] uppercase tracking-wide text-muted">{articleStatus}</small>
                     <div className="flex items-center gap-3">
                       <button
                         type="button"
                         onClick={() => setDeleteSlug(articleSlug)}
-                        className="text-xs text-secondary hover:text-primary transition-colors"
+                        className="text-xs text-secondary transition-colors hover:text-primary"
                       >
                         Use for delete
                       </button>
-                      <Link to={articlePath} className="text-xs text-secondary hover:text-primary transition-colors">
+                      <Link to={articlePath} className="text-xs text-secondary transition-colors hover:text-primary">
                         Open
                       </Link>
                     </div>
@@ -877,11 +917,7 @@ export const Head = ({
 
 export const query = graphql`
   query {
-    allMdx(
-      filter: { frontmatter: { type: { eq: "article" } } }
-      sort: { frontmatter: { date: DESC } }
-      limit: 5
-    ) {
+    allMdx(filter: { frontmatter: { type: { eq: "article" } } }, sort: { frontmatter: { date: DESC } }, limit: 5) {
       nodes {
         fields {
           slug
