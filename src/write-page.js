@@ -31,7 +31,7 @@ const LABEL_CLASSES = 'block text-base font-semibold text-secondary mb-3';
 const ERROR_CLASSES = 'text-salmon text-sm mt-1';
 
 const PANEL_CARD_CLASSES =
-  'rounded-xl border border-outline bg-surface px-6 py-6 shadow-[0_8px_24px_rgba(0,0,0,0.18)] sm:px-8 sm:py-8';
+  'rounded-xl border border-outline bg-surface px-6 py-7 sm:px-8 sm:py-8';
 
 export default function WritePage() {
   const [form, setForm] = useState({ ...DEFAULT_FORM });
@@ -151,25 +151,11 @@ export default function WritePage() {
     .replace(/-{2,}/g, '-');
 
   return (
-    <div className="not-prose mx-auto w-full max-w-4xl space-y-10 sm:space-y-12">
-      <header className={`${PANEL_CARD_CLASSES} space-y-6`}>
-        <div className="flex flex-col gap-4">
-          <div className="min-w-0">
-            <h1 className="m-0 text-3xl font-bold text-text sm:text-4xl">Write Panel</h1>
-            <p className="mt-3 text-base text-muted leading-relaxed">
-              Create and publish MDX posts directly from the browser with runtime-aware behavior.
-            </p>
-          </div>
-        </div>
-        <p className="text-base text-secondary leading-relaxed">
-          {isLocal
-            ? 'Writing to local filesystem. Changes stay local until you commit and push manually.'
-            : 'Publishing via GitHub API. Content is committed to the repository and triggers site rebuild.'}
-        </p>
-      </header>
+    <div className="not-prose mx-auto w-full max-w-4xl space-y-12 sm:space-y-14">
+      <h1 className="m-0 text-3xl font-bold text-text sm:text-4xl">Write Panel</h1>
 
       {isLocal ? (
-        <section className={`${PANEL_CARD_CLASSES} space-y-3`}>
+        <section className={`${PANEL_CARD_CLASSES} space-y-4`}>
           <label className={LABEL_CLASSES} htmlFor="dev-token">
             Dev Token
           </label>
@@ -187,7 +173,7 @@ export default function WritePage() {
           />
         </section>
       ) : (
-        <section className={`${PANEL_CARD_CLASSES} border-primary/30 space-y-3`}>
+        <section className={`${PANEL_CARD_CLASSES} border-primary/30 space-y-4`}>
           <p className="text-sm text-primary font-semibold">Production deployment - Netlify required</p>
           <p className="text-sm text-muted leading-relaxed">
             Set <code>WRITE_SECRET</code> in Netlify environment variables, then use it below as bearer token.
@@ -208,28 +194,30 @@ export default function WritePage() {
         </section>
       )}
 
-      <form onSubmit={handleSubmit} className={`${PANEL_CARD_CLASSES} space-y-9`}>
-        <div className="space-y-4">
-          <span className="block text-base font-semibold text-secondary">Status</span>
-          <div className="flex flex-wrap items-center justify-center sm:justify-start gap-x-10 gap-y-4 rounded-xl border border-outline bg-background/30 px-4 py-4 sm:px-5">
-            {['published', 'draft'].map((s) => (
-              <label key={s} className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  name="status"
-                  value={s}
-                  checked={form.status === s}
-                  onChange={set('status')}
-                  className="accent-primary"
-                />
-                <span className={`text-base ${form.status === s ? 'text-text' : 'text-muted'}`}>
-                  {s.charAt(0).toUpperCase() + s.slice(1)}
-                </span>
-              </label>
-            ))}
+      <form onSubmit={handleSubmit} className={`${PANEL_CARD_CLASSES} space-y-10`}>
+        <div className="space-y-4 sm:space-y-3">
+          <div className="sm:grid sm:grid-cols-[110px_1fr] sm:items-center sm:gap-x-5">
+            <span className="block text-base font-semibold text-secondary mb-3 sm:mb-0">Status</span>
+            <div className="flex flex-wrap items-center justify-center sm:justify-start gap-x-10 gap-y-4 rounded-xl border border-outline bg-background/30 px-4 py-4 sm:px-5">
+              {['published', 'draft'].map((s) => (
+                <label key={s} className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="status"
+                    value={s}
+                    checked={form.status === s}
+                    onChange={set('status')}
+                    className="accent-primary"
+                  />
+                  <span className={`text-base ${form.status === s ? 'text-text' : 'text-muted'}`}>
+                    {s.charAt(0).toUpperCase() + s.slice(1)}
+                  </span>
+                </label>
+              ))}
+            </div>
           </div>
           {form.status === 'draft' && (
-            <small className="block text-sm text-primary">
+            <small className="block text-sm text-primary sm:pl-[130px]">
               Draft mode: will be skipped by gatsby-node.js in build output.
             </small>
           )}
