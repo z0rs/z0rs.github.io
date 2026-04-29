@@ -153,8 +153,9 @@ export default function WritePage() {
     <div className="not-prose mx-auto w-full max-w-4xl space-y-12 sm:space-y-14">
       <h1 className="m-0 text-3xl font-bold text-text sm:text-4xl">Write Panel</h1>
 
-      <form onSubmit={handleSubmit} className={`${PANEL_CARD_CLASSES} space-y-10`}>
-        <div className="space-y-4">
+      <form onSubmit={handleSubmit} className={PANEL_CARD_CLASSES}>
+        <div className="mx-auto w-full max-w-3xl space-y-8 sm:space-y-9">
+          <div className="space-y-4">
           <label className={LABEL_CLASSES} htmlFor="token">
             {isLocal ? 'Dev Token' : 'Write Secret Token'}
           </label>
@@ -166,8 +167,7 @@ export default function WritePage() {
               </>
             ) : (
               <>
-                Production deployment uses <code>WRITE_SECRET</code>. Set it in Netlify env, then paste the token
-                here.
+                Production deployment uses <code>WRITE_SECRET</code>. Set it in Netlify env, then paste the token here.
               </>
             )}
           </p>
@@ -183,10 +183,10 @@ export default function WritePage() {
           {tokenError && <p className={ERROR_CLASSES}>{tokenError}</p>}
         </div>
 
-        <div className="space-y-4 sm:space-y-3">
-          <div className="sm:grid sm:grid-cols-[110px_1fr] sm:items-center sm:gap-x-5">
-            <span className="block text-base font-semibold text-secondary mb-3 sm:mb-0">Status</span>
-            <div className="flex flex-wrap items-center justify-center sm:justify-start gap-x-10 gap-y-4 rounded-xl border border-outline bg-background/30 px-4 py-4 sm:px-5">
+          <div className="space-y-4 sm:space-y-3">
+            <div className="sm:grid sm:grid-cols-[120px_1fr] sm:items-center sm:gap-x-5">
+              <span className="block text-base font-semibold text-secondary mb-3 sm:mb-0">Status</span>
+              <div className="flex flex-wrap items-center justify-center sm:justify-start gap-x-10 gap-y-4 rounded-xl border border-outline bg-background/30 px-4 py-4 sm:px-5">
               {['published', 'draft'].map((s) => (
                 <label key={s} className="flex items-center gap-2 cursor-pointer">
                   <input
@@ -202,164 +202,165 @@ export default function WritePage() {
                   </span>
                 </label>
               ))}
+              </div>
             </div>
+            {form.status === 'draft' && (
+              <small className="block text-sm text-primary sm:pl-[140px]">
+                Draft mode: will be skipped by gatsby-node.js in build output.
+              </small>
+            )}
           </div>
-          {form.status === 'draft' && (
-            <small className="block text-sm text-primary sm:pl-[130px]">
-              Draft mode: will be skipped by gatsby-node.js in build output.
-            </small>
-          )}
-        </div>
 
-        <div className="space-y-3">
-          <label className={LABEL_CLASSES} htmlFor="title">
-            Title <span className="text-salmon">*</span>
-          </label>
-          <input
-            id="title"
-            type="text"
-            value={form.title}
-            onChange={set('title')}
-            required
-            placeholder="e.g. Understanding JWT Security"
-            className={FIELD_CLASSES}
-          />
-          {previewSlug && (
-            <small className="text-sm text-muted block">
-              Preview slug: <code className="bg-background px-1 rounded">/articles/{previewSlug}/</code>
-            </small>
-          )}
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
           <div className="space-y-3">
-            <label className={LABEL_CLASSES} htmlFor="author">
-              Author
+            <label className={LABEL_CLASSES} htmlFor="title">
+              Title <span className="text-salmon">*</span>
             </label>
             <input
-              id="author"
+              id="title"
               type="text"
-              value={form.author}
-              onChange={set('author')}
-              placeholder="Eno"
+              value={form.title}
+              onChange={set('title')}
+              required
+              placeholder="e.g. Understanding JWT Security"
               className={FIELD_CLASSES}
             />
+            {previewSlug && (
+              <small className="text-sm text-muted block">
+                Preview slug: <code className="bg-background px-1 rounded">/articles/{previewSlug}/</code>
+              </small>
+            )}
           </div>
-          <div className="space-y-3">
-            <label className={LABEL_CLASSES} htmlFor="date">
-              Date
-            </label>
-            <input id="date" type="date" value={form.date} onChange={set('date')} className={FIELD_CLASSES} />
-          </div>
-        </div>
 
-        <div className="space-y-3">
-          <label className={LABEL_CLASSES} htmlFor="tags">
-            Tags <span className="font-normal text-muted text-sm">(comma-separated)</span>
-          </label>
-          <input
-            id="tags"
-            type="text"
-            value={form.tags}
-            onChange={set('tags')}
-            placeholder="Security, Web, CTF"
-            className={FIELD_CLASSES}
-          />
-          {form.tags && (
-            <div className="flex flex-wrap gap-2">
-              {form.tags
-                .split(',')
-                .map((t) => t.trim())
-                .filter(Boolean)
-                .map((tag) => (
-                  <span
-                    key={tag}
-                    className="text-sm bg-background border border-outline rounded-full px-2.5 py-1 text-secondary"
-                  >
-                    {tag}
-                  </span>
-                ))}
-            </div>
-          )}
-        </div>
-
-        <div className="space-y-3">
-          <label className={LABEL_CLASSES} htmlFor="featuredImage">
-            Featured Image URL <span className="font-normal text-muted text-sm">(optional)</span>
-          </label>
-          <input
-            id="featuredImage"
-            type="url"
-            value={form.featuredImage}
-            onChange={set('featuredImage')}
-            placeholder="https://..."
-            className={FIELD_CLASSES}
-          />
-          {form.featuredImage && (
-            <div className="rounded-xl overflow-hidden border border-outline w-full max-w-sm h-44 sm:h-52">
-              <img
-                src={form.featuredImage}
-                alt="Preview"
-                className="w-full h-full object-cover"
-                onError={(e) => {
-                  e.target.style.display = 'none';
-                }}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <div className="space-y-3">
+              <label className={LABEL_CLASSES} htmlFor="author">
+                Author
+              </label>
+              <input
+                id="author"
+                type="text"
+                value={form.author}
+                onChange={set('author')}
+                placeholder="Eno"
+                className={FIELD_CLASSES}
               />
             </div>
-          )}
-        </div>
+            <div className="space-y-3">
+              <label className={LABEL_CLASSES} htmlFor="date">
+                Date
+              </label>
+              <input id="date" type="date" value={form.date} onChange={set('date')} className={FIELD_CLASSES} />
+            </div>
+          </div>
 
-        <div className="space-y-3">
-          <label className={LABEL_CLASSES} htmlFor="content">
-            Content (MDX) <span className="text-salmon">*</span>
-          </label>
-          <textarea
-            id="content"
-            value={form.content}
-            onChange={set('content')}
-            required
-            rows={18}
-            placeholder={`Write your article in MDX format.\n\n## Heading\n\nRegular text and **bold** and *italic*.\n\n\`\`\`js\nconsole.log("code block");\n\`\`\``}
-            className={`${FIELD_CLASSES} font-mono text-base leading-relaxed resize-y min-h-[18rem] sm:min-h-[22rem]`}
-          />
-          <p className="text-sm text-muted text-center">
-            {form.content.length} characters &middot; Supports headings, links, tables, code blocks, and embeds.
-          </p>
-        </div>
+          <div className="space-y-3">
+            <label className={LABEL_CLASSES} htmlFor="tags">
+              Tags <span className="font-normal text-muted text-sm">(comma-separated)</span>
+            </label>
+            <input
+              id="tags"
+              type="text"
+              value={form.tags}
+              onChange={set('tags')}
+              placeholder="Security, Web, CTF"
+              className={FIELD_CLASSES}
+            />
+            {form.tags && (
+              <div className="flex flex-wrap gap-2">
+                {form.tags
+                  .split(',')
+                  .map((t) => t.trim())
+                  .filter(Boolean)
+                  .map((tag) => (
+                    <span
+                      key={tag}
+                      className="text-sm bg-background border border-outline rounded-full px-2.5 py-1 text-secondary"
+                    >
+                      {tag}
+                    </span>
+                  ))}
+              </div>
+            )}
+          </div>
 
-        <div className="flex flex-col gap-5 border-t border-outline pt-8 sm:flex-row sm:items-start">
-          <button
-            type="submit"
-            disabled={status.type === 'loading'}
-            className="inline-flex w-full sm:w-auto items-center justify-center rounded-xl border border-primary/60 bg-primary px-7 py-3 text-base font-bold text-background shadow-[0_8px_18px_rgba(240,86,199,0.24)] transition-colors hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {status.type === 'loading' ? 'Publishing...' : form.status === 'draft' ? 'Save Draft' : 'Publish Article'}
-          </button>
+          <div className="space-y-3">
+            <label className={LABEL_CLASSES} htmlFor="featuredImage">
+              Featured Image URL <span className="font-normal text-muted text-sm">(optional)</span>
+            </label>
+            <input
+              id="featuredImage"
+              type="url"
+              value={form.featuredImage}
+              onChange={set('featuredImage')}
+              placeholder="https://..."
+              className={FIELD_CLASSES}
+            />
+            {form.featuredImage && (
+              <div className="rounded-xl overflow-hidden border border-outline w-full max-w-sm h-44 sm:h-52">
+                <img
+                  src={form.featuredImage}
+                  alt="Preview"
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                  }}
+                />
+              </div>
+            )}
+          </div>
 
-          {status.type === 'success' && (
-            <div className="min-w-0 text-sm text-teal">
-              <div className="flex items-start gap-2">
-                <span>&#10003;</span>
+          <div className="space-y-3">
+            <label className={LABEL_CLASSES} htmlFor="content">
+              Content (MDX) <span className="text-salmon">*</span>
+            </label>
+            <textarea
+              id="content"
+              value={form.content}
+              onChange={set('content')}
+              required
+              rows={18}
+              placeholder={`Write your article in MDX format.\n\n## Heading\n\nRegular text and **bold** and *italic*.\n\n\`\`\`js\nconsole.log("code block");\n\`\`\``}
+              className={`${FIELD_CLASSES} font-mono text-base leading-relaxed resize-y min-h-[18rem] sm:min-h-[22rem]`}
+            />
+            <p className="text-sm text-muted text-center">
+              {form.content.length} characters &middot; Supports headings, links, tables, code blocks, and embeds.
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-4 pt-3 sm:flex-row sm:items-start">
+            <button
+              type="submit"
+              disabled={status.type === 'loading'}
+              className="inline-flex w-full sm:w-auto items-center justify-center rounded-xl border border-primary/60 bg-primary px-7 py-3 text-base font-bold text-background transition-colors hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {status.type === 'loading' ? 'Publishing...' : form.status === 'draft' ? 'Save Draft' : 'Publish Article'}
+            </button>
+
+            {status.type === 'success' && (
+              <div className="min-w-0 text-sm text-teal">
+                <div className="flex items-start gap-2">
+                  <span>&#10003;</span>
+                  <span className="break-words">{status.message}</span>
+                </div>
+                {status.url && (
+                  <button
+                    type="button"
+                    onClick={() => navigate(status.url)}
+                    className="mt-2 inline-flex text-secondary underline hover:no-underline"
+                  >
+                    View article
+                  </button>
+                )}
+              </div>
+            )}
+
+            {status.type === 'error' && (
+              <div className="min-w-0 text-sm text-salmon flex items-start gap-2">
+                <span>&#10007;</span>
                 <span className="break-words">{status.message}</span>
               </div>
-              {status.url && (
-                <button
-                  type="button"
-                  onClick={() => navigate(status.url)}
-                  className="mt-2 inline-flex text-secondary underline hover:no-underline"
-                >
-                  View article
-                </button>
-              )}
-            </div>
-          )}
-
-          {status.type === 'error' && (
-            <div className="min-w-0 text-sm text-salmon flex items-start gap-2">
-              <span>&#10007;</span>
-              <span className="break-words">{status.message}</span>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </form>
     </div>
