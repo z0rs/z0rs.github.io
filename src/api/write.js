@@ -409,7 +409,7 @@ export default async function handler(req, res) {
         if (localDelete.invalidSlug) {
           return sendJson(res, 400, {
             error: 'Invalid slug',
-            detail: 'Provide a valid article slug, e.g. "web-application-penetration-test-report-braze".'
+            detail: 'Provide a valid article slug, e.g. "post-title-slug".'
           });
         }
         if (localDelete.notFound) {
@@ -430,7 +430,7 @@ export default async function handler(req, res) {
       if (remoteDelete.invalidSlug) {
         return sendJson(res, 400, {
           error: 'Invalid slug',
-          detail: 'Provide a valid article slug, e.g. "web-application-penetration-test-report-braze".'
+          detail: 'Provide a valid article slug, e.g. "post-title-slug".'
         });
       }
       if (remoteDelete.notFound) {

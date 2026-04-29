@@ -173,7 +173,7 @@ export default function WritePage({ data }) {
     if (!normalizedSlug) {
       setDeleteStatus({
         type: 'error',
-        message: 'Provide a valid article slug (e.g. web-application-penetration-test-report-braze).'
+        message: 'Provide a valid article slug (e.g. post-title-slug).'
       });
       return;
     }
@@ -450,8 +450,8 @@ export default function WritePage({ data }) {
           <div className="space-y-4 border-t border-outline/80 pt-8 sm:pt-9">
             <h2 className="m-0 text-xl font-bold text-text">Delete Article</h2>
             <p className="text-sm text-muted leading-relaxed">
-              Paste article slug or URL (for example <code>/articles/example-slug/</code>) to remove an article without
-              opening GitHub.
+              Paste article slug or URL (for example <code>/articles/post-title-slug/</code>) to remove an article
+              without opening GitHub.
             </p>
             <div className="space-y-3">
               <label className={LABEL_CLASSES} htmlFor="deleteSlug">
@@ -465,7 +465,7 @@ export default function WritePage({ data }) {
                   setDeleteSlug(e.target.value);
                   if (deleteStatus.type !== 'idle') setDeleteStatus({ type: 'idle', message: '' });
                 }}
-                placeholder="web-application-penetration-test-report-braze"
+                placeholder="post-title-slug"
                 className={FIELD_CLASSES}
               />
             </div>
