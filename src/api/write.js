@@ -17,6 +17,19 @@ function isProductionRuntime() {
   return getRuntimeEnv('NODE_ENV') === 'production';
 }
 
+function isNetlifyFunctionRuntime(req) {
+  if (req?.netlifyFunctionParams?.event) return true;
+
+  const runtime = getRuntimeEnv('GATSBY_RUNTIME');
+  if (runtime === 'netlify') return true;
+
+  try {
+    return typeof process.cwd === 'function' && process.cwd().startsWith('/var/task');
+  } catch {
+    return false;
+  }
+}
+
 function getHeader(req, name) {
   const headers = req?.headers;
   if (!headers) return '';
@@ -291,7 +304,8 @@ export default async function handler(req, res) {
   }
 
   try {
-    if (!isProductionRuntime()) {
+    const shouldPublishViaGitHub = isProductionRuntime() || isNetlifyFunctionRuntime(req);
+    if (!shouldPublishViaGitHub) {
       const result = writeToFilesystem({ title, content, tags, author, date, featuredImage, status });
       return sendJson(res, 200, { success: true, ...result });
     }
