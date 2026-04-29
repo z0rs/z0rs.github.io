@@ -24,9 +24,9 @@ const DEFAULT_FORM = {
 };
 
 const FIELD_CLASSES =
-  'w-full bg-surface border border-outline rounded px-3 py-2 text-text placeholder-muted focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors';
+  'w-full bg-surface border border-outline rounded px-3 py-2.5 text-text placeholder-muted focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors';
 
-const LABEL_CLASSES = 'block text-sm font-semibold text-secondary mb-1';
+const LABEL_CLASSES = 'block text-sm font-semibold text-secondary mb-2';
 
 const ERROR_CLASSES = 'text-salmon text-sm mt-1';
 
@@ -39,7 +39,6 @@ export default function WritePage() {
 
   const isDisabled = RUNTIME === 'github';
   const isLocal = RUNTIME === 'local';
-  const isNetlify = RUNTIME === 'netlify';
 
   if (isDisabled) {
     return (
@@ -151,18 +150,15 @@ export default function WritePage() {
     .replace(/-{2,}/g, '-');
 
   return (
-    <div className="not-prose mx-auto w-full max-w-4xl space-y-6">
+    <div className="not-prose mx-auto w-full max-w-4xl space-y-7">
       <header className={PANEL_CARD_CLASSES}>
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex flex-col gap-3">
           <div className="min-w-0">
             <h1 className="m-0 text-2xl font-bold text-text">Write Panel</h1>
             <p className="mt-2 text-sm text-muted">
               Create and publish MDX posts directly from the browser with runtime-aware behavior.
             </p>
           </div>
-          <small className="shrink-0 self-start rounded-full border border-yellow/30 bg-background px-3 py-1 text-xs font-semibold tracking-wide text-yellow">
-            {isLocal ? 'LOCAL DEV' : isNetlify ? 'NETLIFY' : 'RUNTIME'}
-          </small>
         </div>
         <p className="mt-4 text-sm text-secondary">
           {isLocal
@@ -190,9 +186,9 @@ export default function WritePage() {
           />
         </section>
       ) : (
-        <section className={`${PANEL_CARD_CLASSES} border-yellow/30`}>
-          <p className="text-xs text-yellow font-semibold mb-2">Production deployment - Netlify required</p>
-          <p className="text-xs text-muted mb-2">
+        <section className={`${PANEL_CARD_CLASSES} border-primary/30`}>
+          <p className="text-xs text-primary font-semibold mb-2">Production deployment - Netlify required</p>
+          <p className="text-xs text-muted mb-3">
             Set <code>WRITE_SECRET</code> in Netlify environment variables, then use it below as bearer token.
           </p>
           <label className={LABEL_CLASSES} htmlFor="prod-token">
@@ -211,10 +207,10 @@ export default function WritePage() {
         </section>
       )}
 
-      <form onSubmit={handleSubmit} className={`${PANEL_CARD_CLASSES} space-y-6`}>
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <span className="text-sm font-semibold text-secondary">Status:</span>
-          <div className="flex flex-wrap items-center gap-4">
+      <form onSubmit={handleSubmit} className={`${PANEL_CARD_CLASSES} space-y-8`}>
+        <div className="space-y-3">
+          <span className="block text-sm font-semibold text-secondary">Status</span>
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-3 rounded border border-outline bg-background/30 px-3 py-3 sm:px-4">
             {['published', 'draft'].map((s) => (
               <label key={s} className="flex items-center gap-2 cursor-pointer">
                 <input
@@ -232,7 +228,7 @@ export default function WritePage() {
             ))}
           </div>
           {form.status === 'draft' && (
-            <small className="text-xs text-yellow sm:ml-2">
+            <small className="block text-xs text-primary">
               Draft mode: will be skipped by gatsby-node.js in build output.
             </small>
           )}
@@ -258,7 +254,7 @@ export default function WritePage() {
           )}
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
           <div>
             <label className={LABEL_CLASSES} htmlFor="author">
               Author
@@ -354,7 +350,7 @@ export default function WritePage() {
           </p>
         </div>
 
-        <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:items-start">
+        <div className="flex flex-col gap-4 border-t border-outline pt-6 sm:flex-row sm:items-start">
           <button
             type="submit"
             disabled={status.type === 'loading'}
