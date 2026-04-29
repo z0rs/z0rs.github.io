@@ -79,7 +79,7 @@ function buildFrontmatter({ title, content, tags, author, date, featuredImage, s
 
 async function githubApi(path, options = {}) {
   const token = process.env.GITHUB_TOKEN;
-  return fetch(`https://api.github.com${path}`, {
+  return await fetch(`https://api.github.com${path}`, {
     ...options,
     headers: {
       Authorization: `Bearer ${token}`,
