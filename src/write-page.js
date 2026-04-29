@@ -30,8 +30,7 @@ const LABEL_CLASSES = 'block text-base font-semibold text-secondary mb-3';
 
 const ERROR_CLASSES = 'text-salmon text-sm mt-1';
 
-const PANEL_CARD_CLASSES =
-  'rounded-xl border border-outline bg-surface px-6 py-7 sm:px-8 sm:py-8';
+const PANEL_CARD_CLASSES = 'rounded-xl border border-outline bg-surface px-6 py-7 sm:px-8 sm:py-8';
 
 export default function WritePage() {
   const [form, setForm] = useState({ ...DEFAULT_FORM });
@@ -154,47 +153,36 @@ export default function WritePage() {
     <div className="not-prose mx-auto w-full max-w-4xl space-y-12 sm:space-y-14">
       <h1 className="m-0 text-3xl font-bold text-text sm:text-4xl">Write Panel</h1>
 
-      {isLocal ? (
-        <section className={`${PANEL_CARD_CLASSES} space-y-4`}>
-          <label className={LABEL_CLASSES} htmlFor="dev-token">
-            Dev Token
+      <form onSubmit={handleSubmit} className={`${PANEL_CARD_CLASSES} space-y-10`}>
+        <div className="space-y-4">
+          <label className={LABEL_CLASSES} htmlFor="token">
+            {isLocal ? 'Dev Token' : 'Write Secret Token'}
           </label>
           <p className="text-sm text-muted leading-relaxed">
-            In local dev, any non-empty bearer token is accepted. Example:{' '}
-            <code className="bg-background px-1.5 py-0.5 rounded">my-dev-token</code>
+            {isLocal ? (
+              <>
+                In local dev, any non-empty bearer token is accepted. Example:{' '}
+                <code className="bg-background px-1.5 py-0.5 rounded">my-dev-token</code>
+              </>
+            ) : (
+              <>
+                Production deployment uses <code>WRITE_SECRET</code>. Set it in Netlify env, then paste the token
+                here.
+              </>
+            )}
           </p>
           <input
-            id="dev-token"
-            type="text"
-            value={form.token}
-            onChange={handleTokenChange}
-            placeholder="Bearer token (any non-empty string works locally)"
-            className={`${FIELD_CLASSES} font-mono text-sm w-full sm:max-w-xl`}
-          />
-        </section>
-      ) : (
-        <section className={`${PANEL_CARD_CLASSES} border-primary/30 space-y-4`}>
-          <p className="text-sm text-primary font-semibold">Production deployment - Netlify required</p>
-          <p className="text-sm text-muted leading-relaxed">
-            Set <code>WRITE_SECRET</code> in Netlify environment variables, then use it below as bearer token.
-          </p>
-          <label className={LABEL_CLASSES} htmlFor="prod-token">
-            Write Secret Token
-          </label>
-          <input
-            id="prod-token"
+            id="token"
             type="text"
             value={form.token}
             onChange={handleTokenChange}
             onBlur={handleTokenBlur}
-            placeholder="WRITE_SECRET token..."
+            placeholder={isLocal ? 'Bearer token (any non-empty string works locally)' : 'WRITE_SECRET token...'}
             className={`${FIELD_CLASSES} font-mono text-sm ${tokenError ? 'border-salmon' : ''}`}
           />
           {tokenError && <p className={ERROR_CLASSES}>{tokenError}</p>}
-        </section>
-      )}
+        </div>
 
-      <form onSubmit={handleSubmit} className={`${PANEL_CARD_CLASSES} space-y-10`}>
         <div className="space-y-4 sm:space-y-3">
           <div className="sm:grid sm:grid-cols-[110px_1fr] sm:items-center sm:gap-x-5">
             <span className="block text-base font-semibold text-secondary mb-3 sm:mb-0">Status</span>
