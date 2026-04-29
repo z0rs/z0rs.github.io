@@ -25,7 +25,7 @@ const DEFAULT_FORM = {
 };
 
 const FIELD_CLASSES =
-  'w-full rounded border border-outline bg-background/70 px-3.5 py-2.5 text-base leading-6 text-text placeholder:text-muted focus:border-secondary focus:outline-none focus:ring-1 focus:ring-secondary/40 transition-colors';
+  'w-full rounded border border-outline bg-background/40 px-3.5 py-2.5 text-base leading-6 text-text placeholder:text-muted focus:border-secondary focus:outline-none focus:ring-1 focus:ring-secondary/40 transition-colors';
 
 const LABEL_CLASSES = 'mb-2 block text-sm leading-6 font-semibold text-slate-300';
 
@@ -34,19 +34,19 @@ const ERROR_CLASSES = 'mt-1 text-sm text-salmon';
 const PANEL_CARD_CLASSES = 'p-0';
 const FORM_STACK_CLASSES = 'mx-auto w-full max-w-none space-y-8 sm:space-y-10';
 const SECTION_CARD_CLASSES =
-  'space-y-5 rounded border border-outline bg-surface/50 px-4 py-5 sm:space-y-6 sm:px-6 sm:py-6';
+  'space-y-5 rounded border border-outline bg-background/40 px-4 py-5 sm:space-y-6 sm:px-6 sm:py-6';
 const SECTION_TITLE_CLASSES = 'm-0 text-base leading-6 font-semibold uppercase tracking-wide text-secondary';
 const MUTED_TEXT_CLASSES = 'm-0 text-sm leading-7 text-slate-300';
 const PRIMARY_BUTTON_CLASSES =
   'inline-flex w-full sm:w-auto items-center justify-center rounded border border-primary bg-primary px-6 py-2.5 text-base font-semibold text-background transition-colors hover:bg-secondary hover:border-secondary disabled:cursor-not-allowed disabled:opacity-50';
 const SECONDARY_BUTTON_CLASSES =
-  'inline-flex w-full sm:w-auto items-center justify-center rounded border border-outline bg-surface px-4 py-2 text-sm font-semibold text-slate-300 transition-colors hover:bg-muted/10 hover:text-white';
+  'inline-flex w-full sm:w-auto items-center justify-center rounded border border-outline bg-background/40 px-4 py-2 text-sm font-semibold text-slate-300 transition-colors hover:bg-muted/10 hover:text-white';
 const DELETE_BUTTON_CLASSES =
   'inline-flex w-full sm:w-auto items-center justify-center rounded border border-salmon bg-salmon px-6 py-2.5 text-base font-semibold text-background transition-colors hover:border-primary hover:bg-primary disabled:cursor-not-allowed disabled:opacity-50';
 const TAB_BUTTON_CLASSES =
   'inline-flex items-center justify-center rounded-full border px-4 py-1.5 text-sm leading-6 font-semibold transition-colors';
 const TOOLBAR_BUTTON_CLASSES =
-  'inline-flex items-center justify-center rounded border border-outline bg-background/50 px-2.5 py-1.5 text-xs font-semibold text-slate-300 transition-colors hover:bg-muted/10 hover:text-white';
+  'inline-flex items-center justify-center rounded border border-outline bg-background/40 px-2.5 py-1.5 text-xs font-semibold text-slate-300 transition-colors hover:bg-muted/10 hover:text-white';
 
 const WRITE_TABS = [
   { id: 'new', label: 'New Article' },
@@ -105,7 +105,7 @@ function renderInlinePreview(text, keyPrefix) {
       nodes.push(<em key={`${keyPrefix}-i-${tokenIndex}`}>{token.slice(1, -1)}</em>);
     } else if (token.startsWith('`') && token.endsWith('`')) {
       nodes.push(
-        <code key={`${keyPrefix}-c-${tokenIndex}`} className="rounded bg-outline px-1 py-0.5 text-xs text-teal">
+        <code key={`${keyPrefix}-c-${tokenIndex}`} className="rounded bg-outline px-1 py-0.5 text-xs text-slate-300">
           {token.slice(1, -1)}
         </code>
       );
@@ -177,7 +177,7 @@ function renderSafeMdxPreview(content) {
       blocks.push(
         <pre
           key={`code-${i}`}
-          className="overflow-x-auto rounded border border-outline bg-surface px-4 py-3 text-xs text-slate-300"
+          className="overflow-x-auto rounded border border-outline bg-background/40 px-4 py-3 text-xs text-slate-300"
         >
           <code>
             {language ? `// ${language}\n` : ''}
@@ -213,7 +213,7 @@ function renderSafeMdxPreview(content) {
       blocks.push(
         <blockquote
           key={`q-${i}`}
-          className="rounded border-l-4 border-yellow bg-surface px-4 py-2 text-base leading-7 text-slate-300"
+          className="rounded border-l-4 border-outline bg-background/40 px-4 py-2 text-base leading-7 text-slate-300"
         >
           {quoteLines.map((quoteLine, idx) => (
             <p key={`q-${i}-${idx}`}>{renderInlinePreview(quoteLine, `q-${i}-${idx}`)}</p>
@@ -305,7 +305,7 @@ export default function WritePage({ data }) {
       <div className="not-prose mx-auto w-full max-w-none space-y-6">
         <small className="block leading-6 font-semibold capitalize text-primary">Admin</small>
         <h1 className="m-0 text-3xl sm:text-5xl">Write Panel</h1>
-        <div className="rounded border border-outline bg-surface/50 px-5 py-6 text-left sm:px-6">
+        <div className="rounded border border-outline bg-background/40 px-5 py-6 text-left sm:px-6">
           <p className="mb-3 mt-0 text-base leading-7 text-slate-300">
             The Write Panel requires a server-side runtime to handle file writes.
           </p>
@@ -314,7 +314,7 @@ export default function WritePage({ data }) {
           </p>
           <p className="mb-4 mt-0 text-sm leading-7 text-slate-300">
             For write-panel access, deploy to <strong>Netlify</strong> (which runs Gatsby Functions) or use{' '}
-            <strong>local development</strong>: <code className="bg-surface px-2 py-1 rounded">yarn develop</code>
+            <strong>local development</strong>: <code className="rounded bg-background/40 px-2 py-1">yarn develop</code>
           </p>
           <Link to="/" className="inline-block text-secondary transition-colors hover:text-primary">
             &larr; Back to home
@@ -785,7 +785,7 @@ export default function WritePage({ data }) {
       : 'Publish Article';
 
   const renderRecentArticles = () => (
-    <div className="space-y-5 rounded border border-outline bg-surface/50 px-4 py-5 sm:px-6 sm:py-6">
+    <div className="space-y-5 rounded border border-outline bg-background/40 px-4 py-5 sm:px-6 sm:py-6">
       <h5 className="m-0 text-lg leading-6 font-semibold uppercase text-secondary">Recent Articles</h5>
       <p className="m-0 text-sm leading-7 text-slate-300">Use Edit to load article form instantly.</p>
       {recentArticles.length === 0 ? (
@@ -799,15 +799,11 @@ export default function WritePage({ data }) {
           const articleStatus = node?.frontmatter?.status === 'draft' ? 'Draft' : 'Published';
 
           return (
-            <li key={`${articlePath}-${index}`} className="rounded border border-outline bg-background/60 px-4 py-3">
+            <li key={`${articlePath}-${index}`} className="rounded border border-outline bg-background/40 px-4 py-3">
               <p className="m-0 text-base leading-6 font-semibold text-text break-words">{articleTitle}</p>
               <code className="mt-1 block break-all text-xs text-slate-300">{articleSlug}</code>
               <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-                <small
-                  className={`rounded-full border px-2.5 py-0.5 text-[11px] uppercase tracking-wide ${
-                    articleStatus === 'Draft' ? 'border-yellow/60 text-yellow' : 'border-teal/60 text-teal'
-                  }`}
-                >
+                <small className="rounded-full border border-outline px-2.5 py-0.5 text-[11px] uppercase tracking-wide text-slate-300">
                   {articleStatus}
                 </small>
                 <div className="flex flex-wrap items-center gap-2 text-xs">
@@ -858,7 +854,7 @@ export default function WritePage({ data }) {
           <h1 className="m-0 text-3xl sm:text-5xl">Write Panel</h1>
           <span
             className={`inline-flex w-fit items-center rounded-full border px-3 py-1 text-xs font-semibold ${
-              isConnected ? 'border-teal/50 text-teal' : 'border-outline text-slate-300'
+              isConnected ? 'border-secondary/50 text-secondary' : 'border-outline text-slate-300'
             }`}
           >
             {isConnected ? 'Connected' : 'Not Connected'}
@@ -887,7 +883,7 @@ export default function WritePage({ data }) {
       </div>
 
       {(editingSlug || editStatus.type !== 'idle') && activeTab === 'edit' ? (
-        <div className="space-y-2 rounded border border-outline bg-surface/50 px-4 py-4 sm:px-6">
+        <div className="space-y-2 rounded border border-outline bg-background/40 px-4 py-4 sm:px-6">
           {editingSlug ? (
             <div className="text-sm text-slate-300">
               <span className="font-semibold text-text">Editing:</span> <code>{editingSlug}</code>
@@ -901,7 +897,7 @@ export default function WritePage({ data }) {
             </div>
           ) : null}
           {editStatus.type !== 'idle' ? (
-            <div className={`text-sm ${editStatus.type === 'error' ? 'text-salmon' : 'text-teal'}`}>
+            <div className={`text-sm ${editStatus.type === 'error' ? 'text-salmon' : 'text-secondary'}`}>
               {editStatus.message}
             </div>
           ) : null}
@@ -978,7 +974,7 @@ export default function WritePage({ data }) {
 
                 <div className="space-y-3">
                   <span className={LABEL_CLASSES}>Status</span>
-                  <div className="inline-flex rounded-full border border-outline bg-background/70 p-1">
+                  <div className="inline-flex rounded-full border border-outline bg-background/40 p-1">
                     {['published', 'draft'].map((s) => (
                       <label
                         key={s}
@@ -1077,7 +1073,7 @@ export default function WritePage({ data }) {
                     type="file"
                     accept="image/jpeg,image/png,image/webp,image/gif"
                     onChange={handleImageSelection}
-                    className={`${FIELD_CLASSES} file:mr-3 file:rounded file:border file:border-outline file:bg-surface file:px-3 file:py-1.5 file:text-sm file:text-slate-300`}
+                    className={`${FIELD_CLASSES} file:mr-3 file:rounded file:border file:border-outline file:bg-background/40 file:px-3 file:py-1.5 file:text-sm file:text-slate-300`}
                   />
                   <input
                     id="imageAlt"
@@ -1107,7 +1103,7 @@ export default function WritePage({ data }) {
                           uploadStatus.type === 'error'
                             ? 'text-salmon'
                             : uploadStatus.type === 'success'
-                            ? 'text-teal'
+                            ? 'text-secondary'
                             : 'text-slate-300'
                         }`}
                       >
@@ -1144,7 +1140,7 @@ export default function WritePage({ data }) {
               <section className={SECTION_CARD_CLASSES}>
                 <div className="flex items-center justify-between gap-3">
                   <h2 className={SECTION_TITLE_CLASSES}>Content</h2>
-                  <div className="inline-flex rounded-full border border-outline bg-background/70 p-1">
+                  <div className="inline-flex rounded-full border border-outline bg-background/40 p-1">
                     {EDITOR_VIEWS.map((view) => (
                       <button
                         key={view.id}
@@ -1205,7 +1201,7 @@ export default function WritePage({ data }) {
                   </button>
 
                   {status.type === 'success' ? (
-                    <div className="flex items-start gap-2 text-sm text-teal">
+                    <div className="flex items-start gap-2 text-sm text-secondary">
                       <span className="mt-0.5 shrink-0">&#10003;</span>
                       <div>
                         <span className="break-words">{status.message}</span>
@@ -1234,8 +1230,10 @@ export default function WritePage({ data }) {
           )}
 
           {activeTab === 'delete' && (
-            <section className="space-y-5 rounded border border-salmon/40 bg-surface/50 px-4 py-5 sm:px-6 sm:py-6">
-              <h2 className="m-0 text-base leading-6 font-semibold uppercase tracking-wide text-salmon">Danger Zone</h2>
+            <section className="space-y-5 rounded border border-outline bg-background/40 px-4 py-5 sm:px-6 sm:py-6">
+              <h2 className="m-0 text-base leading-6 font-semibold uppercase tracking-wide text-secondary">
+                Danger Zone
+              </h2>
               <p className={MUTED_TEXT_CLASSES}>Enter an article slug to delete it permanently.</p>
               <div className="space-y-2">
                 <label className={LABEL_CLASSES} htmlFor="deleteSlug">
@@ -1264,7 +1262,7 @@ export default function WritePage({ data }) {
                 </button>
 
                 {deleteStatus.type === 'success' ? (
-                  <div className="flex items-start gap-2 text-sm text-teal">
+                  <div className="flex items-start gap-2 text-sm text-secondary">
                     <span className="mt-0.5 shrink-0">&#10003;</span>
                     <span className="break-words">{deleteStatus.message}</span>
                   </div>
@@ -1291,7 +1289,7 @@ export default function WritePage({ data }) {
 
       {deleteConfirm.open ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-          <div className="w-full max-w-md space-y-4 rounded border border-outline bg-surface px-5 py-5">
+          <div className="w-full max-w-md space-y-4 rounded border border-outline bg-background/40 px-5 py-5">
             <h3 className="m-0 text-lg font-semibold text-text">Confirm Deletion</h3>
             <p className="m-0 text-sm leading-7 text-slate-300">
               Delete article <code>{deleteConfirm.slug}</code>? This action cannot be undone.
