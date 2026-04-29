@@ -30,7 +30,8 @@ const LABEL_CLASSES = 'block text-base font-semibold text-secondary mb-3';
 
 const ERROR_CLASSES = 'text-salmon text-sm mt-1';
 
-const PANEL_CARD_CLASSES = 'rounded-2xl border border-outline bg-surface/70 p-5 sm:p-7';
+const PANEL_CARD_CLASSES =
+  'rounded-xl border border-outline bg-surface px-6 py-6 shadow-[0_8px_24px_rgba(0,0,0,0.18)] sm:px-8 sm:py-8';
 
 export default function WritePage() {
   const [form, setForm] = useState({ ...DEFAULT_FORM });
@@ -150,12 +151,12 @@ export default function WritePage() {
     .replace(/-{2,}/g, '-');
 
   return (
-    <div className="not-prose mx-auto w-full max-w-4xl space-y-8 sm:space-y-10">
-      <header className={`${PANEL_CARD_CLASSES} space-y-4`}>
-        <div className="flex flex-col gap-3">
+    <div className="not-prose mx-auto w-full max-w-4xl space-y-10 sm:space-y-12">
+      <header className={`${PANEL_CARD_CLASSES} space-y-6`}>
+        <div className="flex flex-col gap-4">
           <div className="min-w-0">
-            <h1 className="m-0 text-2xl font-bold text-text">Write Panel</h1>
-            <p className="mt-2 text-base text-muted leading-relaxed">
+            <h1 className="m-0 text-3xl font-bold text-text sm:text-4xl">Write Panel</h1>
+            <p className="mt-3 text-base text-muted leading-relaxed">
               Create and publish MDX posts directly from the browser with runtime-aware behavior.
             </p>
           </div>
