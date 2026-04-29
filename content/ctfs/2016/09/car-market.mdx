@@ -58,12 +58,12 @@ address.
 The next thing is to leak out the libc's address. To achieve this, I decide to corrupted fastbin by exploiting the
 off-by-one vulnerability. Assume that we have the following memory layout of a `car->customer` structure:
 
-<pre>
-  +------------------+ customer |........first_name| char first_name[32] |..................| |..................|
-  |..................| +------------------+ customer+32 |..............name| char name[32] |..................|
-  |..................| |..................| +------------------+ customer+64 | 0x12345680| char* comment
-  +------------------+
-</pre>{' '}
+```text
++------------------+ customer |........first_name| char first_name[32] |..................| |..................|
+|..................| +------------------+ customer+32 |..............name| char name[32] |..................|
+|..................| |..................| +------------------+ customer+64 | 0x12345680| char* comment
++------------------+
+```
 
 By using the off-by-one vulnerability on `car->customer->name`, **we can overwrite the last byte of `comment`'s address,
 change it from `0x12345680` to `0x12345600`**. Now if we exit & re-enter the customer menu, the program will try to free
@@ -71,11 +71,11 @@ change it from `0x12345680` to `0x12345600`**. Now if we exit & re-enter the cus
 
 Now if we have the memory layout of a `car` structure like this:
 
-<pre>
-  +------------------+ car 0x123455F0 | 0x0| char model[16] +------------------+ | 0x51| +------------------+ car+16
-  0x12345600 | 0x64| long price +------------------+ car+24 0x12345608 | 0x12348880| struct customer* customer
-  +------------------+
-</pre>{' '}
+```text
++------------------+ car 0x123455F0 | 0x0| char model[16] +------------------+ | 0x51| +------------------+ car+16
+0x12345600 | 0x64| long price +------------------+ car+24 0x12345608 | 0x12348880| struct customer* customer
++------------------+
+```
 
 By setting the model of the car, we can fake the chunk's header, so when glibc's freeing `0x12345600`, it will think
 that it is freeing a memory chunk with the size of `0x50`, **the same size as `car->customer->comment`**, and add
