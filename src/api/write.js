@@ -173,9 +173,10 @@ function writeToFilesystem({ title, content, tags, author, date, featuredImage, 
 
 // Gatsby Functions in development mode receive Express req/res middleware arguments.
 // The Netlify adapter converts the return value to a response in production.
+// Use NODE_ENV as the authoritative signal: dev servers set it to 'development'.
 export default async function handler(req, res) {
-  // --- Development mode: Express middleware ---
-  if (res && typeof res.json === 'function') {
+  // --- Development mode (gatsby develop): Express middleware ---
+  if (process.env.NODE_ENV !== 'production' && res && typeof res.json === 'function') {
     let body;
     try {
       body = typeof req.body === 'object' ? req.body : JSON.parse(req.body || '{}');
@@ -197,7 +198,8 @@ export default async function handler(req, res) {
     }
   }
 
-  // --- Production mode (Netlify): GitHub API ---
+  // --- Production mode (Netlify build): GitHub API via fetch ---
+  // Netlify sets NODE_ENV=production during build AND for deployed serverless functions.
   let body;
   try {
     body = JSON.parse(req.body || '{}');
