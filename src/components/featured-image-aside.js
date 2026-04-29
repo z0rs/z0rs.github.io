@@ -3,7 +3,7 @@ import PropTypes from 'prop-types';
 import { GatsbyImage, getImage } from 'gatsby-plugin-image';
 import NavigationIcon from './navigation-icon';
 
-const FeaturedImageAside = ({ alt, thumbnail, shareText }) => {
+const FeaturedImageAside = ({ alt, thumbnail, featuredImageUrl, shareText }) => {
   const image = getImage(thumbnail);
 
   return (
@@ -11,6 +11,10 @@ const FeaturedImageAside = ({ alt, thumbnail, shareText }) => {
       {image ? (
         <div className="rounded shadow-lg overflow-hidden w-full">
           <GatsbyImage alt={alt} image={image} objectFit="contain" imgStyle={{ objectFit: 'contain' }} />
+        </div>
+      ) : featuredImageUrl ? (
+        <div className="rounded shadow-lg overflow-hidden w-full">
+          <img src={featuredImageUrl} alt={alt} className="w-full h-auto object-contain" loading="lazy" />
         </div>
       ) : null}
       <a
@@ -33,6 +37,8 @@ FeaturedImageAside.propTypes = {
   alt: PropTypes.string.isRequired,
   /** Gatsby Image Data — may be null if remote fetch failed */
   thumbnail: PropTypes.any,
+  /** Optional direct image URL used as fallback when sharp thumbnail is unavailable */
+  featuredImageUrl: PropTypes.string,
   /** The text to populate the share link */
   shareText: PropTypes.string.isRequired
 };

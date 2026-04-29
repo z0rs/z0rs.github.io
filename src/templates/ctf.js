@@ -15,7 +15,7 @@ const Page = ({
     mdx: {
       fields: { slug },
       excerpt,
-      frontmatter: { type, title, date, dateModified, author, tags },
+      frontmatter: { type, title, date, dateModified, author, tags, featuredImage: featuredImageUrl },
       featuredImage,
       embeddedImages,
       tableOfContents: { items: toc }
@@ -47,7 +47,7 @@ const Page = ({
       </ul>
       <MdxParser embedded={embeddedImages}>{children}</MdxParser>
       <AsideElement>
-        <FeaturedImageAside alt={title} thumbnail={thumbnail} shareText={`${siteUrl}${slug}`} />
+        <FeaturedImageAside alt={title} thumbnail={thumbnail} featuredImageUrl={featuredImageUrl} shareText={`${siteUrl}${slug}`} />
         {toc ? (
           <div className="px-6">
             <h5 className="mb-3 text-lg leading-6 font-semibold uppercase text-secondary">On this page</h5>
@@ -74,6 +74,7 @@ export const query = graphql`
         dateModified(formatString: "MMMM DD, YYYY")
         author
         tags
+        featuredImage
       }
       featuredImage {
         childImageSharp {

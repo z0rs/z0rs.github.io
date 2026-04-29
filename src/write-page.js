@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Link, navigate, graphql } from 'gatsby';
 import Seo from './components/seo';
 import AsideElement from './components/aside-element';
@@ -56,12 +56,18 @@ function normalizeArticleSlugInput(value) {
 }
 
 export default function WritePage({ data }) {
+  const contentRef = useRef(null);
   const [form, setForm] = useState({ ...DEFAULT_FORM });
   const [status, setStatus] = useState({ type: 'idle', message: '' });
   const [editStatus, setEditStatus] = useState({ type: 'idle', message: '' });
   const [editingSlug, setEditingSlug] = useState('');
   const [deleteStatus, setDeleteStatus] = useState({ type: 'idle', message: '' });
   const [deleteSlug, setDeleteSlug] = useState('');
+  const [uploadDraft, setUploadDraft] = useState(null);
+  const [uploadPreview, setUploadPreview] = useState('');
+  const [uploadAlt, setUploadAlt] = useState('');
+  const [uploadStatus, setUploadStatus] = useState({ type: 'idle', message: '' });
+  const [uploadedAsset, setUploadedAsset] = useState(null);
   const [tokenError, setTokenError] = useState('');
   const recentArticles = data?.allMdx?.nodes || [];
 
@@ -179,6 +185,127 @@ export default function WritePage({ data }) {
     setEditStatus({ type: 'idle', message: '' });
     setStatus({ type: 'idle', message: '' });
     setForm((prev) => ({ ...DEFAULT_FORM, token: prev.token }));
+  };
+
+  const handleImageSelection = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (!allowedTypes.includes(file.type)) {
+      setUploadStatus({
+        type: 'error',
+        message: 'Unsupported image type. Use JPG, PNG, WEBP, or GIF.'
+      });
+      return;
+    }
+
+    const maxSize = 4 * 1024 * 1024;
+    if (file.size > maxSize) {
+      setUploadStatus({
+        type: 'error',
+        message: 'Image is too large. Max size is 4MB.'
+      });
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = typeof reader.result === 'string' ? reader.result : '';
+      if (!dataUrl) {
+        setUploadStatus({ type: 'error', message: 'Failed to read selected image.' });
+        return;
+      }
+
+      setUploadDraft({
+        filename: file.name,
+        dataUrl
+      });
+      setUploadPreview(dataUrl);
+      setUploadedAsset(null);
+      setUploadStatus({ type: 'idle', message: '' });
+    };
+    reader.onerror = () => setUploadStatus({ type: 'error', message: 'Failed to read selected image.' });
+    reader.readAsDataURL(file);
+  };
+
+  const insertMarkdownIntoContent = (snippet) => {
+    if (!snippet) return;
+
+    const textarea = contentRef.current;
+    if (!textarea) {
+      setForm((prev) => ({ ...prev, content: prev.content ? `${prev.content}\n\n${snippet}` : snippet }));
+      return;
+    }
+
+    const start = textarea.selectionStart ?? form.content.length;
+    const end = textarea.selectionEnd ?? form.content.length;
+    const nextContent = `${form.content.slice(0, start)}${snippet}${form.content.slice(end)}`;
+
+    setForm((prev) => ({ ...prev, content: nextContent }));
+    requestAnimationFrame(() => {
+      textarea.focus();
+      const caret = start + snippet.length;
+      textarea.setSelectionRange(caret, caret);
+    });
+  };
+
+  const handleUploadImage = async () => {
+    if (!uploadDraft?.dataUrl) {
+      setUploadStatus({ type: 'error', message: 'Select an image first.' });
+      return;
+    }
+
+    setUploadStatus({ type: 'loading', message: 'Uploading image...' });
+    setTokenError('');
+
+    try {
+      const res = await fetch('/api/write-image', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${form.token}`
+        },
+        body: JSON.stringify({
+          filename: uploadDraft.filename,
+          dataUrl: uploadDraft.dataUrl,
+          alt: uploadAlt || form.title || 'image'
+        })
+      });
+
+      const rawText = await res.text();
+      let data = {};
+      if (rawText) {
+        try {
+          data = JSON.parse(rawText);
+        } catch {
+          data = { error: rawText };
+        }
+      }
+
+      if (!res.ok) {
+        const errorMessage = data.detail ? `${data.error || 'Request failed'}: ${data.detail}` : data.error;
+        if (res.status === 401) {
+          setUploadStatus({ type: 'error', message: errorMessage || 'Unauthorized' });
+          setTokenError(data.detail || '');
+        } else {
+          setUploadStatus({
+            type: 'error',
+            message: errorMessage || `Request failed with status ${res.status}`
+          });
+        }
+        return;
+      }
+
+      setUploadedAsset({
+        imageUrl: data.imageUrl,
+        markdownSnippet: data.markdownSnippet,
+        filename: data.filename
+      });
+      setUploadStatus({ type: 'success', message: data.message || 'Image uploaded successfully.' });
+    } catch (err) {
+      setUploadStatus({ type: 'error', message: `Network error: ${err.message}` });
+    }
   };
 
   const handleLoadForEdit = async (rawSlug) => {
@@ -486,11 +613,92 @@ export default function WritePage({ data }) {
             )}
           </div>
 
+          <div className="space-y-4 rounded-xl border border-outline bg-background/20 px-4 py-4 sm:px-5 sm:py-5">
+            <label className={LABEL_CLASSES} htmlFor="imageUpload">
+              Upload Image
+            </label>
+            <p className="text-sm text-muted">
+              Upload image to repo path <code>/static/images/uploads/...</code>, then reuse URL for featured image or
+              insert into MDX.
+            </p>
+
+            <input
+              id="imageUpload"
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              onChange={handleImageSelection}
+              className={`${FIELD_CLASSES} file:mr-3 file:rounded-lg file:border-0 file:bg-primary/20 file:px-3 file:py-1.5 file:text-sm file:text-primary`}
+            />
+
+            <input
+              id="imageAlt"
+              type="text"
+              value={uploadAlt}
+              onChange={(e) => setUploadAlt(e.target.value)}
+              placeholder="Alt text for markdown (optional)"
+              className={FIELD_CLASSES}
+            />
+
+            {uploadPreview ? (
+              <div className="rounded-xl overflow-hidden border border-outline w-full max-w-sm h-44 sm:h-52">
+                <img src={uploadPreview} alt="Upload preview" className="w-full h-full object-cover" />
+              </div>
+            ) : null}
+
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+              <button
+                type="button"
+                onClick={handleUploadImage}
+                disabled={uploadStatus.type === 'loading'}
+                className="inline-flex w-full sm:w-auto items-center justify-center rounded-xl border border-primary/60 bg-primary px-6 py-2.5 text-sm font-bold text-background transition-colors hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {uploadStatus.type === 'loading' ? 'Uploading...' : 'Upload Image'}
+              </button>
+
+              {uploadStatus.type !== 'idle' && (
+                <div
+                  className={`min-w-0 text-sm ${
+                    uploadStatus.type === 'error'
+                      ? 'text-salmon'
+                      : uploadStatus.type === 'success'
+                        ? 'text-teal'
+                        : 'text-secondary'
+                  }`}
+                >
+                  {uploadStatus.message}
+                </div>
+              )}
+            </div>
+
+            {uploadedAsset?.imageUrl ? (
+              <div className="space-y-3 rounded-lg border border-outline bg-surface/40 px-4 py-3">
+                <code className="block text-xs text-muted break-all">{uploadedAsset.imageUrl}</code>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <button
+                    type="button"
+                    onClick={() => setForm((prev) => ({ ...prev, featuredImage: uploadedAsset.imageUrl }))}
+                    className="inline-flex w-full sm:w-auto items-center justify-center rounded-lg border border-outline px-4 py-2 text-xs font-semibold text-secondary hover:text-primary transition-colors"
+                  >
+                    Use as Featured Image
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => insertMarkdownIntoContent(`${uploadedAsset.markdownSnippet}\n`)}
+                    className="inline-flex w-full sm:w-auto items-center justify-center rounded-lg border border-outline px-4 py-2 text-xs font-semibold text-secondary hover:text-primary transition-colors"
+                  >
+                    Insert into Content
+                  </button>
+                </div>
+              </div>
+            ) : null}
+          </div>
+
           <div className="space-y-3">
             <label className={LABEL_CLASSES} htmlFor="content">
               Content (MDX) <span className="text-salmon">*</span>
             </label>
             <textarea
+              ref={contentRef}
               id="content"
               value={form.content}
               onChange={set('content')}

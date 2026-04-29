@@ -17,6 +17,10 @@ function isAllowedUrl(url) {
   }
 }
 
+function isLocalImagePath(value) {
+  return typeof value === 'string' && /^\/images\/[a-z0-9/_\-.]+$/i.test(value.trim());
+}
+
 exports.createSchemaCustomization = async ({ actions: { createTypes } }) => {
   createTypes(`
     type Mdx implements Node @dontInfer {
@@ -121,6 +125,8 @@ exports.onCreateNode = async ({
         console.warn(`[gatsby-node] Could not fetch featuredImage for "${node.frontmatter.title}": ${err.message}`);
         console.warn(`  URL: ${node.frontmatter.featuredImage}`);
       }
+    } else if (isLocalImagePath(node.frontmatter.featuredImage)) {
+      // Local static image path (e.g. /images/uploads/...) is allowed and rendered directly in UI.
     } else if (node.frontmatter.featuredImage) {
       console.warn(
         `[gatsby-node] Blocked SSRF attempt — invalid URL in featuredImage for "${node.frontmatter.title}": ${node.frontmatter.featuredImage}`
