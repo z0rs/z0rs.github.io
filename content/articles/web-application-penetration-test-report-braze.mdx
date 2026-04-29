@@ -300,14 +300,3 @@ PRIORITY 1 — Short-term (Medium)
 | FIND-001 | WSTG-CONF-03 | Sensitive Token Exposure |
 | FIND-001 | WSTG-ATHN-07 | CSRF (no anti-CSRF token on password change POST) |
 | FIND-002 | WSTG-INPV-15 | HTTP Response Splitting / Host Header Injection |
-
-### C. Rejected Findings Log
-
-| Finding | Reason for Rejection |
-|---------|----------------------|
-| Username enumeration at `/clusters` | Both valid and invalid email addresses produce identical 302 → `/auth` redirects; no difference in status, response body, or timing observable |
-| SSRF at API endpoints | Excluded per program scope (SSRF re-announced separately) |
-| CORS on `bug-bounty-api.*` | Excluded per program scope |
-| IDOR in Braze REST API | Unable to test without a Braze REST API key; endpoint returns `{"message":"Invalid URL"}` without credentials |
-| Post-auth access control / IDOR | No authenticated session available during testing; no lower-privilege account provided for horizontal escalation testing |
-| Tags feature vulnerabilities | Explicitly out of scope per program scope file |
