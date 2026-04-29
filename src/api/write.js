@@ -1,5 +1,5 @@
 import https from 'node:https';
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const GITHUB_OWNER = 'z0rs';
@@ -135,6 +135,31 @@ function buildFilename(title) {
   return `${buildSlug(title)}.mdx`;
 }
 
+function normalizeArticleSlug(rawSlug) {
+  if (typeof rawSlug !== 'string') return '';
+
+  let slug = rawSlug.trim();
+  if (!slug) return '';
+
+  if (/^https?:\/\//i.test(slug)) {
+    try {
+      slug = new URL(slug).pathname;
+    } catch {
+      return '';
+    }
+  }
+
+  slug = slug.split('?')[0].split('#')[0];
+  slug = slug.replace(/^\/+|\/+$/g, '');
+  slug = slug.replace(/^articles\//i, '');
+  slug = slug.replace(/\.mdx$/i, '');
+
+  if (!slug) return '';
+  if (slug.includes('..') || slug.includes('\\') || slug.includes('/')) return '';
+
+  return slug;
+}
+
 function buildFrontmatter({ title, content, tags, author, date, featuredImage, status }) {
   return [
     '---',
@@ -199,6 +224,15 @@ function githubFetch(apiPath, token, options = {}) {
   });
 }
 
+async function triggerRebuildWorkflow(token) {
+  const workflowRes = await githubFetch(`/repos/${GITHUB_OWNER}/${GITHUB_REPO}/actions/workflows/gatsby.yml/dispatches`, token, {
+    method: 'POST',
+    body: JSON.stringify({ ref: 'master' })
+  });
+
+  return workflowRes.status === 204 || workflowRes.status === 200;
+}
+
 async function publishToGitHub({ title, content, tags, author, date, featuredImage, status, token }) {
   const filename = buildFilename(title);
   const githubPath = `${CONTENT_PATH}/${filename}`;
@@ -229,14 +263,7 @@ async function publishToGitHub({ title, content, tags, author, date, featuredIma
     throw new Error(`GitHub API error ${commitRes.status}: ${reason}`);
   }
 
-  // Trigger GitHub Actions workflow rebuild.
-  const workflowRes = await githubFetch(
-    `/repos/${GITHUB_OWNER}/${GITHUB_REPO}/actions/workflows/gatsby.yml/dispatches`,
-    token,
-    { method: 'POST', body: JSON.stringify({ ref: 'master' }) }
-  );
-
-  const rebuildTriggered = workflowRes.status === 204 || workflowRes.status === 200;
+  const rebuildTriggered = await triggerRebuildWorkflow(token);
 
   return {
     filename,
@@ -251,6 +278,53 @@ async function publishToGitHub({ title, content, tags, author, date, featuredIma
               ? ' Site rebuild triggered.'
               : ' Note: rebuild trigger failed - check GitHub token permissions.'
           }`
+  };
+}
+
+async function deleteFromGitHub({ slug, token }) {
+  const normalizedSlug = normalizeArticleSlug(slug);
+  if (!normalizedSlug) {
+    return { notFound: false, invalidSlug: true };
+  }
+
+  const filename = `${normalizedSlug}.mdx`;
+  const githubPath = `${CONTENT_PATH}/${filename}`;
+  const articleUrl = `/articles/${normalizedSlug}/`;
+
+  const existingRes = await githubFetch(`/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${githubPath}`, token);
+  if (existingRes.status === 404) {
+    return { notFound: true, filename, articleUrl };
+  }
+  if (!existingRes.ok) {
+    const reason = existingRes.data?.message || 'Failed to resolve article file';
+    throw new Error(`GitHub API error ${existingRes.status}: ${reason}`);
+  }
+
+  const sha = existingRes.data?.sha;
+  if (!sha) {
+    throw new Error(`GitHub API error: SHA not found for "${filename}"`);
+  }
+
+  const deleteRes = await githubFetch(`/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${githubPath}`, token, {
+    method: 'DELETE',
+    body: JSON.stringify({
+      message: `Delete article: ${normalizedSlug}`,
+      sha
+    })
+  });
+
+  if (!deleteRes.ok) {
+    const reason = deleteRes.data?.message || deleteRes.data?.error || 'Unknown GitHub API error';
+    throw new Error(`GitHub API error ${deleteRes.status}: ${reason}`);
+  }
+
+  const rebuildTriggered = await triggerRebuildWorkflow(token);
+  return {
+    notFound: false,
+    filename,
+    articleUrl,
+    rebuildTriggered,
+    message: `Article "${filename}" deleted from GitHub.${rebuildTriggered ? ' Site rebuild triggered.' : ''}`
   };
 }
 
@@ -277,12 +351,36 @@ function writeToFilesystem({ title, content, tags, author, date, featuredImage, 
   };
 }
 
+function deleteFromFilesystem({ slug }) {
+  const normalizedSlug = normalizeArticleSlug(slug);
+  if (!normalizedSlug) {
+    return { notFound: false, invalidSlug: true };
+  }
+
+  const filename = `${normalizedSlug}.mdx`;
+  const filepath = join(process.cwd(), CONTENT_PATH, filename);
+
+  if (!existsSync(filepath)) {
+    return { notFound: true, filename, articleUrl: `/articles/${normalizedSlug}/` };
+  }
+
+  unlinkSync(filepath);
+  return {
+    notFound: false,
+    filename,
+    articleUrl: `/articles/${normalizedSlug}/`,
+    rebuildTriggered: false,
+    message: `Article "${filename}" deleted locally. Commit and push to apply in production.`
+  };
+}
+
 export default async function handler(req, res) {
   if (!res || typeof res.status !== 'function' || typeof res.json !== 'function') {
     throw new Error('Invalid Gatsby function response object.');
   }
 
-  if ((req.method || '').toUpperCase() !== 'POST') {
+  const method = (req.method || '').toUpperCase();
+  if (!['POST', 'DELETE'].includes(method)) {
     return sendJson(res, 405, { error: 'Method not allowed' });
   }
 
@@ -293,12 +391,55 @@ export default async function handler(req, res) {
     return sendJson(res, 400, { error: 'Invalid JSON body' });
   }
 
-  const { title, content, tags, author, date, featuredImage, status } = body;
-
   const authCheck = validateAuth(req);
   if (!authCheck.valid) {
     return sendJson(res, authCheck.code, { error: authCheck.error, detail: authCheck.detail });
   }
+
+  const shouldPublishViaGitHub = isProductionRuntime() || isNetlifyFunctionRuntime(req);
+
+  if (method === 'DELETE') {
+    try {
+      if (!shouldPublishViaGitHub) {
+        const localDelete = deleteFromFilesystem({ slug: body?.slug });
+        if (localDelete.invalidSlug) {
+          return sendJson(res, 400, {
+            error: 'Invalid slug',
+            detail: 'Provide a valid article slug, e.g. "web-application-penetration-test-report-braze".'
+          });
+        }
+        if (localDelete.notFound) {
+          return sendJson(res, 404, { error: 'Article not found', detail: `No file found for "${localDelete.filename}".` });
+        }
+        return sendJson(res, 200, { success: true, ...localDelete });
+      }
+
+      const githubToken = getRuntimeEnv('GITHUB_TOKEN');
+      if (!githubToken) {
+        return sendJson(res, 500, {
+          error: 'GitHub token not configured',
+          detail: 'Set GITHUB_TOKEN in Netlify environment variables to enable deletion.'
+        });
+      }
+
+      const remoteDelete = await deleteFromGitHub({ slug: body?.slug, token: githubToken });
+      if (remoteDelete.invalidSlug) {
+        return sendJson(res, 400, {
+          error: 'Invalid slug',
+          detail: 'Provide a valid article slug, e.g. "web-application-penetration-test-report-braze".'
+        });
+      }
+      if (remoteDelete.notFound) {
+        return sendJson(res, 404, { error: 'Article not found', detail: `No file found for "${remoteDelete.filename}".` });
+      }
+
+      return sendJson(res, 200, { success: true, ...remoteDelete });
+    } catch (err) {
+      return sendJson(res, 500, { error: 'Failed to delete article', detail: err.message });
+    }
+  }
+
+  const { title, content, tags, author, date, featuredImage, status } = body;
 
   if (!title || !title.trim()) {
     return sendJson(res, 400, { error: 'Title is required' });
@@ -308,7 +449,6 @@ export default async function handler(req, res) {
   }
 
   try {
-    const shouldPublishViaGitHub = isProductionRuntime() || isNetlifyFunctionRuntime(req);
     if (!shouldPublishViaGitHub) {
       const result = writeToFilesystem({ title, content, tags, author, date, featuredImage, status });
       return sendJson(res, 200, { success: true, ...result });

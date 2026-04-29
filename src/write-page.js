@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, navigate, graphql } from 'gatsby';
 import Seo from './components/seo';
+import AsideElement from './components/aside-element';
 
 // Runtime detection via GATSBY_RUNTIME env var set at build time:
 //   "local"    — yarn develop (form enabled, filesystem write)
@@ -32,10 +33,35 @@ const ERROR_CLASSES = 'text-salmon text-sm mt-1';
 
 const PANEL_CARD_CLASSES = 'rounded-xl border border-outline bg-surface px-6 py-7 sm:px-8 sm:py-8';
 
-export default function WritePage() {
+function normalizeArticleSlugInput(value) {
+  if (!value || typeof value !== 'string') return '';
+
+  let slug = value.trim();
+  if (!slug) return '';
+
+  if (/^https?:\/\//i.test(slug)) {
+    try {
+      slug = new URL(slug).pathname;
+    } catch {
+      return '';
+    }
+  }
+
+  slug = slug.split('?')[0].split('#')[0];
+  slug = slug.replace(/^\/+|\/+$/g, '');
+  slug = slug.replace(/^articles\//i, '');
+  slug = slug.replace(/\.mdx$/i, '');
+
+  return slug;
+}
+
+export default function WritePage({ data }) {
   const [form, setForm] = useState({ ...DEFAULT_FORM });
   const [status, setStatus] = useState({ type: 'idle', message: '' });
+  const [deleteStatus, setDeleteStatus] = useState({ type: 'idle', message: '' });
+  const [deleteSlug, setDeleteSlug] = useState('');
   const [tokenError, setTokenError] = useState('');
+  const recentArticles = data?.allMdx?.nodes || [];
 
   const isDisabled = RUNTIME === 'github';
   const isLocal = RUNTIME === 'local';
@@ -142,6 +168,64 @@ export default function WritePage() {
     }
   };
 
+  const handleDeleteSubmit = async () => {
+    const normalizedSlug = normalizeArticleSlugInput(deleteSlug);
+    if (!normalizedSlug) {
+      setDeleteStatus({
+        type: 'error',
+        message: 'Provide a valid article slug (e.g. web-application-penetration-test-report-braze).'
+      });
+      return;
+    }
+
+    if (!window.confirm(`Delete article "${normalizedSlug}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    setDeleteStatus({ type: 'loading', message: 'Deleting...' });
+    setTokenError('');
+
+    try {
+      const res = await fetch('/api/write', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${form.token}`
+        },
+        body: JSON.stringify({ slug: normalizedSlug })
+      });
+
+      const rawText = await res.text();
+      let data = {};
+      if (rawText) {
+        try {
+          data = JSON.parse(rawText);
+        } catch {
+          data = { error: rawText };
+        }
+      }
+
+      if (!res.ok) {
+        const errorMessage = data.detail ? `${data.error || 'Request failed'}: ${data.detail}` : data.error;
+        if (res.status === 401) {
+          setDeleteStatus({ type: 'error', message: errorMessage || 'Unauthorized' });
+          setTokenError(data.detail || '');
+        } else {
+          setDeleteStatus({
+            type: 'error',
+            message: errorMessage || `Request failed with status ${res.status}`
+          });
+        }
+        return;
+      }
+
+      setDeleteStatus({ type: 'success', message: data.message });
+      setDeleteSlug('');
+    } catch (err) {
+      setDeleteStatus({ type: 'error', message: `Network error: ${err.message}` });
+    }
+  };
+
   const previewSlug = form.title
     .toLowerCase()
     .replace(/[^a-z0-9\s-]/g, '')
@@ -156,52 +240,53 @@ export default function WritePage() {
       <form onSubmit={handleSubmit} className={PANEL_CARD_CLASSES}>
         <div className="mx-auto w-full max-w-3xl space-y-8 sm:space-y-9">
           <div className="space-y-4">
-          <label className={LABEL_CLASSES} htmlFor="token">
-            {isLocal ? 'Dev Token' : 'Write Secret Token'}
-          </label>
-          <p className="text-sm text-muted leading-relaxed">
-            {isLocal ? (
-              <>
-                In local dev, any non-empty bearer token is accepted. Example:{' '}
-                <code className="bg-background px-1.5 py-0.5 rounded">my-dev-token</code>
-              </>
-            ) : (
-              <>
-                Production deployment uses <code>WRITE_SECRET</code>. Set it in Netlify env, then paste the token here.
-              </>
-            )}
-          </p>
-          <input
-            id="token"
-            type="text"
-            value={form.token}
-            onChange={handleTokenChange}
-            onBlur={handleTokenBlur}
-            placeholder={isLocal ? 'Bearer token (any non-empty string works locally)' : 'WRITE_SECRET token...'}
-            className={`${FIELD_CLASSES} font-mono text-sm ${tokenError ? 'border-salmon' : ''}`}
-          />
-          {tokenError && <p className={ERROR_CLASSES}>{tokenError}</p>}
-        </div>
+            <label className={LABEL_CLASSES} htmlFor="token">
+              {isLocal ? 'Dev Token' : 'Write Secret Token'}
+            </label>
+            <p className="text-sm text-muted leading-relaxed">
+              {isLocal ? (
+                <>
+                  In local dev, any non-empty bearer token is accepted. Example:{' '}
+                  <code className="bg-background px-1.5 py-0.5 rounded">my-dev-token</code>
+                </>
+              ) : (
+                <>
+                  Production deployment uses <code>WRITE_SECRET</code>. Set it in Netlify env, then paste the token
+                  here.
+                </>
+              )}
+            </p>
+            <input
+              id="token"
+              type="text"
+              value={form.token}
+              onChange={handleTokenChange}
+              onBlur={handleTokenBlur}
+              placeholder={isLocal ? 'Bearer token (any non-empty string works locally)' : 'WRITE_SECRET token...'}
+              className={`${FIELD_CLASSES} font-mono text-sm ${tokenError ? 'border-salmon' : ''}`}
+            />
+            {tokenError && <p className={ERROR_CLASSES}>{tokenError}</p>}
+          </div>
 
           <div className="space-y-4 sm:space-y-3">
             <div className="sm:grid sm:grid-cols-[120px_1fr] sm:items-center sm:gap-x-5">
               <span className="block text-base font-semibold text-secondary mb-3 sm:mb-0">Status</span>
               <div className="flex flex-wrap items-center justify-center sm:justify-start gap-x-10 gap-y-4 rounded-xl border border-outline bg-background/30 px-4 py-4 sm:px-5">
-              {['published', 'draft'].map((s) => (
-                <label key={s} className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="status"
-                    value={s}
-                    checked={form.status === s}
-                    onChange={set('status')}
-                    className="accent-primary"
-                  />
-                  <span className={`text-base ${form.status === s ? 'text-text' : 'text-muted'}`}>
-                    {s.charAt(0).toUpperCase() + s.slice(1)}
-                  </span>
-                </label>
-              ))}
+                {['published', 'draft'].map((s) => (
+                  <label key={s} className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="status"
+                      value={s}
+                      checked={form.status === s}
+                      onChange={set('status')}
+                      className="accent-primary"
+                    />
+                    <span className={`text-base ${form.status === s ? 'text-text' : 'text-muted'}`}>
+                      {s.charAt(0).toUpperCase() + s.slice(1)}
+                    </span>
+                  </label>
+                ))}
               </div>
             </div>
             {form.status === 'draft' && (
@@ -361,8 +446,90 @@ export default function WritePage() {
               </div>
             )}
           </div>
+
+          <div className="space-y-4 border-t border-outline/80 pt-8 sm:pt-9">
+            <h2 className="m-0 text-xl font-bold text-text">Delete Article</h2>
+            <p className="text-sm text-muted leading-relaxed">
+              Paste article slug or URL (for example <code>/articles/example-slug/</code>) to remove an article without
+              opening GitHub.
+            </p>
+            <div className="space-y-3">
+              <label className={LABEL_CLASSES} htmlFor="deleteSlug">
+                Article Slug
+              </label>
+              <input
+                id="deleteSlug"
+                type="text"
+                value={deleteSlug}
+                onChange={(e) => {
+                  setDeleteSlug(e.target.value);
+                  if (deleteStatus.type !== 'idle') setDeleteStatus({ type: 'idle', message: '' });
+                }}
+                placeholder="web-application-penetration-test-report-braze"
+                className={FIELD_CLASSES}
+              />
+            </div>
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+              <button
+                type="button"
+                onClick={handleDeleteSubmit}
+                disabled={deleteStatus.type === 'loading'}
+                className="inline-flex w-full sm:w-auto items-center justify-center rounded-xl border border-salmon/70 bg-salmon px-7 py-3 text-base font-bold text-background transition-colors hover:bg-primary disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {deleteStatus.type === 'loading' ? 'Deleting...' : 'Delete Article'}
+              </button>
+
+              {deleteStatus.type === 'success' && (
+                <div className="min-w-0 text-sm text-teal flex items-start gap-2">
+                  <span>&#10003;</span>
+                  <span className="break-words">{deleteStatus.message}</span>
+                </div>
+              )}
+
+              {deleteStatus.type === 'error' && (
+                <div className="min-w-0 text-sm text-salmon flex items-start gap-2">
+                  <span>&#10007;</span>
+                  <span className="break-words">{deleteStatus.message}</span>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </form>
+
+      <AsideElement>
+        <div className="px-6">
+          <h5 className="mb-3 text-lg leading-6 font-semibold uppercase text-secondary">Recent Articles</h5>
+          <p className="mb-4 text-sm text-muted">Click an article to autofill slug for deletion.</p>
+          <ul className="m-0 p-0 list-none space-y-4">
+            {recentArticles.map((node, index) => {
+              const articlePath = node?.fields?.slug || '';
+              const articleSlug = normalizeArticleSlugInput(articlePath);
+              const articleTitle = node?.frontmatter?.title || articleSlug;
+              const articleStatus = node?.frontmatter?.status === 'draft' ? 'Draft' : 'Published';
+
+              return (
+                <li key={`${articlePath}-${index}`} className="m-0 p-0">
+                  <button
+                    type="button"
+                    onClick={() => setDeleteSlug(articleSlug)}
+                    className="block w-full text-left text-sm font-semibold text-secondary hover:text-primary transition-colors"
+                  >
+                    {articleTitle}
+                  </button>
+                  <code className="block mt-1 text-xs text-muted break-all">{articleSlug}</code>
+                  <div className="mt-2 flex items-center justify-between gap-3">
+                    <small className="uppercase tracking-wide text-[10px] text-muted">{articleStatus}</small>
+                    <Link to={articlePath} className="text-xs text-secondary hover:text-primary transition-colors">
+                      Open
+                    </Link>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      </AsideElement>
     </div>
   );
 }
@@ -391,6 +558,21 @@ export const Head = ({
 
 export const query = graphql`
   query {
+    allMdx(
+      filter: { frontmatter: { type: { eq: "article" } } }
+      sort: { frontmatter: { date: DESC } }
+      limit: 5
+    ) {
+      nodes {
+        fields {
+          slug
+        }
+        frontmatter {
+          title
+          status
+        }
+      }
+    }
     site {
       siteMetadata {
         name
