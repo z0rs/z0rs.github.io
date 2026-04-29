@@ -14,6 +14,8 @@ function validateAuth(req) {
   const auth = req.headers?.authorization || req.headers?.Authorization || '';
   const bearer = auth.replace(/^Bearer\s+/i, '').trim();
 
+  // Bracket notation required: webpack DEAD-CODE ELIMINATION replaces dot-notation
+  // process.env.WRITE_SECRET with {} in production builds. Bracket notation keeps the reference.
   if (process.env.NODE_ENV !== 'production') {
     if (bearer) return { valid: true };
     return {
@@ -24,7 +26,7 @@ function validateAuth(req) {
     };
   }
 
-  const secret = process.env.WRITE_SECRET;
+  const secret = process.env['WRITE_SECRET'];
   if (!secret) {
     return {
       valid: false,
@@ -76,18 +78,45 @@ function buildFrontmatter({ title, content, tags, author, date, featuredImage, s
 }
 
 // --- GitHub API helpers ---
+const https = await import('node:https');
 
-async function githubApi(path, options = {}) {
-  const token = process.env.GITHUB_TOKEN;
-  return await fetch(`https://api.github.com${path}`, {
-    ...options,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: 'application/vnd.github+json',
-      'Content-Type': 'application/json',
-      'X-GitHub-Api-Version': '2022-11-28',
-      ...(options.headers || {})
-    }
+function githubFetch(path, options = {}) {
+  return new Promise((resolve, reject) => {
+    const token = process.env['GITHUB_TOKEN'];
+    const url = new URL(`https://api.github.com${path}`);
+    const reqOptions = {
+      hostname: url.hostname,
+      path: url.pathname + url.search,
+      method: options.method || 'GET',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/vnd.github+json',
+        'Content-Type': 'application/json',
+        'X-GitHub-Api-Version': '2022-11-28',
+        ...(options.headers || {})
+      }
+    };
+    const req = https.request(reqOptions, (res) => {
+      let body = '';
+      res.on('data', (chunk) => (body += chunk));
+      res.on('end', () => {
+        let data;
+        try {
+          data = JSON.parse(body);
+        } catch {
+          data = {};
+        }
+        const response = {
+          ok: res.statusCode >= 200 && res.statusCode < 300,
+          status: res.statusCode,
+          json: () => Promise.resolve(data)
+        };
+        resolve(response);
+      });
+    });
+    req.on('error', reject);
+    if (options.body) req.write(options.body);
+    req.end();
   });
 }
 
@@ -101,14 +130,14 @@ async function publishToGitHub({ title, content, tags, author, date, featuredIma
 
   // Get current SHA if file already exists (update vs create)
   let sha = null;
-  const existingRes = await githubApi(`/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${githubPath}`);
+  const existingRes = await githubFetch(`/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${githubPath}`);
   if (existingRes.status === 200) {
     const data = await existingRes.json();
     sha = data.sha;
   }
 
   // Commit the MDX file to the repo
-  const commitRes = await githubApi(`/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${githubPath}`, {
+  const commitRes = await githubFetch(`/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${githubPath}`, {
     method: 'PUT',
     body: JSON.stringify({
       message: `Add article: ${title}`,
@@ -123,10 +152,10 @@ async function publishToGitHub({ title, content, tags, author, date, featuredIma
   }
 
   // Trigger GitHub Actions workflow rebuild — POST is required, not PUT
-  const workflowRes = await githubApi(`/repos/${GITHUB_OWNER}/${GITHUB_REPO}/actions/workflows/gatsby.yml/dispatches`, {
-    method: 'POST',
-    body: JSON.stringify({ ref: 'master' })
-  });
+  const workflowRes = await githubFetch(
+    `/repos/${GITHUB_OWNER}/${GITHUB_REPO}/actions/workflows/gatsby.yml/dispatches`,
+    { method: 'POST', body: JSON.stringify({ ref: 'master' }) }
+  );
 
   const rebuildTriggered = workflowRes.status === 204 || workflowRes.status === 200;
 
