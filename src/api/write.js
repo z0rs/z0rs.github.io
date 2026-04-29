@@ -1,22 +1,76 @@
-import { writeFileSync, mkdirSync, existsSync } from 'fs';
-import { join } from 'path';
+import https from 'node:https';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 const GITHUB_OWNER = 'z0rs';
 const GITHUB_REPO = 'z0rs.github.io';
 const CONTENT_PATH = 'content/articles';
 
+function getRuntimeEnv(key) {
+  const env = globalThis && globalThis.process && globalThis.process.env ? globalThis.process.env : null;
+  if (!env) return undefined;
+  const value = env[key];
+  return typeof value === 'string' ? value : undefined;
+}
+
+function isProductionRuntime() {
+  return getRuntimeEnv('NODE_ENV') === 'production';
+}
+
+function getHeader(req, name) {
+  const headers = req?.headers;
+  if (!headers) return '';
+
+  const value = headers[name] ?? headers[name.toLowerCase()] ?? headers[name.toUpperCase()] ?? '';
+  if (Array.isArray(value)) return value[0] || '';
+  if (typeof value === 'string') return value;
+  if (value == null) return '';
+  return String(value);
+}
+
+function parseBodyValue(rawBody, isBase64Encoded = false) {
+  if (rawBody == null) return {};
+  if (typeof rawBody === 'object' && !Buffer.isBuffer(rawBody)) return rawBody;
+
+  let text = '';
+  if (Buffer.isBuffer(rawBody)) {
+    text = rawBody.toString('utf8');
+  } else if (typeof rawBody === 'string') {
+    text = isBase64Encoded ? Buffer.from(rawBody, 'base64').toString('utf8') : rawBody;
+  } else {
+    return {};
+  }
+
+  if (!text.trim()) return {};
+  return JSON.parse(text);
+}
+
+function parseRequestBody(req) {
+  const parsed = parseBodyValue(req?.body);
+  if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
+    return parsed;
+  }
+
+  const event = req?.netlifyFunctionParams?.event;
+  if (event && typeof event.body === 'string') {
+    return parseBodyValue(event.body, Boolean(event.isBase64Encoded));
+  }
+
+  return parsed;
+}
+
+function sendJson(res, statusCode, payload) {
+  return res.status(statusCode).json(payload);
+}
+
 // Bearer token validation:
 //   Local dev (NODE_ENV !== 'production'): accept any non-empty Authorization header.
-//     This lets you test with any token string without hardcoding secrets locally.
 //   Production (Netlify): require Authorization: Bearer <WRITE_SECRET>.
-//     Set WRITE_SECRET in Netlify environment variables.
 function validateAuth(req) {
-  const auth = req.headers?.authorization || req.headers?.Authorization || '';
+  const auth = getHeader(req, 'authorization');
   const bearer = auth.replace(/^Bearer\s+/i, '').trim();
 
-  // Bracket notation required: webpack DEAD-CODE ELIMINATION replaces dot-notation
-  // process.env.WRITE_SECRET with {} in production builds. Bracket notation keeps the reference.
-  if (process.env.NODE_ENV !== 'production') {
+  if (!isProductionRuntime()) {
     if (bearer) return { valid: true };
     return {
       valid: false,
@@ -26,7 +80,7 @@ function validateAuth(req) {
     };
   }
 
-  const secret = process.env['WRITE_SECRET'];
+  const secret = getRuntimeEnv('WRITE_SECRET');
   if (!secret) {
     return {
       valid: false,
@@ -36,12 +90,18 @@ function validateAuth(req) {
     };
   }
   if (bearer !== secret) {
-    return { valid: false, code: 401, error: 'Unauthorized', detail: 'Invalid bearer token.' };
+    return {
+      valid: false,
+      code: 401,
+      error: 'Unauthorized',
+      detail: 'Invalid bearer token.'
+    };
   }
+
   return { valid: true };
 }
 
-// YAML-safe string: escapes double-quotes and backslashes.
+// YAML-safe string: escapes double quotes and backslashes.
 function yamlString(str) {
   if (typeof str !== 'string') return '""';
   if (/^[a-zA-Z0-9_\s.,;+\-=()/@#%&$!?|~^-]+$/.test(str)) return str;
@@ -77,50 +137,52 @@ function buildFrontmatter({ title, content, tags, author, date, featuredImage, s
     .join('\n');
 }
 
-// --- GitHub API helpers ---
-const https = await import('node:https');
-
-function githubFetch(path, options = {}) {
+function githubFetch(apiPath, token, options = {}) {
   return new Promise((resolve, reject) => {
-    const token = process.env['GITHUB_TOKEN'];
-    const url = new URL(`https://api.github.com${path}`);
-    const reqOptions = {
-      hostname: url.hostname,
-      path: url.pathname + url.search,
+    const requestOptions = {
+      hostname: 'api.github.com',
+      path: apiPath,
       method: options.method || 'GET',
       headers: {
         Authorization: `Bearer ${token}`,
         Accept: 'application/vnd.github+json',
         'Content-Type': 'application/json',
         'X-GitHub-Api-Version': '2022-11-28',
+        'User-Agent': 'z0rs-write-panel',
         ...(options.headers || {})
       }
     };
-    const req = https.request(reqOptions, (res) => {
-      let body = '';
-      res.on('data', (chunk) => (body += chunk));
+
+    const req = https.request(requestOptions, (res) => {
+      let rawBody = '';
+      res.on('data', (chunk) => (rawBody += chunk));
       res.on('end', () => {
-        let data;
-        try {
-          data = JSON.parse(body);
-        } catch {
-          data = {};
+        let data = {};
+        if (rawBody) {
+          try {
+            data = JSON.parse(rawBody);
+          } catch {
+            data = { message: rawBody };
+          }
         }
-        const response = {
-          ok: res.statusCode >= 200 && res.statusCode < 300,
-          status: res.statusCode,
-          json: () => Promise.resolve(data)
-        };
-        resolve(response);
+
+        const status = res.statusCode || 500;
+        resolve({
+          ok: status >= 200 && status < 300,
+          status,
+          data,
+          json: async () => data
+        });
       });
     });
+
     req.on('error', reject);
     if (options.body) req.write(options.body);
     req.end();
   });
 }
 
-async function publishToGitHub({ title, content, tags, author, date, featuredImage, status }) {
+async function publishToGitHub({ title, content, tags, author, date, featuredImage, status, token }) {
   const filename = buildFilename(title);
   const githubPath = `${CONTENT_PATH}/${filename}`;
   const articleSlug = filename.replace('.mdx', '');
@@ -128,16 +190,15 @@ async function publishToGitHub({ title, content, tags, author, date, featuredIma
   const mdxContent = buildFrontmatter({ title, content, tags, author, date, featuredImage, status });
   const encodedContent = Buffer.from(mdxContent).toString('base64');
 
-  // Get current SHA if file already exists (update vs create)
+  // Get current SHA if file already exists (update vs create).
   let sha = null;
-  const existingRes = await githubFetch(`/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${githubPath}`);
+  const existingRes = await githubFetch(`/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${githubPath}`, token);
   if (existingRes.status === 200) {
-    const data = await existingRes.json();
-    sha = data.sha;
+    sha = existingRes.data?.sha || null;
   }
 
-  // Commit the MDX file to the repo
-  const commitRes = await githubFetch(`/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${githubPath}`, {
+  // Commit the MDX file to the repo.
+  const commitRes = await githubFetch(`/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${githubPath}`, token, {
     method: 'PUT',
     body: JSON.stringify({
       message: `Add article: ${title}`,
@@ -147,13 +208,14 @@ async function publishToGitHub({ title, content, tags, author, date, featuredIma
   });
 
   if (!commitRes.ok) {
-    const err = await commitRes.json().catch(() => ({}));
-    throw new Error(`GitHub API error ${commitRes.status}: ${err.message || commitRes.statusText}`);
+    const reason = commitRes.data?.message || commitRes.data?.error || 'Unknown GitHub API error';
+    throw new Error(`GitHub API error ${commitRes.status}: ${reason}`);
   }
 
-  // Trigger GitHub Actions workflow rebuild — POST is required, not PUT
+  // Trigger GitHub Actions workflow rebuild.
   const workflowRes = await githubFetch(
     `/repos/${GITHUB_OWNER}/${GITHUB_REPO}/actions/workflows/gatsby.yml/dispatches`,
+    token,
     { method: 'POST', body: JSON.stringify({ ref: 'master' }) }
   );
 
@@ -170,12 +232,10 @@ async function publishToGitHub({ title, content, tags, author, date, featuredIma
         : `Article committed as "${filename}" on GitHub.${
             rebuildTriggered
               ? ' Site rebuild triggered.'
-              : ' Note: rebuild trigger failed — check GitHub token permissions.'
+              : ' Note: rebuild trigger failed - check GitHub token permissions.'
           }`
   };
 }
-
-// --- Filesystem write (local development) ---
 
 function writeToFilesystem({ title, content, tags, author, date, featuredImage, status }) {
   const filename = buildFilename(title);
@@ -195,98 +255,67 @@ function writeToFilesystem({ title, content, tags, author, date, featuredImage, 
     rebuildTriggered: false,
     message:
       status === 'draft'
-        ? `Draft saved as "${filename}". Changes are local only — commit and push to trigger a rebuild.`
+        ? `Draft saved as "${filename}". Changes are local only - commit and push to trigger a rebuild.`
         : `Article saved as "${filename}". Commit and push to trigger a rebuild.`
   };
 }
 
-// Gatsby Functions in development mode receive Express req/res middleware arguments.
-// The Netlify adapter converts the return value to a response in production.
-// Use NODE_ENV as the authoritative signal: dev servers set it to 'development'.
 export default async function handler(req, res) {
-  // --- Development mode (gatsby develop): Express middleware ---
-  if (process.env.NODE_ENV !== 'production' && res && typeof res.json === 'function') {
-    let body;
-    try {
-      body = typeof req.body === 'object' ? req.body : JSON.parse(req.body || '{}');
-    } catch {
-      return res.status(400).json({ error: 'Invalid JSON body' });
-    }
-
-    const { title, content, tags, author, date, featuredImage, status } = body;
-    const authCheck = validateAuth(req);
-    if (!authCheck.valid) return res.status(authCheck.code).json({ error: authCheck.error, detail: authCheck.detail });
-    if (!title || !title.trim()) return res.status(400).json({ error: 'Title is required' });
-    if (!content || !content.trim()) return res.status(400).json({ error: 'Content is required' });
-
-    try {
-      const result = writeToFilesystem({ title, content, tags, author, date, featuredImage, status });
-      return res.status(200).json({ success: true, ...result });
-    } catch (err) {
-      return res.status(500).json({ error: 'Failed to write file', detail: err.message });
-    }
+  if (!res || typeof res.status !== 'function' || typeof res.json !== 'function') {
+    throw new Error('Invalid Gatsby function response object.');
   }
 
-  // --- Production mode (Netlify build): GitHub API via fetch ---
-  // Netlify sets NODE_ENV=production during build AND for deployed serverless functions.
+  if ((req.method || '').toUpperCase() !== 'POST') {
+    return sendJson(res, 405, { error: 'Method not allowed' });
+  }
+
   let body;
   try {
-    body = JSON.parse(req.body || '{}');
+    body = parseRequestBody(req);
   } catch {
-    return {
-      statusCode: 400,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ error: 'Invalid JSON body' })
-    };
+    return sendJson(res, 400, { error: 'Invalid JSON body' });
   }
 
   const { title, content, tags, author, date, featuredImage, status } = body;
+
   const authCheck = validateAuth(req);
   if (!authCheck.valid) {
-    return {
-      statusCode: authCheck.code,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ error: authCheck.error, detail: authCheck.detail })
-    };
-  }
-  if (!title || !title.trim()) {
-    return {
-      statusCode: 400,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ error: 'Title is required' })
-    };
-  }
-  if (!content || !content.trim()) {
-    return {
-      statusCode: 400,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ error: 'Content is required' })
-    };
+    return sendJson(res, authCheck.code, { error: authCheck.error, detail: authCheck.detail });
   }
 
-  if (!process.env.GITHUB_TOKEN) {
-    return {
-      statusCode: 500,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        error: 'GitHub token not configured',
-        detail: 'Set GITHUB_TOKEN in Netlify environment variables to enable publishing.'
-      })
-    };
+  if (!title || !title.trim()) {
+    return sendJson(res, 400, { error: 'Title is required' });
+  }
+  if (!content || !content.trim()) {
+    return sendJson(res, 400, { error: 'Content is required' });
   }
 
   try {
-    const result = await publishToGitHub({ title, content, tags, author, date, featuredImage, status });
-    return {
-      statusCode: 200,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ success: true, ...result })
-    };
+    if (!isProductionRuntime()) {
+      const result = writeToFilesystem({ title, content, tags, author, date, featuredImage, status });
+      return sendJson(res, 200, { success: true, ...result });
+    }
+
+    const githubToken = getRuntimeEnv('GITHUB_TOKEN');
+    if (!githubToken) {
+      return sendJson(res, 500, {
+        error: 'GitHub token not configured',
+        detail: 'Set GITHUB_TOKEN in Netlify environment variables to enable publishing.'
+      });
+    }
+
+    const result = await publishToGitHub({
+      title,
+      content,
+      tags,
+      author,
+      date,
+      featuredImage,
+      status,
+      token: githubToken
+    });
+    return sendJson(res, 200, { success: true, ...result });
   } catch (err) {
-    return {
-      statusCode: 500,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ error: 'Failed to publish', detail: err.message })
-    };
+    return sendJson(res, 500, { error: 'Failed to publish', detail: err.message });
   }
 }

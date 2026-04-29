@@ -105,14 +105,25 @@ export default function WritePage() {
         body: JSON.stringify(payload)
       });
 
-      const data = await res.json();
+      const rawText = await res.text();
+      let data = {};
+      if (rawText) {
+        try {
+          data = JSON.parse(rawText);
+        } catch {
+          data = { error: rawText };
+        }
+      }
 
       if (!res.ok) {
         if (res.status === 401) {
           setStatus({ type: 'error', message: `Unauthorized: ${data.detail || data.error}` });
           setTokenError(data.detail || '');
         } else {
-          setStatus({ type: 'error', message: data.error || 'Something went wrong' });
+          setStatus({
+            type: 'error',
+            message: data.error || `Request failed with status ${res.status}`
+          });
         }
         return;
       }
