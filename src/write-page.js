@@ -58,6 +58,8 @@ function normalizeArticleSlugInput(value) {
 export default function WritePage({ data }) {
   const [form, setForm] = useState({ ...DEFAULT_FORM });
   const [status, setStatus] = useState({ type: 'idle', message: '' });
+  const [editStatus, setEditStatus] = useState({ type: 'idle', message: '' });
+  const [editingSlug, setEditingSlug] = useState('');
   const [deleteStatus, setDeleteStatus] = useState({ type: 'idle', message: '' });
   const [deleteSlug, setDeleteSlug] = useState('');
   const [tokenError, setTokenError] = useState('');
@@ -102,7 +104,7 @@ export default function WritePage({ data }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setStatus({ type: 'loading', message: 'Publishing...' });
+    setStatus({ type: 'loading', message: editingSlug ? 'Updating...' : 'Publishing...' });
     setTokenError('');
 
     const tags = form.tags
@@ -119,7 +121,8 @@ export default function WritePage({ data }) {
       author: form.author || 'Eno',
       date: form.date,
       featuredImage: form.featuredImage || null,
-      status: form.status
+      status: form.status,
+      sourceSlug: editingSlug || null
     };
 
     try {
@@ -162,9 +165,81 @@ export default function WritePage({ data }) {
         url: data.articleUrl,
         isDraft: data.isDraft
       });
-      setForm({ ...DEFAULT_FORM, token: form.token });
+
+      if (!editingSlug) {
+        setForm({ ...DEFAULT_FORM, token: form.token });
+      }
     } catch (err) {
       setStatus({ type: 'error', message: `Network error: ${err.message}` });
+    }
+  };
+
+  const handleResetEditor = () => {
+    setEditingSlug('');
+    setEditStatus({ type: 'idle', message: '' });
+    setStatus({ type: 'idle', message: '' });
+    setForm((prev) => ({ ...DEFAULT_FORM, token: prev.token }));
+  };
+
+  const handleLoadForEdit = async (rawSlug) => {
+    const normalizedSlug = normalizeArticleSlugInput(rawSlug);
+    if (!normalizedSlug) {
+      setEditStatus({ type: 'error', message: 'Invalid slug selected for edit.' });
+      return;
+    }
+
+    setEditStatus({ type: 'loading', message: `Loading "${normalizedSlug}"...` });
+    setTokenError('');
+
+    try {
+      const res = await fetch(`/api/write?slug=${encodeURIComponent(normalizedSlug)}`, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${form.token}`
+        }
+      });
+
+      const rawText = await res.text();
+      let data = {};
+      if (rawText) {
+        try {
+          data = JSON.parse(rawText);
+        } catch {
+          data = { error: rawText };
+        }
+      }
+
+      if (!res.ok) {
+        const errorMessage = data.detail ? `${data.error || 'Request failed'}: ${data.detail}` : data.error;
+        if (res.status === 401) {
+          setEditStatus({ type: 'error', message: errorMessage || 'Unauthorized' });
+          setTokenError(data.detail || '');
+        } else {
+          setEditStatus({
+            type: 'error',
+            message: errorMessage || `Request failed with status ${res.status}`
+          });
+        }
+        return;
+      }
+
+      const article = data.article || {};
+      setEditingSlug(article.slug || normalizedSlug);
+      setDeleteSlug(article.slug || normalizedSlug);
+      setForm((prev) => ({
+        token: prev.token,
+        title: article.title || '',
+        author: article.author || 'Eno',
+        date: article.date || DEFAULT_FORM.date,
+        tags: Array.isArray(article.tags) ? article.tags.join(', ') : '',
+        featuredImage: article.featuredImage || '',
+        content: article.content || '',
+        status: article.status === 'draft' ? 'draft' : 'published'
+      }));
+      setStatus({ type: 'idle', message: '' });
+      setEditStatus({ type: 'success', message: `Loaded "${article.filename || `${normalizedSlug}.mdx`}" for editing.` });
+    } catch (err) {
+      setEditStatus({ type: 'error', message: `Network error: ${err.message}` });
     }
   };
 
@@ -236,6 +311,23 @@ export default function WritePage({ data }) {
   return (
     <div className="not-prose mx-auto w-full max-w-4xl space-y-12 sm:space-y-14">
       <h1 className="m-0 text-3xl font-bold text-text sm:text-4xl">Write Panel</h1>
+      {editingSlug && (
+        <div className="rounded-xl border border-primary/50 bg-background/40 px-4 py-3 text-sm text-secondary">
+          Editing mode active: <code>{editingSlug}</code>
+          <button
+            type="button"
+            onClick={handleResetEditor}
+            className="ml-3 inline-flex text-primary underline hover:no-underline"
+          >
+            Reset form
+          </button>
+        </div>
+      )}
+      {editStatus.type !== 'idle' && (
+        <div className={`text-sm ${editStatus.type === 'error' ? 'text-salmon' : editStatus.type === 'success' ? 'text-teal' : 'text-secondary'}`}>
+          {editStatus.message}
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className={PANEL_CARD_CLASSES}>
         <div className="mx-auto w-full max-w-3xl space-y-8 sm:space-y-9">
@@ -418,7 +510,17 @@ export default function WritePage({ data }) {
               disabled={status.type === 'loading'}
               className="inline-flex w-full sm:w-auto items-center justify-center rounded-xl border border-primary/60 bg-primary px-7 py-3 text-base font-bold text-background transition-colors hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {status.type === 'loading' ? 'Publishing...' : form.status === 'draft' ? 'Save Draft' : 'Publish Article'}
+              {status.type === 'loading'
+                ? editingSlug
+                  ? 'Updating...'
+                  : 'Publishing...'
+                : editingSlug
+                  ? form.status === 'draft'
+                    ? 'Update Draft'
+                    : 'Update Article'
+                  : form.status === 'draft'
+                    ? 'Save Draft'
+                    : 'Publish Article'}
             </button>
 
             {status.type === 'success' && (
@@ -500,7 +602,7 @@ export default function WritePage({ data }) {
       <AsideElement>
         <div className="px-6">
           <h5 className="mb-3 text-lg leading-6 font-semibold uppercase text-secondary">Recent Articles</h5>
-          <p className="mb-4 text-sm text-muted">Click an article to autofill slug for deletion.</p>
+          <p className="mb-4 text-sm text-muted">Load an article for edit or autofill slug for deletion.</p>
           <ul className="m-0 p-0 list-none space-y-4">
             {recentArticles.map((node, index) => {
               const articlePath = node?.fields?.slug || '';
@@ -512,7 +614,7 @@ export default function WritePage({ data }) {
                 <li key={`${articlePath}-${index}`} className="m-0 p-0">
                   <button
                     type="button"
-                    onClick={() => setDeleteSlug(articleSlug)}
+                    onClick={() => handleLoadForEdit(articleSlug)}
                     className="block w-full text-left text-sm font-semibold text-secondary hover:text-primary transition-colors"
                   >
                     {articleTitle}
@@ -520,9 +622,18 @@ export default function WritePage({ data }) {
                   <code className="block mt-1 text-xs text-muted break-all">{articleSlug}</code>
                   <div className="mt-2 flex items-center justify-between gap-3">
                     <small className="uppercase tracking-wide text-[10px] text-muted">{articleStatus}</small>
-                    <Link to={articlePath} className="text-xs text-secondary hover:text-primary transition-colors">
-                      Open
-                    </Link>
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setDeleteSlug(articleSlug)}
+                        className="text-xs text-secondary hover:text-primary transition-colors"
+                      >
+                        Use for delete
+                      </button>
+                      <Link to={articlePath} className="text-xs text-secondary hover:text-primary transition-colors">
+                        Open
+                      </Link>
+                    </div>
                   </div>
                 </li>
               );

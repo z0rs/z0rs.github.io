@@ -1,5 +1,5 @@
 import https from 'node:https';
-import { existsSync, mkdirSync, unlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const GITHUB_OWNER = 'z0rs';
@@ -72,6 +72,16 @@ function parseRequestBody(req) {
   return parsed;
 }
 
+function getQueryParam(req, key) {
+  const direct = req?.query?.[key];
+  if (typeof direct === 'string') return direct;
+  if (Array.isArray(direct)) return direct[0] || '';
+
+  const event = req?.netlifyFunctionParams?.event;
+  const queryValue = event?.queryStringParameters?.[key];
+  return typeof queryValue === 'string' ? queryValue : '';
+}
+
 function sendJson(res, statusCode, payload) {
   return res.status(statusCode).json(payload);
 }
@@ -131,10 +141,6 @@ function buildSlug(title) {
   return slug || 'untitled-article';
 }
 
-function buildFilename(title) {
-  return `${buildSlug(title)}.mdx`;
-}
-
 function normalizeArticleSlug(rawSlug) {
   if (typeof rawSlug !== 'string') return '';
 
@@ -158,6 +164,104 @@ function normalizeArticleSlug(rawSlug) {
   if (slug.includes('..') || slug.includes('\\') || slug.includes('/')) return '';
 
   return slug;
+}
+
+function unquoteYamlString(rawValue) {
+  if (typeof rawValue !== 'string') return '';
+  const trimmed = rawValue.trim();
+  if (!trimmed) return '';
+
+  if (trimmed.startsWith('"') && trimmed.endsWith('"')) {
+    return trimmed
+      .slice(1, -1)
+      .replace(/\\\\/g, '\\')
+      .replace(/\\"/g, '"');
+  }
+
+  if (trimmed.startsWith("'") && trimmed.endsWith("'")) {
+    return trimmed.slice(1, -1).replace(/\\'/g, "'");
+  }
+
+  return trimmed;
+}
+
+function parseTagList(rawTags) {
+  if (typeof rawTags !== 'string') return [];
+
+  const trimmed = rawTags.trim();
+  if (!trimmed) return [];
+  if (trimmed === '[]') return [];
+
+  if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+    const inner = trimmed.slice(1, -1).trim();
+    if (!inner) return [];
+    return inner
+      .split(',')
+      .map((part) => unquoteYamlString(part))
+      .map((tag) => tag.trim())
+      .filter(Boolean);
+  }
+
+  const singleTag = unquoteYamlString(trimmed);
+  return singleTag ? [singleTag] : [];
+}
+
+function normalizeDateForInput(rawDate) {
+  const value = unquoteYamlString(rawDate);
+  if (!value) return new Date().toISOString().split('T')[0];
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return new Date().toISOString().split('T')[0];
+  return parsed.toISOString().split('T')[0];
+}
+
+function parseArticleMdx(rawMdx) {
+  if (typeof rawMdx !== 'string') return null;
+
+  const frontmatterMatch = rawMdx.match(/^---\n([\s\S]*?)\n---\n?/);
+  if (!frontmatterMatch) return null;
+
+  const frontmatterText = frontmatterMatch[1] || '';
+  const body = rawMdx.slice(frontmatterMatch[0].length).trimStart();
+  const frontmatter = {};
+
+  frontmatterText.split('\n').forEach((line) => {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) return;
+    const separatorIndex = trimmed.indexOf(':');
+    if (separatorIndex <= 0) return;
+
+    const key = trimmed.slice(0, separatorIndex).trim();
+    const value = trimmed.slice(separatorIndex + 1).trim();
+    frontmatter[key] = value;
+  });
+
+  const status = unquoteYamlString(frontmatter.status).toLowerCase() === 'draft' ? 'draft' : 'published';
+
+  return {
+    title: unquoteYamlString(frontmatter.title),
+    author: unquoteYamlString(frontmatter.author) || 'Eno',
+    date: normalizeDateForInput(frontmatter.date),
+    tags: parseTagList(frontmatter.tags),
+    featuredImage: unquoteYamlString(frontmatter.featuredImage),
+    status,
+    content: body
+  };
+}
+
+function resolveTargetSlug({ title, sourceSlug }) {
+  const normalizedSourceSlug = normalizeArticleSlug(sourceSlug);
+  const hasSourceSlug = typeof sourceSlug === 'string' && sourceSlug.trim().length > 0;
+
+  if (hasSourceSlug && !normalizedSourceSlug) {
+    return { invalidSourceSlug: true, targetSlug: '' };
+  }
+
+  return {
+    invalidSourceSlug: false,
+    targetSlug: normalizedSourceSlug || buildSlug(title)
+  };
 }
 
 function buildFrontmatter({ title, content, tags, author, date, featuredImage, status }) {
@@ -237,11 +341,56 @@ async function triggerRebuildWorkflow(token) {
   return workflowRes.status === 204 || workflowRes.status === 200;
 }
 
-async function publishToGitHub({ title, content, tags, author, date, featuredImage, status, token }) {
-  const filename = buildFilename(title);
+function shapeLoadedArticle({ slug, parsedArticle }) {
+  const filename = `${slug}.mdx`;
+  return {
+    slug,
+    filename,
+    articleUrl: `/articles/${slug}/`,
+    title: parsedArticle.title || slug,
+    author: parsedArticle.author || 'Eno',
+    date: parsedArticle.date || new Date().toISOString().split('T')[0],
+    tags: Array.isArray(parsedArticle.tags) ? parsedArticle.tags : [],
+    featuredImage: parsedArticle.featuredImage || '',
+    status: parsedArticle.status === 'draft' ? 'draft' : 'published',
+    content: parsedArticle.content || ''
+  };
+}
+
+async function readFromGitHub({ slug, token }) {
+  const normalizedSlug = normalizeArticleSlug(slug);
+  if (!normalizedSlug) return { invalidSlug: true, notFound: false };
+
+  const filename = `${normalizedSlug}.mdx`;
   const githubPath = `${CONTENT_PATH}/${filename}`;
-  const articleSlug = filename.replace('.mdx', '');
-  const articleUrl = `/articles/${articleSlug}/`;
+  const readRes = await githubFetch(`/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${githubPath}`, token);
+
+  if (readRes.status === 404) {
+    return { invalidSlug: false, notFound: true, filename };
+  }
+  if (!readRes.ok) {
+    const reason = readRes.data?.message || 'Failed to read article file';
+    throw new Error(`GitHub API error ${readRes.status}: ${reason}`);
+  }
+
+  const encodedContent = typeof readRes.data?.content === 'string' ? readRes.data.content : '';
+  const mdxContent = Buffer.from(encodedContent.replace(/\n/g, ''), 'base64').toString('utf8');
+  const parsedArticle = parseArticleMdx(mdxContent);
+  if (!parsedArticle) {
+    return { invalidSlug: false, notFound: false, invalidContent: true, filename };
+  }
+
+  return {
+    invalidSlug: false,
+    notFound: false,
+    article: shapeLoadedArticle({ slug: normalizedSlug, parsedArticle })
+  };
+}
+
+async function publishToGitHub({ title, content, tags, author, date, featuredImage, status, targetSlug, token }) {
+  const filename = `${targetSlug}.mdx`;
+  const githubPath = `${CONTENT_PATH}/${filename}`;
+  const articleUrl = `/articles/${targetSlug}/`;
   const mdxContent = buildFrontmatter({ title, content, tags, author, date, featuredImage, status });
   const encodedContent = Buffer.from(mdxContent).toString('base64');
 
@@ -332,8 +481,31 @@ async function deleteFromGitHub({ slug, token }) {
   };
 }
 
-function writeToFilesystem({ title, content, tags, author, date, featuredImage, status }) {
-  const filename = buildFilename(title);
+function readFromFilesystem({ slug }) {
+  const normalizedSlug = normalizeArticleSlug(slug);
+  if (!normalizedSlug) return { invalidSlug: true, notFound: false };
+
+  const filename = `${normalizedSlug}.mdx`;
+  const filepath = join(process.cwd(), CONTENT_PATH, filename);
+  if (!existsSync(filepath)) {
+    return { invalidSlug: false, notFound: true, filename };
+  }
+
+  const mdxContent = readFileSync(filepath, 'utf8');
+  const parsedArticle = parseArticleMdx(mdxContent);
+  if (!parsedArticle) {
+    return { invalidSlug: false, notFound: false, invalidContent: true, filename };
+  }
+
+  return {
+    invalidSlug: false,
+    notFound: false,
+    article: shapeLoadedArticle({ slug: normalizedSlug, parsedArticle })
+  };
+}
+
+function writeToFilesystem({ title, content, tags, author, date, featuredImage, status, targetSlug }) {
+  const filename = `${targetSlug}.mdx`;
   const filepath = join(process.cwd(), CONTENT_PATH, filename);
   const mdxContent = buildFrontmatter({ title, content, tags, author, date, featuredImage, status });
 
@@ -342,10 +514,9 @@ function writeToFilesystem({ title, content, tags, author, date, featuredImage, 
   }
   writeFileSync(filepath, mdxContent, 'utf8');
 
-  const articleSlug = filename.replace('.mdx', '');
   return {
     filename,
-    articleUrl: `/articles/${articleSlug}/`,
+    articleUrl: `/articles/${targetSlug}/`,
     isDraft: status === 'draft',
     rebuildTriggered: false,
     message:
@@ -384,7 +555,7 @@ export default async function handler(req, res) {
   }
 
   const method = (req.method || '').toUpperCase();
-  if (!['POST', 'DELETE'].includes(method)) {
+  if (!['GET', 'POST', 'DELETE'].includes(method)) {
     return sendJson(res, 405, { error: 'Method not allowed' });
   }
 
@@ -401,6 +572,56 @@ export default async function handler(req, res) {
   }
 
   const shouldPublishViaGitHub = isProductionRuntime() || isNetlifyFunctionRuntime(req);
+
+  if (method === 'GET') {
+    const slugFromQuery = getQueryParam(req, 'slug');
+
+    try {
+      if (!shouldPublishViaGitHub) {
+        const localArticle = readFromFilesystem({ slug: slugFromQuery });
+        if (localArticle.invalidSlug) {
+          return sendJson(res, 400, { error: 'Invalid slug', detail: 'Provide a valid article slug.' });
+        }
+        if (localArticle.notFound) {
+          return sendJson(res, 404, { error: 'Article not found', detail: `No file found for "${localArticle.filename}".` });
+        }
+        if (localArticle.invalidContent) {
+          return sendJson(res, 422, {
+            error: 'Invalid article format',
+            detail: `Could not parse frontmatter for "${localArticle.filename}".`
+          });
+        }
+
+        return sendJson(res, 200, { success: true, article: localArticle.article });
+      }
+
+      const githubToken = getRuntimeEnv('GITHUB_TOKEN');
+      if (!githubToken) {
+        return sendJson(res, 500, {
+          error: 'GitHub token not configured',
+          detail: 'Set GITHUB_TOKEN in Netlify environment variables to enable article loading.'
+        });
+      }
+
+      const remoteArticle = await readFromGitHub({ slug: slugFromQuery, token: githubToken });
+      if (remoteArticle.invalidSlug) {
+        return sendJson(res, 400, { error: 'Invalid slug', detail: 'Provide a valid article slug.' });
+      }
+      if (remoteArticle.notFound) {
+        return sendJson(res, 404, { error: 'Article not found', detail: `No file found for "${remoteArticle.filename}".` });
+      }
+      if (remoteArticle.invalidContent) {
+        return sendJson(res, 422, {
+          error: 'Invalid article format',
+          detail: `Could not parse frontmatter for "${remoteArticle.filename}".`
+        });
+      }
+
+      return sendJson(res, 200, { success: true, article: remoteArticle.article });
+    } catch (err) {
+      return sendJson(res, 500, { error: 'Failed to load article', detail: err.message });
+    }
+  }
 
   if (method === 'DELETE') {
     try {
@@ -443,7 +664,7 @@ export default async function handler(req, res) {
     }
   }
 
-  const { title, content, tags, author, date, featuredImage, status } = body;
+  const { title, content, tags, author, date, featuredImage, status, sourceSlug } = body;
 
   if (!title || !title.trim()) {
     return sendJson(res, 400, { error: 'Title is required' });
@@ -452,9 +673,26 @@ export default async function handler(req, res) {
     return sendJson(res, 400, { error: 'Content is required' });
   }
 
+  const slugResolution = resolveTargetSlug({ title, sourceSlug });
+  if (slugResolution.invalidSourceSlug) {
+    return sendJson(res, 400, {
+      error: 'Invalid source slug',
+      detail: 'Provide a valid source slug if you are updating an existing article.'
+    });
+  }
+
   try {
     if (!shouldPublishViaGitHub) {
-      const result = writeToFilesystem({ title, content, tags, author, date, featuredImage, status });
+      const result = writeToFilesystem({
+        title,
+        content,
+        tags,
+        author,
+        date,
+        featuredImage,
+        status,
+        targetSlug: slugResolution.targetSlug
+      });
       return sendJson(res, 200, { success: true, ...result });
     }
 
@@ -474,6 +712,7 @@ export default async function handler(req, res) {
       date,
       featuredImage,
       status,
+      targetSlug: slugResolution.targetSlug,
       token: githubToken
     });
     return sendJson(res, 200, { success: true, ...result });
