@@ -1,0 +1,438 @@
+---
+type: article
+title: "Security & Code Review — Write Panel"
+tags: [Race Condition in GitHub API, Slug Normalization Bypass via URL Encoding, XSS via Frontmatter Tags in Markdown Snippet, "Bearer Token Accepted as \"Any Non-Empty String\" in Dev Mode", Missing Content-Length Validation on Image Uploads]
+author: Eno
+date: 2026-04-30
+---
+Now let me get additional context from package.json and check if there are any environment variable docs or related configurations:Sekarang saya akan melakukan analisis menyeluruh untuk mendapat gambaran lengkap tentang potensi masalah. Biarkan saya mencari informasi tambahan tentang struktur dan konfigurasi.Now let me search for more details about the write-page.js and check for any XSS risks in the frontend:Based on my thorough review of the **z0rs/z0rs.github.io** repository, here is a comprehensive code review focused on security, bugs, regressions, and testing gaps:
+
+---
+
+## **FINDINGS**
+
+### **🔴 HIGH SEVERITY**
+
+#### **1. Race Condition in GitHub API: Missing SHA Sync Between Check and Write**
+- **File:** `src/api/write.js` lines 397–412 (publishToGitHub)
+- **File:** `src/api/write-image.js` lines 251–265 (uploadToGitHub)
+- **Issue:** Both functions perform an existence check (`GET /repos/.../contents/...`), then later commit the file. Between these two calls, the SHA can become stale if another process writes the same file.
+  - Line 399–402: Fetches SHA
+  - Line 405–411: Tries to commit with that SHA
+  - **Gap**: If commit fails with `422 Unprocessable Entity` ("sha doesn't match"), it's caught as generic error (line 415–416) without retry or recovery.
+- **Impact:** Silent commit failure, user sees success message, article isn't actually written to GitHub.
+- **PoC:** 
+  1. User A starts editing article X
+  2. User B commits article X first
+  3. User A commits → SHA mismatch → silently fails → no webhook trigger → site doesn't rebuild
+  4. User A sees success message; article is not published.
+- **Evidence:** Lines 414–417 catch all non-2xx statuses as terminal errors without distinguishing 422 (sha conflict) from 500 (server error).
+
+---
+
+#### **2. GitHub Token Validation Missing in Auth Check**
+- **File:** `src/api/write.js` lines 92–125 (validateAuth) and `src/api/write-image.js` lines 87–120 (validateAuth)
+- **File:** `.github/workflows/gatsby.yml` lines 9–12 (permissions)
+- **Issue:** 
+  - The `validateAuth` function checks if `WRITE_SECRET` matches the bearer token in production, but does **not verify that the token is used for GitHub API calls**.
+  - The workflow permission block (line 9–12) specifies `contents: read` and `pages: write` but **workflows:write is missing**.
+  - Line 336–338 in `write.js` dispatches the `gatsby.yml` workflow, but the token might only have `contents:write` permissions, causing workflow dispatch to silently fail.
+- **Impact:** 
+  - Article commits succeed, but site rebuild never triggers.
+  - No error feedback to user; they see "rebuild triggered" in the response message (lines 428–433) even though it failed.
+- **GitHub Requirement:** A PAT with `contents:write` + `workflows:write` is required per documentation (README line 205), but there's no **validation** that the provided token has both.
+- **Evidence:**
+  - Line 336: `/repos/z0rs/z0rs.github.io/actions/workflows/gatsby.yml/dispatches` requires `workflows:write`
+  - Line 341: The return only checks `status === 204 || status === 200`, no handling for `403 Forbidden`
+  - Lines 419–432: Response message claims rebuild triggered without checking actual success
+
+---
+
+#### **3. Slug Normalization Bypass via URL Encoding**
+- **File:** `src/api/write.js` lines 144–167 (normalizeArticleSlug)
+- **Issue:** The slug normalization regex `slug.includes('..')` (line 164) checks for literal `..` but doesn't handle **URL-encoded variations**:
+  - `%2e%2e` (URL-encoded `..`) passes validation
+  - `%252e%252e` (double-encoded `..`) passes validation
+  - These are decoded later by GitHub API or filesystem operations, creating path traversal
+- **PoC:**
+  1. POST `/api/write` with `sourceSlug: "../../malicious%2e%2emdx"`
+  2. Normalization passes (no `..` literal found)
+  3. GitHub API or filesystem decodes it → writes outside `content/articles/`
+- **Evidence:** 
+  - Line 164 is a simple string contains check, not a decoded URL check
+  - Line 158–161 parse tags from YAML but don't decode frontmatter values
+  - `normalizeArticleSlug` is called on raw input without decoding first (line 254, 361, 485)
+- **Impact:** File write outside intended directory; potential RCE if written to `.github/workflows/` and deployed.
+
+---
+
+#### **4. XSS via Frontmatter Tags in Markdown Snippet**
+- **File:** `src/api/write-image.js` lines 198–201 (buildMarkdownSnippet)
+- **Issue:** The alt text passed to `buildMarkdownSnippet` comes from user input (`body?.alt`) and is not escaped before being inserted into markdown.
+  - Line 199: `const safeAlt = typeof alt === 'string' && alt.trim() ? alt.trim() : 'image';`
+  - "safeAlt" is only type-checked and trimmed, **not HTML-escaped or markdown-escaped**.
+  - Line 200: Directly interpolates into markdown: `![${safeAlt}](${publicUrl})`
+- **PoC:**
+  1. Upload image with alt text: `](http://evil.com/xss.js) <img src=x onerror="alert(1)">`
+  2. Markdown snippet: `![](http://evil.com/xss.js) <img src=x onerror="alert(1)">/images/uploads/...`
+  3. When rendered in browser, this becomes executable HTML
+- **Impact:** XSS in article content; attacker can steal session tokens, deface articles.
+- **Evidence:**
+  - No markdown escaping in `buildMarkdownSnippet`
+  - Client copies this snippet directly into textarea (user sees the raw markdown)
+  - When article is published, the markdown is base64-encoded to GitHub (safe there), but if ever rendered via unescaped HTML, XSS triggers
+
+---
+
+#### **5. No Validation of Draft vs Published Status at Read Time**
+- **File:** `gatsby-node.js` lines 207–222
+- **Issue:** The build-time page creation filters articles by `status !== 'draft'` (line 207), but:
+  - There's no enforcement that draft articles cannot be accessed via direct URL
+  - If a draft article's slug is known (e.g., from a sitemap or Git history), it's still rendered
+  - The write API doesn't validate that drafts cannot be published (line 240 in `write.js` only sets `status` field, doesn't enforce it)
+- **PoC:**
+  1. Create draft article: `my-secret-draft`
+  2. Attacker somehow knows the slug
+  3. Direct visit to `/articles/my-secret-draft/` → 404 (not in build)
+  4. But if someone commits a published version later, it's exposed
+- **Impact:** Information disclosure; draft articles could be leaked if the write panel is compromised.
+- **Evidence:**
+  - Line 207: Only filters at build time, not at runtime
+  - No `robots: noindex` or 403 response for draft articles
+  - Drafts are published to GitHub (commits exist in history)
+
+---
+
+### **🟡 MEDIUM SEVERITY**
+
+#### **6. Bearer Token Accepted as "Any Non-Empty String" in Dev Mode**
+- **File:** `src/api/write.js` lines 96–97 and `src/api/write-image.js` lines 91–92
+- **Issue:** In local dev (`NODE_ENV !== 'production'`), any non-empty bearer token is accepted.
+  - Line 97 in `write.js`: `if (bearer) return { valid: true };`
+  - This means `Authorization: Bearer x` or `Authorization: Bearer nonsense` both work
+  - No distinction between intended token and accidental/spoofed token
+- **Impact:** Local dev is **not a security boundary**, but if dev server is exposed to network, anyone can use the write API.
+- **Residual Risk:** Dev deployments to cloud runners (e.g., GitHub Codespaces) might expose the write API.
+- **Evidence:** Line 96–104 in both files; no token comparison in dev mode.
+
+---
+
+#### **7. GITHUB_TOKEN Not Validated Before Use in GitHub API Calls**
+- **File:** `src/api/write.js` lines 598–604, 642–648, 699–705
+- **File:** `src/api/write-image.js` lines 306–312
+- **Issue:** Token is fetched from environment but never tested:
+  - No HEAD request to validate token format or permissions
+  - If token is missing, expired, or revoked, error is thrown at publish time (line 415 in `write.js`)
+  - User has already written content to form, triggers publish, then gets an error
+- **Impact:** Poor UX; no pre-validation of GitHub token; potential for state inconsistency.
+- **Fix:** Add token validation on API initialization or during first GitHub call.
+
+---
+
+#### **8. No Rate Limiting on Write/Delete Operations**
+- **File:** `src/api/write.js` (entire handler) and `src/api/write-image.js` (entire handler)
+- **Issue:** Any client with a valid token can:
+  - POST unlimited articles without rate limiting
+  - DELETE unlimited articles without soft-delete or restore
+  - Each action triggers a workflow dispatch (potential GitHub Actions quota abuse)
+- **Impact:** DoS via token compromise; attacker can spam articles or mass-delete all content.
+- **Evidence:** No rate limiting middleware or counter in the handlers.
+
+---
+
+#### **9. Silent Failure in Image Upload if GitHub Commit Fails**
+- **File:** `src/api/write-image.js` lines 303–327
+- **Issue:**
+  - Line 304: Runtime detection is good
+  - Line 314–319: Calls `uploadToGitHub`, which throws on failure (line 263)
+  - Line 321–327: On success, returns markdown snippet with image URL
+  - **But**: If upload fails (exception in line 314), catch block (line 342–344) returns generic error without logging which step failed
+  - User doesn't know if image was uploaded or not
+  - URL returned in response might be wrong if GitHub call partially succeeded
+- **Impact:** Broken image URLs in articles; silent failures.
+- **Evidence:** Line 342–344 catches all errors uniformly.
+
+---
+
+#### **10. Inconsistent Input Validation: Title vs Author vs Content**
+- **File:** `src/api/write.js` lines 669–674
+- **Issue:**
+  - Title is required (line 669–670): `if (!title || !title.trim())`
+  - Content is required (line 672–673): `if (!content || !content.trim())`
+  - **But**: Author is optional and defaults to "Eno" (line 244, 273)
+  - **And**: Tags, date, featuredImage are not validated for format
+  - Tags array could be malformed, date could be invalid, featuredImage URL could be SSRF
+- **Impact:** Inconsistent input handling; potential for invalid YAML frontmatter; SSRF via featuredImage (though partially mitigated in gatsby-node.js).
+- **Evidence:**
+  - Lines 667–674 validate title and content
+  - Line 244–246: Author defaults without validation
+  - Line 369–381: No validation on featuredImage URL format
+
+---
+
+### **🟢 LOW SEVERITY**
+
+#### **11. Missing Content-Length Validation on Image Uploads**
+- **File:** `src/api/write-image.js` lines 159–176
+- **Issue:**
+  - Image payload is decoded from base64 (line 161), then validated for size (line 169)
+  - **But**: There's no validation of `body` size before base64 decoding
+  - If client sends huge base64 string, decoding happens first, consuming memory
+  - No header-level Content-Length check (though `Content-Length: Buffer.byteLength(rawBody)` is set in `githubFetch`, line 218)
+- **Impact:** Memory exhaustion attack; Denial of Service via large base64 payloads.
+- **Evidence:**
+  - Line 161: `Buffer.from(base64, 'base64')` can allocate large memory
+  - No limit on `dataUrl` string length before decoding
+  - Line 169: Size check happens after decoding
+
+---
+
+#### **12. Hardcoded Path Constants Without Validation**
+- **File:** `src/api/write.js` line 7 and `src/api/write-image.js` line 7
+- **Issue:**
+  - `CONTENT_PATH = 'content/articles'` and `IMAGE_UPLOAD_BASE = 'static/images/uploads'` are hardcoded
+  - If project structure changes, these are inconsistent with actual paths
+  - No validation that these directories exist (on filesystem, they're created on-demand; on GitHub, they're assumed to exist)
+- **Impact:** Silent failures if directory structure changes; no versioning/documentation of required structure.
+- **Evidence:** Lines 7 in both files; no directory existence check.
+
+---
+
+#### **13. Error Messages Leak Implementation Details**
+- **File:** `src/api/write.js` lines 415–416, 622, 663
+- **File:** `src/api/write-image.js` lines 262–263, 343
+- **Issue:**
+  - Error responses include raw GitHub API messages: `GitHub API error ${readRes.status}: ${reason}` (line 373)
+  - This leaks internal API structure and error details to the client
+  - Example: "404: Not Found" tells attacker the file path format; "422 Unprocessable Entity" reveals SHA mismatch logic
+- **Impact:** Information disclosure; helps attackers understand API structure.
+- **Evidence:** Lines 373, 415, 452, 470 in `write.js` and 263 in `write-image.js`.
+
+---
+
+#### **14. No Logging of Write Operations**
+- **File:** `src/api/write.js` and `src/api/write-image.js` (entire files)
+- **Issue:**
+  - No `console.log` or logger for successful operations
+  - Makes audit trails impossible; can't trace who deleted what article
+  - If WRITE_SECRET is compromised, there's no forensic record
+- **Impact:** Compliance issue; incident response is blind.
+- **Evidence:** No logging statements in either handler.
+
+---
+
+#### **15. YAML Frontmatter Parsing is Naive**
+- **File:** `src/api/write.js` lines 219–251
+- **Issue:**
+  - Regex-based parsing at lines 222: `/^---\n([\s\S]*?)\n---\n?/`
+  - Doesn't handle edge cases:
+    - Extra newlines: `---\n\n---\n` (captures empty frontmatter)
+    - YAML comments: `# this is ignored` (parsed as key "# this")
+    - Multiline values: `description: |` (broken; only line 1 captured)
+    - Duplicate keys: Only last value kept (line 237)
+  - Line 229–238: Split by newline and parse key-value manually; no YAML parsing library
+- **Impact:** Malformed YAML can be silently accepted and serialized back incorrectly.
+- **PoC:** Upload article with:
+  ```yaml
+  title: My Article
+  tags: [tag1, tag2
+  author: Eno
+  ```
+  Frontmatter is truncated; tags field is corrupted.
+- **Evidence:** Lines 219–251 do manual string parsing instead of using `yaml` library.
+
+---
+
+#### **16. GitHub API Version Pinned to 2022-11-28**
+- **File:** `src/api/write.js` line 299 and `src/api/write-image.js` line 216
+- **Issue:**
+  - Header `X-GitHub-Api-Version: 2022-11-28` is hardcoded
+  - If GitHub deprecates or changes this version, API calls will fail
+  - No fallback or versioning strategy
+- **Impact:** Future GitHub API changes might break the write panel without warning.
+- **Mitigation:** Consider using latest stable version or implementing version negotiation.
+- **Evidence:** Lines 299, 216 hardcode the version.
+
+---
+
+#### **17. No Filesystem Symlink Protection**
+- **File:** `src/api/write.js` lines 507–515 (writeToFilesystem) and lines 484–505 (readFromFilesystem)
+- **Issue:**
+  - `join(process.cwd(), CONTENT_PATH, filename)` doesn't validate that the result is still within `CONTENT_PATH`
+  - If `filename` is a symlink (e.g., `../../secret.mdx`), it could write outside the intended directory
+  - While `normalizeArticleSlug` attempts to block `..`, it doesn't prevent symlink-based escape
+- **Impact:** Filesystem escape attack; attacker could write to arbitrary locations.
+- **PoC (requires pre-existing symlink):**
+  1. Attacker creates symlink: `ln -s /tmp/malicious.mdx content/articles/escape`
+  2. Write article with slug `escape`
+  3. File is written to `/tmp/malicious.mdx` instead of `content/articles/escape.mdx`
+- **Evidence:** No `realpath` validation in lines 509, 536.
+
+---
+
+#### **18. Unclear Runtime Mode Detection Logic**
+- **File:** `src/api/write.js` lines 20–31 and `src/api/write-image.js` lines 28–39 (isNetlifyFunctionRuntime)
+- **Issue:**
+  - Three different runtime checks:
+    1. `req?.netlifyFunctionParams?.event` (Netlify-specific)
+    2. `getRuntimeEnv('GATSBY_RUNTIME') === 'netlify'` (config-based)
+    3. `process.cwd().startsWith('/var/task')` (Lambda-specific path)
+  - Unclear which takes precedence; could behave unexpectedly in edge cases
+  - Line 574 in `write.js`: `shouldPublishViaGitHub` is inverse of `isNetlifyFunctionRuntime`, but code is confusing
+- **Impact:** Behavior mismatch between dev, Netlify, and local environments.
+- **Evidence:** Lines 20–31 and confusing variable naming (line 574: should it be "publish to GitHub" or "is Netlify runtime"?).
+
+---
+
+---
+
+## **OPEN QUESTIONS & ASSUMPTIONS**
+
+1. **Is `WRITE_SECRET` cryptographically random and sufficiently long?**
+   - No guidance in docs or code; assumed to be user-provided.
+   - **Recommend:** Generate via `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
+
+2. **What happens if `/content/articles/` directory doesn't exist on GitHub repo?**
+   - First write would attempt PUT to a non-existent path; GitHub API should create it, but not tested.
+
+3. **Can the write API update articles in `/content/pages/` or `/content/ctfs/`?**
+   - `CONTENT_PATH` is hardcoded; no, but not explicitly enforced.
+
+4. **Are draft articles visible in search/SEO?**
+   - Drafts are filtered at build time, so they don't appear in the static site, but Git history is public.
+
+5. **Does Netlify enforce workflow permissions at dispatch time?**
+   - Unclear; if `workflows:write` is missing, does the dispatch fail with 403 or silently succeed?
+
+6. **Is the write panel accessible behind authentication (e.g., Netlify Identity, GitHub OAuth)?**
+   - Code doesn't show any auth layer beyond bearer token; assumed to be open if the token is known.
+
+---
+
+## **SUGGESTED TEST CASES**
+
+### **Unit Tests**
+
+| Test Case | File | Expected Behavior |
+|-----------|------|-------------------|
+| Slug normalization rejects `../` | `write.js` | Should return empty string |
+| Slug normalization rejects URL-encoded `%2e%2e` | `write.js` | Should reject or decode first |
+| `yamlString` escapes quotes | `write.js` | `"hello\"world"` → correct YAML |
+| `parseArticleMdx` handles empty frontmatter | `write.js` | Should return null or default values |
+| Image alt text with markdown special chars | `write-image.js` | Should escape `]`, `(`, `)` in alt |
+| Max image size boundary (4MB exactly) | `write-image.js` | Should accept 4MB, reject 4MB+1byte |
+| Bearer token validation rejects empty token | `write.js` + `write-image.js` | 401 Unauthorized |
+| Bearer token validation accepts "x" in dev mode | (both) | 200 OK in dev, 401 in prod |
+
+### **Integration Tests**
+
+| Test Case | Endpoint | Expected Behavior |
+|-----------|----------|-------------------|
+| Create article, then update with new title | `POST /api/write` twice | Second request updates, single file in GitHub |
+| Race condition: two simultaneous updates | `POST /api/write` x2 | One succeeds, one returns SHA conflict error (not silent) |
+| Upload image, then verify GitHub commit | `POST /api/write-image` | File appears in GitHub repo with correct path |
+| Delete article that doesn't exist | `DELETE /api/write` | 404 with clear message |
+| Publish article without `workflows:write` token | `POST /api/write` | Article commits but rebuild fails; response indicates failure |
+| Load article with SSRF URL in featuredImage | `GET /api/write?slug=...` | featuredImage is blocked by `gatsby-node.js` validation |
+
+### **E2E Tests**
+
+| Test Case | Steps | Expected |
+|-----------|-------|----------|
+| Full write flow: create → upload image → publish | 1. Create article 2. Upload image 3. Click publish | Article appears on site; image displays correctly |
+| Draft to published transition | 1. Create draft 2. Load via slug 3. Republish as published | Draft not visible; published version visible |
+| Delete recovery | 1. Create article 2. Delete 3. Check GitHub history | Commit exists in Git history (recoverable) |
+| Cross-runtime consistency | 1. Create in local mode 2. Commit to GitHub 3. Switch to Netlify | Same article reads identically |
+
+---
+
+## **DEAD CODE & UNUSED EXPORTS**
+
+| Item | Location | Status |
+|------|----------|--------|
+| `unquoteYamlString` | `write.js` line 169–186 | **Used**: parseTagList, normalizeDateForInput, parseArticleMdx ✓ |
+| `yamlString` | `write.js` line 128–132 | **Used**: buildFrontmatter ✓ |
+| `buildSlug` | `write.js` line 134–142 | **Used**: resolveTargetSlug ✓ |
+| `readFromFilesystem` | `write.js` line 484–505 | **Used**: GET handler (line 581) ✓ |
+| `deleteFromFilesystem` | `write.js` line 529–550 | **Used**: DELETE handler (line 629) ✓ |
+| `sanitizeName` | `write-image.js` line 122–134 | **Used**: parseImagePayload ✓ |
+| `buildMarkdownSnippet` | `write-image.js` line 198–201 | **Used**: handler (line 301) ✓ |
+
+**Verdict:** No dead code; all helper functions are used. ✓
+
+---
+
+## **QUICK WINS** (High Impact, Low Effort)
+
+| Priority | Fix | File | Impact | Effort |
+|----------|-----|------|--------|--------|
+| **P0** | Add 422 (SHA conflict) retry logic | `write.js:405–412` | Prevent silent publish failures | 2h |
+| **P0** | Validate GitHub token has `workflows:write` | `write.js:698–705` | Catch permission errors early | 1h |
+| **P0** | URL-decode slug before path traversal check | `write.js:144–167` | Block encoded path traversal | 30min |
+| **P0** | HTML-escape alt text in markdown | `write-image.js:199–200` | Prevent XSS in image snippets | 15min |
+| **P1** | Add basic logging of write/delete operations | Both files | Enable audit trail | 1h |
+| **P1** | Validate GITHUB_TOKEN with HEAD request | Both files | Fail fast on bad token | 1h |
+| **P2** | Rate limit write endpoints | Middleware or handler | Prevent quota abuse | 3h |
+| **P2** | Escape GitHub API error messages | `write.js:372–374, 415–416` | Reduce info disclosure | 30min |
+
+---
+
+## **FOLLOW-UP REFACTORS** (Non-Urgent)
+
+1. **Extract shared utilities:** `getRuntimeEnv`, `getHeader`, `parseBodyValue`, `validateAuth` are duplicated in `write.js` and `write-image.js`. Move to `src/lib/auth.js`.
+
+2. **Replace regex YAML parsing with `yaml` npm package:** Current parsing is fragile (lines 219–251 in `write.js`). Use `import YAML from 'yaml'` for robust parsing.
+
+3. **Structured logging:** Replace `console.warn` in `gatsby-node.js` with a logger that supports JSON output and structured fields.
+
+4. **Implement idempotent writes:** Add SHA checking and retry logic to avoid conflicts. Consider using GitHub's `merge` endpoint for safer updates.
+
+5. **Add request signing:** Use HMAC-SHA256 for webhook signature verification (if webhooks are added in future).
+
+6. **Separate auth layer:** Extract `validateAuth` into a Gatsby function wrapper to reduce duplication and ensure consistent validation across endpoints.
+
+---
+
+## **PRIORITY SUMMARY**
+
+### **Rank 1: Fix Silent Failures (High Risk)**
+1. SHA mismatch handling (race condition in line 405–412)
+2. GitHub token permissions validation (line 699–705)
+3. Slug URL-decoding (line 144–167)
+
+### **Rank 2: Fix Information Disclosure (Medium Risk)**
+4. XSS in image alt text (line 199–200)
+5. Error message escaping (lines 372–374, 415–416)
+6. Add operation logging (both files)
+
+### **Rank 3: Fix Operational Issues (Low Risk)**
+7. Token validation before use (both files)
+8. Rate limiting (both handlers)
+9. Code deduplication (shared utils)
+
+---
+
+## **RESIDUAL RISKS** (After Fixes)
+
+| Risk | Mitigation | Status |
+|------|-----------|--------|
+| Compromised `WRITE_SECRET` | No MFA on write API; consider Netlify Identity or GitHub OAuth | **Unfixed** |
+| Deleted articles in GitHub history | Public repo = anyone can read deleted content | **By design** |
+| No backup/restore for articles | Deletion is permanent in write API | **Consider**: soft-delete + trash bin |
+| Workflow dispatch quota exhaustion | Every publish triggers a workflow; no quota checking | **Low risk** (typical usage); monitor |
+| SSRF via embeddedImages | `gatsby-node.js` validates URLs; still a risk if validation is bypassed | **Mitigated** |
+
+---
+
+## **CONCLUSION**
+
+**No critical findings that immediately compromise the system, but several HIGH and MEDIUM issues that create silent failures, race conditions, and information disclosure.**
+
+The codebase shows thoughtful security considerations (SSRF blocking in `gatsby-node.js`, slug normalization, auth gating), but has:
+- **Race conditions** in GitHub API interactions (SHA sync)
+- **Missing validation** of token permissions before use
+- **Input encoding issues** (path traversal, XSS)
+- **Silent failures** (no indication when rebuilds fail)
+- **Poor observability** (no logging, error details leaked)
+
+Recommend addressing **Rank 1 priorities** before production use, especially if multiple admins use the write panel simultaneously.
