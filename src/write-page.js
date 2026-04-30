@@ -25,26 +25,26 @@ const DEFAULT_FORM = {
 };
 
 const FIELD_CLASSES =
-  'w-full rounded border border-outline bg-background/40 px-3.5 py-2.5 text-base leading-6 text-text placeholder:text-muted focus:border-secondary focus:outline-none focus:ring-1 focus:ring-secondary/40 transition-colors';
+  'w-full rounded border border-outline bg-surface px-3.5 py-2.5 text-base leading-7 text-text placeholder:text-muted focus:border-secondary focus:outline-none focus:ring-1 focus:ring-secondary/40 transition-colors';
 
-const LABEL_CLASSES = 'mb-2 block text-sm leading-6 font-semibold text-slate-300';
+const LABEL_CLASSES = 'mb-2 block text-base leading-6 font-semibold text-slate-300';
 
 const ERROR_CLASSES = 'mt-1 text-sm text-salmon';
 
 const PANEL_CARD_CLASSES = 'p-0';
 const FORM_STACK_CLASSES = 'mx-auto w-full max-w-none space-y-8 sm:space-y-10';
 const SECTION_CARD_CLASSES =
-  'space-y-5 rounded border border-outline bg-background/40 px-4 py-5 sm:space-y-6 sm:px-6 sm:py-6';
+  'space-y-5 rounded border border-outline bg-surface/60 px-4 py-5 sm:space-y-6 sm:px-6 sm:py-6';
 const SECTION_TITLE_CLASSES = 'm-0 text-base leading-6 font-semibold uppercase tracking-wide text-secondary';
 const MUTED_TEXT_CLASSES = 'm-0 text-sm leading-7 text-slate-300';
 const PRIMARY_BUTTON_CLASSES =
   'inline-flex w-full sm:w-auto items-center justify-center rounded border border-primary bg-primary px-6 py-2.5 text-base font-semibold text-background transition-colors hover:bg-secondary hover:border-secondary disabled:cursor-not-allowed disabled:opacity-50';
 const SECONDARY_BUTTON_CLASSES =
-  'inline-flex w-full sm:w-auto items-center justify-center rounded border border-outline bg-background/40 px-4 py-2 text-sm font-semibold text-slate-300 transition-colors hover:bg-muted/10 hover:text-white';
+  'inline-flex w-full sm:w-auto items-center justify-center rounded border border-outline bg-surface px-4 py-2 text-sm font-semibold text-slate-300 transition-colors hover:bg-muted/10 hover:text-white';
 const DELETE_BUTTON_CLASSES =
   'inline-flex w-full sm:w-auto items-center justify-center rounded border border-salmon bg-salmon px-6 py-2.5 text-base font-semibold text-background transition-colors hover:border-primary hover:bg-primary disabled:cursor-not-allowed disabled:opacity-50';
 const TOOLBAR_BUTTON_CLASSES =
-  'inline-flex items-center justify-center rounded border border-outline bg-background/40 px-2.5 py-1.5 text-xs font-semibold text-slate-300 transition-colors hover:bg-muted/10 hover:text-white';
+  'inline-flex items-center justify-center rounded border border-outline bg-surface px-2.5 py-1.5 text-xs font-semibold text-slate-300 transition-colors hover:bg-muted/10 hover:text-white';
 
 const EDITOR_VIEWS = [
   { id: 'write', label: 'Write' },
@@ -901,7 +901,7 @@ export default function WritePage({ data }) {
                   onChange={handleTokenChange}
                   onBlur={handleTokenBlur}
                   placeholder={isLocal ? 'Bearer token...' : 'WRITE_SECRET token...'}
-                  className={`${FIELD_CLASSES} font-mono text-sm ${
+                  className={`${FIELD_CLASSES} font-mono ${
                     tokenError ? 'border-salmon focus:border-salmon focus:ring-salmon/30' : ''
                   }`}
                 />
@@ -1035,7 +1035,7 @@ export default function WritePage({ data }) {
                   type="file"
                   accept="image/jpeg,image/png,image/webp,image/gif"
                   onChange={handleImageSelection}
-                  className={`${FIELD_CLASSES} file:mr-3 file:rounded file:border file:border-outline file:bg-background/40 file:px-3 file:py-1.5 file:text-sm file:text-slate-300`}
+                  className={`${FIELD_CLASSES} file:mr-3 file:rounded file:border file:border-outline file:bg-surface file:px-3 file:py-1.5 file:text-sm file:text-slate-300`}
                 />
                 <input
                   id="imageAlt"
@@ -1144,7 +1144,7 @@ export default function WritePage({ data }) {
                     required
                     rows={18}
                     placeholder={`Write your article in MDX format.\n\n## Heading\n\nRegular text and **bold** and *italic*.\n\n\`\`\`js\nconsole.log("code block");\n\`\`\``}
-                    className={`${FIELD_CLASSES} min-h-[20rem] resize-y font-mono text-sm leading-relaxed sm:min-h-[24rem]`}
+                    className={`${FIELD_CLASSES} min-h-[20rem] resize-y font-mono leading-relaxed sm:min-h-[24rem]`}
                   />
                   <p className="text-right text-xs text-slate-300">{form.content.length} characters</p>
                 </div>
