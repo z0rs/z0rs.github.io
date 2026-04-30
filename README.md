@@ -11,6 +11,7 @@ Personal security research blog and portfolio — built with Gatsby 5, MDX v2, T
 - [Project Structure](#project-structure)
 - [Build Instructions](#build-instructions)
 - [Deployment](#deployment)
+- [Write Panel](#write-panel)
 - [Environment Variables](#environment-variables)
 - [Migration Notes: Gatsby 5 + gatsby-plugin-mdx v5](#migration-notes-gatsby-5--gatsby-plugin-mdx-v5)
 - [Troubleshooting](#troubleshooting)
@@ -32,18 +33,27 @@ content/
                                gatsby-transformer-sharp
                                         |
                                         v
-                                  GraphQL Data Layer
+                                 GraphQL Data Layer
                                         |
                                         v
                              gatsby-node.js createPages()
                              +-- src/templates/article.js
                              +-- src/templates/ctf.js
                              +-- src/templates/page.js
+                             +-- src/write-page.js (/write)
                                         |
                                         v
                                Static HTML + JS bundles
                                   -> public/
 ```
+
+### Runtime Modes
+
+The project uses `GATSBY_RUNTIME` to separate static-site mode and write-admin mode:
+
+- `github` -> GitHub Pages build mode. `/write/` is skipped in `gatsby-node.js`.
+- `local` -> local development mode. Write API reads/writes local filesystem.
+- `netlify` -> Netlify runtime mode. Write API uses GitHub REST API and triggers `gatsby.yml`.
 
 ### Content System
 
@@ -64,6 +74,10 @@ Gatsby Functions in `src/api/` are deployed as serverless endpoints:
 | `/api/fauna-reaction-by-slug` | Fetch reactions for a page         |
 | `/api/newsletter`             | Newsletter signup (ConvertKit)     |
 | `/api/ua-analytics`           | Proxy to Google Analytics Data API |
+| `GET /api/write`              | Load an existing article by slug   |
+| `POST /api/write`             | Create / update article MDX        |
+| `DELETE /api/write`           | Delete article MDX by slug         |
+| `POST /api/write-image`       | Upload image and return MDX snippet |
 
 ### Styling
 
@@ -79,9 +93,9 @@ TailwindCSS v3 with `@tailwindcss/typography` provides all styling. PostCSS + Au
 | Content      | MDX v2 (`gatsby-plugin-mdx` v5, `@mdx-js/react` v2, `@mdx-js/mdx` v2)       |
 | Styling      | TailwindCSS 3, PostCSS, Autoprefixer                                        |
 | 3D / Viz     | Three.js, `@react-three/fiber`, `@react-three/drei`, `d3-geo`, `dotted-map` |
-| Backend      | Gatsby Functions, FaunaDB, Google Analytics Data API                        |
+| Backend      | Gatsby Functions, FaunaDB, Google Analytics Data API, GitHub Content API    |
 | Images       | `gatsby-plugin-image`, `gatsby-plugin-sharp`                                |
-| Deployment   | GitHub Pages via GitHub Actions                                             |
+| Deployment   | GitHub Pages (public site) + Netlify (write panel runtime)                  |
 | Code Quality | Prettier, Husky, commitlint                                                 |
 
 ---
@@ -96,6 +110,8 @@ TailwindCSS v3 with `@tailwindcss/typography` provides all styling. PostCSS + Au
 |   +-- pages/          # Top-level page MDX files (index, about, etc.)
 +-- src/
 |   +-- api/            # Gatsby serverless functions
+|   |   +-- write.js         # Article CRUD API (GET/POST/DELETE)
+|   |   +-- write-image.js   # Image upload API
 |   +-- components/     # React components
 |   +-- context/        # React context (app state)
 |   +-- hooks/          # Custom React hooks
@@ -103,9 +119,10 @@ TailwindCSS v3 with `@tailwindcss/typography` provides all styling. PostCSS + Au
 |   +-- styles/         # Global CSS
 |   +-- templates/      # Page templates (article, ctf, page)
 |   +-- utils/          # Utility functions
+|   +-- write-page.js   # /write admin panel
 +-- static/             # Static assets (fonts, images, favicon)
 +-- gatsby-browser.js   # Browser-side Gatsby APIs
-+-- gatsby-config.js    # Gatsby configuration + plugins
++-- gatsby-config.mjs   # Gatsby configuration + plugins
 +-- gatsby-node.js      # Node.js build-time APIs (createPages, schema)
 +-- gatsby-ssr.js       # SSR-side Gatsby APIs
 +-- tailwind.config.js  # TailwindCSS configuration
@@ -130,15 +147,16 @@ yarn install
 ### Development server
 
 ```bash
-yarn develop
+GATSBY_RUNTIME=local yarn develop
 # Site available at http://localhost:8000
 # GraphiQL at http://localhost:8000/___graphql
+# Write Panel at http://localhost:8000/write/
 ```
 
 ### Production build
 
 ```bash
-yarn build
+GATSBY_RUNTIME=github yarn build
 ```
 
 Output is written to `public/`.
@@ -160,17 +178,20 @@ yarn clean
 
 ## Deployment
 
-The site deploys automatically to **GitHub Pages** on every push to `master`.
+The repo currently uses two runtime targets:
 
-### CI/CD Pipeline (`.github/workflows/gatsby.yml`)
+- **GitHub Pages** -> public site at `https://z0rs.github.io/`
+- **Netlify** -> write-admin runtime (`/write` + Gatsby Functions)
+
+### GitHub Pages pipeline (`.github/workflows/gatsby.yml`)
 
 1. Checkout source
 2. Detect package manager (yarn)
 3. Setup Node 18
 4. Configure GitHub Pages
-5. Restore Gatsby build cache (keyed on `yarn.lock`)
-6. `yarn install`
-7. `gatsby build` with `--max-old-space-size=4096`
+5. `yarn install --frozen-lockfile`
+6. Clear stale `.cache` and `public`
+7. Build with `GATSBY_RUNTIME=github` and `NODE_OPTIONS=--max-old-space-size=4096`
 8. Upload `public/` as a Pages artifact
 9. Deploy to GitHub Pages
 
@@ -178,21 +199,58 @@ The site is served from the root domain `https://z0rs.github.io/` (no `pathPrefi
 
 ---
 
+## Write Panel
+
+`/write/` is an admin-style page generated from `src/write-page.js`.
+
+Capabilities:
+
+- Create article
+- Update article (load via Recent Articles -> Edit)
+- Delete article (Danger Zone)
+- Upload image to `/static/images/uploads/YYYY/MM/`
+
+Runtime behavior:
+
+- **Local (`GATSBY_RUNTIME=local`)**:
+  - APIs read/write local filesystem.
+  - You still need manual git commit/push for production changes.
+- **Netlify (`GATSBY_RUNTIME=netlify`)**:
+  - APIs use GitHub REST API via `GITHUB_TOKEN`.
+  - Article/image updates are committed directly to GitHub.
+  - Site rebuild is triggered by dispatching workflow `gatsby.yml`.
+- **GitHub Pages (`GATSBY_RUNTIME=github`)**:
+  - `/write/` is not created at build time.
+
+Auth model:
+
+- Local: any non-empty bearer token is accepted.
+- Production runtime: requires `Authorization: Bearer <WRITE_SECRET>`.
+
 ## Environment Variables
 
-Copy `.env` and fill in the values. The file is loaded by `dotenv` in `gatsby-config.js`.
+Copy `.env` and fill in the values. The file is loaded by `dotenv` in `gatsby-config.mjs`.
 
-| Variable                   | Description                                         |
-| -------------------------- | --------------------------------------------------- |
-| `GATSBY_API_URL`           | Base URL for API calls                              |
-| `GATSBY_TWITTER_USERNAME`  | Twitter/X username for webmentions                  |
-| `GATSBY_GA_MEASUREMENT_ID` | Google Analytics measurement ID                     |
-| `CK_FORM_ID`               | ConvertKit form ID (newsletter)                     |
-| `CK_API_KEY`               | ConvertKit API key                                  |
-| `FAUNA_KEY`                | FaunaDB secret key                                  |
-| `URL` / `SITE_URL`         | Canonical site URL (used in `siteMetadata.siteUrl`) |
+| Variable                   | Description                                                                 |
+| -------------------------- | --------------------------------------------------------------------------- |
+| `GATSBY_RUNTIME`           | Runtime mode: `local`, `netlify`, or `github`                              |
+| `WRITE_SECRET`             | Bearer token required by `/api/write` and `/api/write-image` in production |
+| `GITHUB_TOKEN`             | Token used by write APIs to commit files and trigger rebuilds               |
+| `GATSBY_API_URL`           | Base URL for API calls                                                      |
+| `GATSBY_TWITTER_USERNAME`  | Twitter/X username for webmentions                                          |
+| `GATSBY_GA_MEASUREMENT_ID` | Google Analytics measurement ID                                             |
+| `CK_FORM_ID`               | ConvertKit form ID (newsletter)                                             |
+| `CK_API_KEY`               | ConvertKit API key                                                          |
+| `FAUNA_KEY`                | FaunaDB secret key                                                          |
+| `URL` / `SITE_URL`         | Canonical site URL (used in `siteMetadata.siteUrl`)                        |
 
 GitHub Actions secrets required for CI: `GATSBY_GA_MEASUREMENT_ID`, `FAUNA_KEY`, `CK_API_KEY`, `CK_FORM_ID` (and optionally `URL`/`SITE_URL` if overriding the default production domain).
+
+For Netlify write runtime, set at minimum:
+
+- `GATSBY_RUNTIME=netlify`
+- `WRITE_SECRET=<strong-random-value>`
+- `GITHUB_TOKEN=<PAT with contents:write and workflows:write>`
 
 ---
 
@@ -208,7 +266,7 @@ This section documents every breaking change resolved during the Gatsby 4 -> Gat
 "@mdx-js/react": "^2.3.0"
 ```
 
-`gatsby-config.js` change: rehype plugins must be nested under `mdxOptions` (was `options`).
+`gatsby-config.mjs` change: rehype plugins must be nested under `mdxOptions` (was `options`).
 
 ### 2. MDXRenderer removed — use children
 
@@ -285,6 +343,52 @@ const thumbnail = featuredImage?.childImageSharp?.thumbnail ?? null;
 ---
 
 ## Troubleshooting
+
+### `/api/write` or `/api/write-image` returns 500 in Netlify
+
+Common causes:
+
+1. `WRITE_SECRET` is missing or wrong.
+2. `GITHUB_TOKEN` is missing.
+3. `GATSBY_RUNTIME` is not set to `netlify`.
+
+Check Netlify environment variables and redeploy.
+
+---
+
+### GitHub API 422 on delete: `"sha" weren't supplied`
+
+The delete flow requires an existing file SHA from GitHub Contents API.
+
+Typical causes:
+
+1. Slug is invalid or does not map to an existing file in `content/articles`.
+2. API request path is wrong (`articles/<slug>/` instead of raw slug).
+
+Use the article slug only, for example `my-post-title`.
+
+---
+
+### `ERR_REQUIRE_ESM` for `remark-gfm` while loading Gatsby config
+
+**Symptom:**
+`require() of ES Module remark-gfm ... from gatsby-config.js not supported`
+
+**Fix:** use ESM config (`gatsby-config.mjs`) with `import remarkGfm from 'remark-gfm'`.
+
+---
+
+### GraphQL error: `Cannot query field "allMdx"` or `childImageSharp`
+
+This usually means schema sources/plugins are not aligned with current config.
+
+Checklist:
+
+1. Ensure `gatsby-source-filesystem` paths include `content/articles`, `content/ctfs`, and `content/pages`.
+2. Ensure image plugins are installed and enabled: `gatsby-plugin-image`, `gatsby-plugin-sharp`, `gatsby-transformer-sharp`.
+3. Run `gatsby clean` and rebuild after config/plugin changes.
+
+---
 
 ### `gatsby-plugin-mdx` version mismatch
 
