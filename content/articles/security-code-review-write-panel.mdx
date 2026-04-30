@@ -1,11 +1,11 @@
 ---
 type: article
 title: "Security & Code Review — Write Panel"
-tags: [Race Condition in GitHub API, Slug Normalization Bypass via URL Encoding, XSS via Frontmatter Tags in Markdown Snippet, "Bearer Token Accepted as \"Any Non-Empty String\" in Dev Mode", Missing Content-Length Validation on Image Uploads]
+tags: [Race conditions, Missing validation, Input encoding issues]
 author: Eno
 date: 2026-04-30
 ---
-Now let me get additional context from package.json and check if there are any environment variable docs or related configurations:Sekarang saya akan melakukan analisis menyeluruh untuk mendapat gambaran lengkap tentang potensi masalah. Biarkan saya mencari informasi tambahan tentang struktur dan konfigurasi.Now let me search for more details about the write-page.js and check for any XSS risks in the frontend:Based on my thorough review of the **z0rs/z0rs.github.io** repository, here is a comprehensive code review focused on security, bugs, regressions, and testing gaps:
+Based on my thorough review of the **z0rs/z0rs.github.io**, here is a comprehensive focused on security, bugs, regressions, and testing gaps:
 
 ---
 
