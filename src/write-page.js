@@ -50,7 +50,6 @@ const TOOLBAR_BUTTON_CLASSES =
 
 const WRITE_TABS = [
   { id: 'new', label: 'New Article' },
-  { id: 'edit', label: 'Edit Article' },
   { id: 'delete', label: 'Delete' }
 ];
 
@@ -665,7 +664,7 @@ export default function WritePage({ data }) {
       }
 
       const article = data.article || {};
-      setActiveTab('edit');
+      setActiveTab('new');
       setEditorView('write');
       setEditingSlug(article.slug || normalizedSlug);
       setDeleteSlug(article.slug || normalizedSlug);
@@ -787,7 +786,7 @@ export default function WritePage({ data }) {
   const renderRecentArticles = () => (
     <div className="space-y-5 rounded border border-outline bg-background/40 px-4 py-5 sm:px-6 sm:py-6">
       <h5 className="m-0 text-lg leading-6 font-semibold uppercase text-secondary">Recent Articles</h5>
-      <p className="m-0 text-sm leading-7 text-slate-300">Use Edit to load article form instantly.</p>
+      <p className="m-0 text-sm leading-7 text-slate-300">Use the Edit button to load article form instantly.</p>
       {recentArticles.length === 0 ? (
         <p className="m-0 text-sm leading-7 text-slate-300">No recent articles found.</p>
       ) : null}
@@ -882,7 +881,7 @@ export default function WritePage({ data }) {
         ))}
       </div>
 
-      {(editingSlug || editStatus.type !== 'idle') && activeTab === 'edit' ? (
+      {(editingSlug || editStatus.type !== 'idle') && activeTab === 'new' ? (
         <div className="space-y-2 rounded border border-outline bg-background/40 px-4 py-4 sm:px-6">
           {editingSlug ? (
             <div className="text-sm text-slate-300">
@@ -947,7 +946,7 @@ export default function WritePage({ data }) {
             ) : null}
           </section>
 
-          {(activeTab === 'new' || activeTab === 'edit') && (
+          {activeTab === 'new' && (
             <>
               <section className={SECTION_CARD_CLASSES}>
                 <h2 className={SECTION_TITLE_CLASSES}>Article Info</h2>
@@ -1226,6 +1225,8 @@ export default function WritePage({ data }) {
                   ) : null}
                 </div>
               </section>
+
+              {renderRecentArticles()}
             </>
           )}
 
@@ -1280,12 +1281,8 @@ export default function WritePage({ data }) {
         </div>
       </form>
 
-      {activeTab === 'edit' ? (
-        <>
-          <div className="xl:hidden">{renderRecentArticles()}</div>
-          <AsideElement>{renderRecentArticles()}</AsideElement>
-        </>
-      ) : null}
+      {activeTab === 'delete' ? <div className="xl:hidden">{renderRecentArticles()}</div> : null}
+      <AsideElement>{renderRecentArticles()}</AsideElement>
 
       {deleteConfirm.open ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
