@@ -1,0 +1,732 @@
+---
+type: article
+title: "Rooting Notes — Magisk, Odin4, AVB Fail, and VBMETA Bullshit"
+tags: [A515F, Samsung, odin4, Bootloader, VBMETA]
+author: Eno
+date: 2026-06-09
+---
+Device:
+
+```txt
+Samsung Galaxy A51
+Model: SM-A515F/DSN
+Firmware: A515FXXU8HWI1
+Android: 13
+Binary: U8
+Tool: odin4 on Linux
+Magisk: v30.7
+```
+
+Working dir:
+
+```bash
+~/Documents/A515F/firmware
+```
+
+Main files:
+
+```txt
+AP_A515FXXU8HWI1_QB71281625_REV00_user_low_ship_meta_OS13.tar.md5
+BL_A515FXXU8HWI1_QB71281625_REV00_user_low_ship.tar.md5
+CP_A515FXXU8HWI1_CP25025400_QB71281625_REV00_user_low_ship.tar.md5
+CSC_OLM_A515FOLM8HWI1_QB71298985_REV00_user_low_ship.tar.md5
+odin4
+Magisk-v30.7.apk
+```
+
+Bootloader was already unlocked:
+
+```txt
+OEM LOCK: OFF(U)
+FRP LOCK: OFF
+KG STATE: Checking
+```
+
+So technically, the phone was ready.
+Samsung’s AVB system, however, decided to be a dramatic little bastard.
+
+---
+
+# 1. Patch AP with Magisk
+
+Push the stock AP to the phone using ADB.
+
+Do not use MTP unless you enjoy corrupting multi-gigabyte files like a clown.
+
+```bash
+cd ~/Documents/A515F/firmware
+
+adb push AP_A515FXXU8HWI1_QB71281625_REV00_user_low_ship_meta_OS13.tar.md5 /sdcard/Download/
+```
+
+In Magisk:
+
+```txt
+Magisk
+→ Install
+→ Select and Patch a File
+→ choose AP_A515FXXU8HWI1_QB71281625_REV00_user_low_ship_meta_OS13.tar.md5
+→ Let's Go
+```
+
+Magisk showed:
+
+```txt
+Ramdisk: Yes
+```
+
+So patch normally. No Recovery Mode nonsense. No weird checkbox. No “pray to the Samsung gods” ritual.
+
+Magisk generated:
+
+```txt
+/sdcard/Download/magisk_patched-30700_19Uwq.tar
+```
+
+Pull it back with ADB:
+
+```bash
+cd ~/Documents/A515F/firmware
+
+adb pull /sdcard/Download/magisk_patched-30700_19Uwq.tar .
+mv magisk_patched-30700_19Uwq.tar magisk_patched_A515FXXU8HWI1_fresh.tar
+```
+
+Check size:
+
+```bash
+ls -lh magisk_patched_A515FXXU8HWI1_fresh.tar
+```
+
+Expected:
+
+```txt
+4.4G - 4.5G
+```
+
+If the file is tiny, stop. You did not make a patched AP. You made digital trash.
+
+---
+
+# 2. Flash the Fresh Magisk Patched AP
+
+Flash with Odin4:
+
+```bash
+cd ~/Documents/A515F/firmware
+
+sudo ./odin4 \
+  -b BL_A515FXXU8HWI1_QB71281625_REV00_user_low_ship.tar.md5 \
+  -a magisk_patched_A515FXXU8HWI1_fresh.tar \
+  -c CP_A515FXXU8HWI1_CP25025400_QB71281625_REV00_user_low_ship.tar.md5 \
+  -s CSC_OLM_A515FOLM8HWI1_QB71298985_REV00_user_low_ship.tar.md5
+```
+
+Odin4 successfully uploaded the binaries:
+
+```txt
+Setup Connection
+initializeConnection
+Set Partition
+Receive PIT Info
+success getpit
+Upload Binaries
+...
+boot.img
+vbmeta.img
+vbmeta.img.lz4
+vbmeta_samsung.img.lz4
+...
+Close Connection
+```
+
+Looks good, right?
+
+Wrong.
+
+The phone rebooted into:
+
+```txt
+ODIN MODE (AVB Fail)
+vbmeta: Error verifying vbmeta
+vbmeta: VERIFICATION_DISABLED bit is set.
+CUSTOM VBMETA
+```
+
+Translation:
+
+```txt
+Samsung saw your Magisk patch and immediately lost its damn mind.
+```
+
+---
+
+# 3. The Disabled VBMETA Experiment
+
+The obvious nerd-brain idea:
+
+```txt
+Maybe disabled vbmeta fixes it.
+```
+
+Spoiler: it did not. But here’s the process anyway, because pain should be documented.
+
+Create work folders:
+
+```bash
+cd ~/Documents/A515F
+
+mkdir -p advanced_root/{stock_vbmeta,patched_ap}
+```
+
+Extract VBMETA from the same stock AP:
+
+```bash
+cd ~/Documents/A515F/advanced_root/stock_vbmeta
+
+tar -xf ../../firmware/AP_A515FXXU8HWI1_QB71281625_REV00_user_low_ship_meta_OS13.tar.md5 \
+  vbmeta.img.lz4 \
+  vbmeta_samsung.img.lz4
+```
+
+Decompress:
+
+```bash
+lz4 -d -f vbmeta.img.lz4 vbmeta.img
+lz4 -d -f vbmeta_samsung.img.lz4 vbmeta_samsung.img
+```
+
+Patch AVB flags:
+
+```bash
+python3 - <<'PY'
+from pathlib import Path
+import struct
+
+for name in ["vbmeta.img", "vbmeta_samsung.img"]:
+    p = Path(name)
+    data = bytearray(p.read_bytes())
+
+    if data[:4] != b"AVB0":
+        raise SystemExit(f"[!] {name}: not AVB0 vbmeta image")
+
+    old_flags = struct.unpack(">I", data[120:124])[0]
+    new_flags = old_flags | 3
+
+    data[120:124] = struct.pack(">I", new_flags)
+    p.write_bytes(data)
+
+    print(f"[+] {name}: flags {old_flags} -> {new_flags}")
+PY
+```
+
+Output:
+
+```txt
+[+] vbmeta.img: flags 0 -> 3
+[+] vbmeta_samsung.img: flags 0 -> 3
+```
+
+Very hacker. Very fancy. Still didn’t mean shit.
+
+Recompress properly for Odin4:
+
+```bash
+lz4 -B6 --content-size -f vbmeta.img vbmeta.img.lz4
+lz4 -B6 --content-size -f vbmeta_samsung.img vbmeta_samsung.img.lz4
+```
+
+Why?
+
+Because if you use plain `lz4 -f`, Odin4 might cry like this:
+
+```txt
+Contens size is not defined
+Fail parse
+```
+
+Yes, “Contens.” Even the error message is broken. Beautiful.
+
+---
+
+# 4. Repack Magisk AP with Disabled VBMETA
+
+Extract the fresh Magisk patched AP:
+
+```bash
+cd ~/Documents/A515F/advanced_root/patched_ap
+
+tar -xf ../../firmware/magisk_patched_A515FXXU8HWI1_fresh.tar
+```
+
+Remove old VBMETA:
+
+```bash
+rm -f vbmeta.img vbmeta.img.lz4 vbmeta_samsung.img vbmeta_samsung.img.lz4
+```
+
+Copy the disabled VBMETA:
+
+```bash
+cp ../stock_vbmeta/vbmeta.img.lz4 .
+cp ../stock_vbmeta/vbmeta_samsung.img.lz4 .
+```
+
+Repack:
+
+```bash
+tar -H ustar -cvf ../../firmware/magisk_patched_A515FXXU8HWI1_disabled_vbmeta.tar *
+```
+
+Verify contents:
+
+```bash
+cd ~/Documents/A515F/firmware
+
+tar -tf magisk_patched_A515FXXU8HWI1_disabled_vbmeta.tar | grep -E 'boot|vbmeta|super|recovery|dtbo|metadata'
+```
+
+Expected:
+
+```txt
+boot.img
+dtbo.img.lz4
+metadata.img.lz4
+recovery.img.lz4
+super.img.lz4
+vbmeta.img.lz4
+vbmeta_samsung.img.lz4
+```
+
+Flash it:
+
+```bash
+sudo ./odin4 \
+  -b BL_A515FXXU8HWI1_QB71281625_REV00_user_low_ship.tar.md5 \
+  -a magisk_patched_A515FXXU8HWI1_disabled_vbmeta.tar \
+  -c CP_A515FXXU8HWI1_CP25025400_QB71281625_REV00_user_low_ship.tar.md5 \
+  -s CSC_OLM_A515FOLM8HWI1_QB71298985_REV00_user_low_ship.tar.md5
+```
+
+Odin4 uploaded everything successfully.
+
+The phone replied with:
+
+```txt
+ODIN MODE (AVB Fail)
+CUSTOM VBMETA
+```
+
+Translation:
+
+```txt
+Nice try, dumbass.
+```
+
+Disabled VBMETA was not the sauce.
+
+---
+
+# 5. The Actual Fix: Stock VBMETA from the Same Firmware
+
+The fix that actually worked was hilariously simple:
+
+```txt
+Flash the original stock vbmeta.img.lz4 and vbmeta_samsung.img.lz4
+from the exact same AP firmware.
+```
+
+Not disabled.
+
+Not patched.
+
+Not some random Telegram file.
+
+Not an ancient “disable dm-verity” ZIP from 2020.
+
+Just the original VBMETA from:
+
+```txt
+AP_A515FXXU8HWI1_QB71281625_REV00_user_low_ship_meta_OS13.tar.md5
+```
+
+Because apparently Samsung hates custom VBMETA, but is willing to chill if you give it its own damn VBMETA back.
+
+---
+
+# 6. Build the Stock VBMETA Tar
+
+Create folder:
+
+```bash
+cd ~/Documents/A515F/firmware
+
+mkdir -p stock_vbmeta_only
+cd stock_vbmeta_only
+```
+
+Extract original VBMETA:
+
+```bash
+tar -xf ../AP_A515FXXU8HWI1_QB71281625_REV00_user_low_ship_meta_OS13.tar.md5 \
+  vbmeta.img.lz4 \
+  vbmeta_samsung.img.lz4
+```
+
+Check:
+
+```bash
+ls -lh
+```
+
+Expected:
+
+```txt
+vbmeta.img.lz4
+vbmeta_samsung.img.lz4
+```
+
+Pack them:
+
+```bash
+tar -H ustar -cvf ../stock_vbmeta_A515FXXU8HWI1.tar \
+  vbmeta.img.lz4 \
+  vbmeta_samsung.img.lz4
+```
+
+Verify:
+
+```bash
+cd ~/Documents/A515F/firmware
+
+tar -tf stock_vbmeta_A515FXXU8HWI1.tar
+ls -lh stock_vbmeta_A515FXXU8HWI1.tar
+```
+
+Expected:
+
+```txt
+vbmeta.img.lz4
+vbmeta_samsung.img.lz4
+
+stock_vbmeta_A515FXXU8HWI1.tar ≈ 10K
+```
+
+Tiny file. Massive attitude.
+
+---
+
+# 7. Flash Stock VBMETA While Stuck in AVB Fail
+
+When the phone is stuck at:
+
+```txt
+ODIN MODE (AVB Fail)
+CUSTOM VBMETA
+```
+
+check if Odin4 sees it:
+
+```bash
+cd ~/Documents/A515F/firmware
+
+sudo ./odin4 -l
+```
+
+If detected, flash stock VBMETA:
+
+```bash
+sudo ./odin4 -a stock_vbmeta_A515FXXU8HWI1.tar
+```
+
+Successful output:
+
+```txt
+Check file : stock_vbmeta_A515FXXU8HWI1.tar
+Setup Connection
+initializeConnection
+Receive PIT Info
+success getpit
+Upload Binaries
+vbmeta.img.lz4
+vbmeta_samsung.img.lz4
+Close Connection
+```
+
+After this, the phone stopped rage-quitting into AVB Fail and booted into Recovery.
+
+Finally. Some fucking progress.
+
+---
+
+# 8. Recovery Step
+
+In Recovery:
+
+```txt
+Wipe data / factory reset
+→ Factory data reset / Yes
+→ Reboot system now
+```
+
+After reboot, red text may appear above the Samsung logo.
+
+That is normal.
+
+It basically means:
+
+```txt
+Your bootloader is unlocked and Samsung is judging you.
+```
+
+Boot time:
+
+```txt
+5-15 minutes is normal
+```
+
+Do not panic reboot every 10 seconds. Let the damn thing cook.
+
+---
+
+# 9. If Android Boots
+
+Once Android setup appears:
+
+```txt
+Do minimal setup
+Connect Wi-Fi
+Reach home screen
+Install / open Magisk
+```
+
+If Magisk asks for:
+
+```txt
+Additional Setup
+```
+
+tap:
+
+```txt
+OK / Install
+```
+
+Let it reboot.
+
+Then check root:
+
+```bash
+adb shell su -c id
+```
+
+Root success:
+
+```txt
+uid=0(root) gid=0(root)
+```
+
+That’s the win screen.
+
+---
+
+# Technical Takeaways
+
+## 1. Magisk patched AP can trigger CUSTOM VBMETA
+
+On this firmware:
+
+```txt
+A515FXXU8HWI1
+```
+
+flashing Magisk patched AP can cause:
+
+```txt
+ODIN MODE (AVB Fail)
+CUSTOM VBMETA
+```
+
+Even when Odin4 says the flash completed fine.
+
+Because apparently flashing fine and booting fine are two completely different fucking religions.
+
+---
+
+## 2. Disabled VBMETA did not work here
+
+Setting:
+
+```txt
+HASHTREE_DISABLED
+VERIFICATION_DISABLED
+```
+
+on both:
+
+```txt
+vbmeta.img
+vbmeta_samsung.img
+```
+
+still resulted in:
+
+```txt
+ODIN MODE (AVB Fail)
+CUSTOM VBMETA
+```
+
+So no, “just disable vbmeta bro” was not the magic spell.
+
+---
+
+## 3. Odin4 is picky with LZ4
+
+If you repack `.lz4` files for Odin4, use:
+
+```bash
+lz4 -B6 --content-size -f input.img output.img.lz4
+```
+
+Otherwise Odin4 may throw:
+
+```txt
+Contens size is not defined
+Fail parse
+```
+
+The typo makes it even worse. Peak Linux flashing experience.
+
+---
+
+## 4. The working fix was stock VBMETA from the same firmware
+
+The file that worked:
+
+```txt
+stock_vbmeta_A515FXXU8HWI1.tar
+```
+
+Contents:
+
+```txt
+vbmeta.img.lz4
+vbmeta_samsung.img.lz4
+```
+
+Source:
+
+```txt
+AP_A515FXXU8HWI1_QB71281625_REV00_user_low_ship_meta_OS13.tar.md5
+```
+
+Do not use VBMETA from another firmware.
+
+Do not use VBMETA from another Samsung.
+
+Do not use random shit from Telegram.
+
+Do not use some fossil ZIP from 2020 and call it “advanced.”
+
+Use the same firmware. The exact same one. Samsung is picky as hell.
+
+---
+
+# Working Sequence
+
+The sequence that actually worked:
+
+```txt
+1. Flash Magisk patched AP fresh
+2. Phone hits ODIN MODE (AVB Fail) / CUSTOM VBMETA
+3. Build stock_vbmeta_A515FXXU8HWI1.tar from the same AP firmware
+4. Flash stock VBMETA via Odin4 AP slot
+5. Phone boots into Recovery
+6. Wipe data / factory reset
+7. Reboot system
+8. Finish Magisk setup if Android boots
+```
+
+---
+
+# Minimal Command Recap
+
+## Flash Magisk patched AP fresh
+
+```bash
+sudo ./odin4 \
+  -b BL_A515FXXU8HWI1_QB71281625_REV00_user_low_ship.tar.md5 \
+  -a magisk_patched_A515FXXU8HWI1_fresh.tar \
+  -c CP_A515FXXU8HWI1_CP25025400_QB71281625_REV00_user_low_ship.tar.md5 \
+  -s CSC_OLM_A515FOLM8HWI1_QB71298985_REV00_user_low_ship.tar.md5
+```
+
+## Build stock VBMETA fix
+
+```bash
+cd ~/Documents/A515F/firmware
+
+mkdir -p stock_vbmeta_only
+cd stock_vbmeta_only
+
+tar -xf ../AP_A515FXXU8HWI1_QB71281625_REV00_user_low_ship_meta_OS13.tar.md5 \
+  vbmeta.img.lz4 \
+  vbmeta_samsung.img.lz4
+
+tar -H ustar -cvf ../stock_vbmeta_A515FXXU8HWI1.tar \
+  vbmeta.img.lz4 \
+  vbmeta_samsung.img.lz4
+```
+
+## Flash stock VBMETA fix
+
+```bash
+cd ~/Documents/A515F/firmware
+
+sudo ./odin4 -a stock_vbmeta_A515FXXU8HWI1.tar
+```
+
+## Recovery
+
+```txt
+Wipe data / factory reset
+→ Reboot system now
+```
+
+---
+
+# Final Sauce
+
+For this Samsung Galaxy A51 SM-A515F/DSN on firmware:
+
+```txt
+A515FXXU8HWI1
+```
+
+the fix was not:
+
+```txt
+disabled vbmeta
+```
+
+The fix was:
+
+```txt
+flash stock vbmeta from the exact same firmware after Magisk patched AP triggers AVB Fail
+```
+
+In plain English:
+
+```txt
+Samsung got pissed at custom VBMETA,
+so we shoved stock VBMETA back in its face
+while keeping the Magisk-patched AP setup alive.
+```
+
+Cursed? Yes.
+
+Stupid? Kinda.
+
+Worked? Apparently.
+
+Very Samsung. Very bullshit. Very educational.
